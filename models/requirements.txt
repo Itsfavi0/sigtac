@@ -1,0 +1,16 @@
+# ==========================================
+# DEPENDENCIAS DEL PROYECTO SIGTAC
+# ==========================================
+# Interfaz gráfica moderna
+customtkinter>=5.2.2
+
+# Conector de base de datos MySQL
+mysql-connector-python>=8.3.0
+
+# Variables de entorno y seguridad
+python-dotenv>=1.0.1
+bcrypt>=4.1.2
+
+# Generación de reportes
+reportlab>=4.1.0
+matplotlib>=3.8.3
