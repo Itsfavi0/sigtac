@@ -19,6 +19,9 @@ class Persona(ABC):
     @property
     def apellidos(self): return self._apellidos
 
+    @property
+    def fecha_nac(self): return self._fecha_nac
+
     def calcular_edad(self) -> int:
         hoy = date.today()
         return hoy.year - self._fecha_nac.year - ((hoy.month, hoy.day) < (self._fecha_nac.month, self._fecha_nac.day))
@@ -30,23 +33,33 @@ class Persona(ABC):
 
 #SUBCLASE: PACIENTE
 class Paciente(Persona):
-    def __init__(self, id_paciente : int, dni : str, nombres: str, apellidos: str, fecha_nac : date, seguro: str):
+    def __init__(self, id_paciente : int, dni : str, nombres: str, apellidos: str, fecha_nac : date, seguro: str, activo: bool = True):
         super().__init__(dni, nombres, apellidos, fecha_nac)
         self._id_paciente = id_paciente
         self._seguro = seguro
         self._episodios = []
+        # Espejo de paciente.estado_registro en la BD (RN-11: no se elimina
+        # físicamente, solo se anula lógicamente conservando el registro).
+        self._activo = activo
 
     @property
     def id_paciente(self): return self._id_paciente
 
     @property
     def seguro(self): return self._seguro
-    
+
+    @property
+    def activo(self): return self._activo
+
     def obtener_resumen(self) -> str:
-        return  f"PACIENTE: [{self.dni} - {self.apellidos}, {self.nombres}, {self.seguro}] | Seguro: {self.seguro}]"
+        return f"PACIENTE: [{self.dni} - {self.apellidos}, {self.nombres}] | Seguro: {self.seguro}"
 
     def agregar_episodio(self, episodio):
         self._episodios.append(episodio)
+
+    def anular(self):
+        """RN-11: baja lógica. El registro se conserva, solo deja de estar activo."""
+        self._activo = False
 
 class Empleado(Persona):
     """Clase abstracta que extiende a Persona para el personal del Hospital"""
@@ -56,11 +69,20 @@ class Empleado(Persona):
         self._cargo = cargo
         self._colegiatura = colegiatura
 
-    def obtener_resumen(self) -> str:
-        base = f"EMPLEADO [{self._id_empleado}] - {self._apellidos}, {self.nombres} | Cargo: {self._cargo}"
+    @property
+    def id_empleado(self): return self._id_empleado
 
-        if self._colegiatura:
-            base += f" | Registro: {self._colegiatura}"
+    @property
+    def cargo(self): return self._cargo
+
+    @property
+    def colegiatura(self): return self._colegiatura
+
+    def obtener_resumen(self) -> str:
+        base = f"EMPLEADO [{self.id_empleado}] - {self.apellidos}, {self.nombres} | Cargo: {self.cargo}"
+
+        if self.colegiatura:
+            base += f" | Registro: {self.colegiatura}"
 
         return base
 
