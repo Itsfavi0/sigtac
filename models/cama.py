@@ -1,8 +1,5 @@
 from abc import ABC, abstractmethod
-
-class CamaEstadoInvalidoError(Exception):
-    """Excepción lanzada cuando se intenta un cambio de estado ilegal de la cama"""
-    pass
+from excepciones import CamaEstadoInvalidoError
 
 #CLASE PADRE
 class Cama(ABC):
