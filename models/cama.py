@@ -56,8 +56,19 @@ class Cama(ABC):
         self._estado = self.ESTADO_DISPONIBLE
 
     def fuera_de_servicio(self):
-        """Para casos de mantenimiento o daños físicos."""
+        """Para casos de mantenimiento o daños físicos.
+
+        Deliberadamente no valida el estado de origen: es una anulación
+        administrativa (p. ej. un equipo que falla con el paciente aún
+        dentro) y puede decretarse desde cualquier estado.
+        """
         self._estado = self.ESTADO_FUERA_SERVICIO
+
+    def volver_a_servicio(self):
+        """Confirma que el mantenimiento terminó y la cama vuelve a circular."""
+        if self._estado != self.ESTADO_FUERA_SERVICIO:
+            raise CamaEstadoInvalidoError(f"La cama {self._codigo} no está fuera de servicio.")
+        self._estado = self.ESTADO_DISPONIBLE
 
     @abstractmethod
     def es_compatible(self, nivel_triaje: int) -> bool:
@@ -71,6 +82,18 @@ class Cama(ABC):
         return f"[{self._codigo}] - {self.__class__.__name__} | Estado: {self._estado}"
 
 #SUBCLASES DE CAMA
+class CamaTraumaShock(Cama):
+    """Cama de reanimación inmediata: solo para el nivel más crítico (Nivel I)."""
+
+    def __init__(self, id_cama: int, codigo: str, area: str, estado: str, equipo_reanimacion: bool = True):
+        super().__init__(id_cama, codigo, area, estado)
+        self._equipo_reanimacion = equipo_reanimacion
+
+    def es_compatible(self, nivel_triaje: int) -> bool:
+        """Trauma Shock es estrictamente exclusiva del Nivel I (Rojo)."""
+        return nivel_triaje == 1
+
+
 class CamaUCI(Cama):
     def __init__(self, id_cama: int, codigo: str, area: str, estado: str, ventilador: bool = True):
         super().__init__(id_cama, codigo, area, estado)
