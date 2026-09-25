@@ -77,7 +77,7 @@ INSERT INTO estado_cama (id_estado_cama, nombre_estado_cama) VALUES
 (2, 'RESERVADA'),
 (3, 'OCUPADA'),
 (4, 'EN LIMPIEZA'),
-(5, 'FUERA DE SERVICIO (MANTENIMIENTO)');
+(5, 'FUERA DE SERVICIO');
 
 -- Áreas del Hospital
 INSERT INTO area (id_area, nombre_area, piso) VALUES
@@ -171,10 +171,13 @@ INSERT INTO signos_vitales (id_si, id_episodio, pa_sis, pa_dia, fc, fr, temp, sa
 (3, 3, 120, 80, 85, 18, 39.5, 98);  -- Paciente 3 (Fiebre)
 
 -- Triajes realizados por el Enfermero (id_empleado = 3)
-INSERT INTO triaje (id_triaje, id_episodio, id_nivel, id_empleado, fecha_hora) VALUES
-(1, 1, 1, 3, DATE_SUB(NOW(), INTERVAL 115 MINUTE)), -- Prioridad 1 (Rojo)
-(2, 2, 2, 3, DATE_SUB(NOW(), INTERVAL 40 MINUTE)),  -- Prioridad 2 (Naranja)
-(3, 3, 3, 3, DATE_SUB(NOW(), INTERVAL 10 MINUTE));  -- Prioridad 3 (Amarillo)
+-- El triaje 2 demuestra RN-10: el sistema sugirió Nivel III y el profesional
+-- reclasificó a Nivel II, dejando constancia escrita de por qué difiere.
+INSERT INTO triaje (id_triaje, id_episodio, id_nivel, id_nivel_sugerido, id_empleado, fecha_hora, justificacion) VALUES
+(1, 1, 1, 1, 3, DATE_SUB(NOW(), INTERVAL 115 MINUTE), NULL), -- Prioridad 1 (Rojo), sin reclasificar
+(2, 2, 2, 3, 3, DATE_SUB(NOW(), INTERVAL 40 MINUTE),
+    'Paciente con antecedente de fractura expuesta previa en la misma extremidad; se prioriza pese a signos vitales estables por alto riesgo de complicación vascular.'),
+(3, 3, 3, 3, 3, DATE_SUB(NOW(), INTERVAL 10 MINUTE), NULL);  -- Prioridad 3 (Amarillo), sin reclasificar
 
 -- Síntomas asociados a cada Triaje (Tabla Puente)
 INSERT INTO triaje_sintoma (id_triaje, id_sintoma) VALUES

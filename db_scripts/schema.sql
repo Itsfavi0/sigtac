@@ -1,6 +1,18 @@
 -- ==============================================================================
 -- SISTEMA INTEGRADO DE GESTIÓN DE TRIAJE Y ASIGNACIÓN DE CAMAS (SIGTAC)
 -- Orden de creación: Catálogos -> Maestras -> Transaccionales -> Auditoría
+--
+-- CHANGELOG (auditoría técnica):
+--   - usuario.activo            : cierra la brecha entre lo documentado en el
+--                                  proyecto ("separar usuario de empleado permite
+--                                  desactivar el acceso sin eliminar al empleado")
+--                                  y el esquema, que no tenía ninguna columna que
+--                                  permitiera realmente desactivar un acceso.
+--   - triaje.id_nivel_sugerido  : sin esta columna, RN-10 (justificación obligatoria
+--     triaje.justificacion        cuando el profesional reclasifica) no tenía dónde
+--                                  persistirse. id_nivel sigue siendo el nivel FINAL
+--                                  vigente; id_nivel_sugerido guarda lo que calculó
+--                                  la EstrategiaTriaje antes de la confirmación.
 -- ==============================================================================
 
 CREATE DATABASE IF NOT EXISTS sigtac_db
@@ -138,6 +150,7 @@ CREATE TABLE usuario (
     id_empleado INT NOT NULL,
     id_rol INT NOT NULL,
     hash_clave VARCHAR(255) NOT NULL,
+    activo BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Permite desactivar el acceso de un empleado sin eliminar su registro ni su historial de auditoría',
     
     CONSTRAINT PK_usuario PRIMARY KEY (id_usuario),
     CONSTRAINT UN_usuario_empleado UNIQUE (id_empleado),
@@ -214,14 +227,17 @@ CREATE TABLE signos_vitales (
 CREATE TABLE triaje (
     id_triaje INT AUTO_INCREMENT,
     id_episodio INT NOT NULL,
-    id_nivel INT NOT NULL,
+    id_nivel INT NOT NULL COMMENT 'Nivel final/confirmado, el que efectivamente rige la prioridad del paciente',
+    id_nivel_sugerido INT NULL COMMENT 'Nivel calculado por la EstrategiaTriaje (Manchester/MINSA) antes de la confirmación del profesional',
     id_empleado INT NOT NULL,
     fecha_hora DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    justificacion TEXT NULL COMMENT 'RN-10: obligatoria cuando id_nivel difiere de id_nivel_sugerido',
     estado_registro BOOLEAN DEFAULT TRUE,
     
     CONSTRAINT PK_triaje PRIMARY KEY (id_triaje),
     CONSTRAINT FK_triaje_episodio FOREIGN KEY (id_episodio) REFERENCES episodio_emergencia(id_episodio) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT FK_triaje_nivel FOREIGN KEY (id_nivel) REFERENCES nivel_triaje(id_nivel) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT FK_triaje_nivel_sugerido FOREIGN KEY (id_nivel_sugerido) REFERENCES nivel_triaje(id_nivel) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT FK_triaje_empleado FOREIGN KEY (id_empleado) REFERENCES empleado(id_empleado) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
