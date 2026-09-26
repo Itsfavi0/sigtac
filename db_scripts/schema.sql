@@ -139,6 +139,7 @@ CREATE TABLE empleado (
     apellidos VARCHAR(100) NOT NULL,
     colegiatura VARCHAR(20) NULL,
     id_cargo INT NOT NULL,
+    estado_registro BOOLEAN DEFAULT TRUE COMMENT 'TRUE=Activo, FALSE=Anulado',
     
     CONSTRAINT PK_empleado PRIMARY KEY (id_empleado),
     CONSTRAINT UN_empleado_dni UNIQUE (dni),
@@ -171,7 +172,6 @@ CREATE TABLE paciente (
     CONSTRAINT PK_paciente PRIMARY KEY (id_paciente),
     CONSTRAINT UN_paciente_dni UNIQUE (dni),
     CONSTRAINT CH_paciente_sexo CHECK (sexo IN ('M', 'F')),
-    CONSTRAINT CH_paciente_estado CHECK (estado_registro IN (0, 1)),
     CONSTRAINT FK_paciente_seguro FOREIGN KEY (id_seguro) REFERENCES seguro(id_seguro) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
@@ -181,6 +181,7 @@ CREATE TABLE cama (
     id_area INT NOT NULL,
     id_tipo_cama INT NOT NULL,
     id_estado_cama INT NOT NULL,
+    estado_registro BOOLEAN DEFAULT TRUE,
     
     CONSTRAINT PK_cama PRIMARY KEY (id_cama),
     CONSTRAINT UN_cama_codigo UNIQUE (codigo),
@@ -217,6 +218,7 @@ CREATE TABLE signos_vitales (
     fr INT NOT NULL,
     temp DECIMAL(4,2) NOT NULL,
     sato2 INT NOT NULL,
+    fecha_hora DATETIME DEFAULT CURRENT_TIMESTAMP,
     
     CONSTRAINT PK_signos_vitales PRIMARY KEY (id_si),
     CONSTRAINT CH_sv_presion CHECK (pa_sis > pa_dia),
@@ -300,6 +302,8 @@ CREATE TABLE bitacora_auditoria (
     tabla_afectada VARCHAR(100) NOT NULL,
     accion VARCHAR(50) NOT NULL,
     fecha_hora DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id_registro_afectado INT NOT NULL,
+    detalles_json TEXT,
     
     CONSTRAINT PK_bitacora_auditoria PRIMARY KEY (id_bitacora),
     CONSTRAINT FK_auditoria_usuario FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE RESTRICT ON UPDATE CASCADE
