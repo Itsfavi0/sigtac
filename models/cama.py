@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from excepciones import CamaEstadoInvalidoError
+from models.excepciones import CamaEstadoInvalidoError
 
 #CLASE PADRE
 class Cama(ABC):
@@ -55,8 +55,8 @@ class Cama(ABC):
     def fuera_de_servicio(self):
         """Para casos de mantenimiento o daños físicos.
 
-        Deliberadamente no valida el estado de origen: es una anulación
-        administrativa (p. ej. un equipo que falla con el paciente aún
+        Deliberadamente, no valída el estado de origen: es una anulación
+        administrativa (p. ej. un equipo que falla con el paciente aun
         dentro) y puede decretarse desde cualquier estado.
         """
         self._estado = self.ESTADO_FUERA_SERVICIO

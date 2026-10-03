@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Any
 
+from models.excepciones import NivelTriajeInvalidoError
 
 # CATÁLOGO: SÍNTOMA
 class Sintoma:
@@ -57,7 +58,7 @@ class SignosVitales:
 class Triaje:
     def __init__(self, id_triaje: int, nivel_sugerido: int, id_empleado: int, fecha_hora: datetime):
         if nivel_sugerido not in range(1, 6):
-            raise ValueError("El nivel sugerido debe estar entre 1 (Rojo) y 5 (Azul).")
+            raise NivelTriajeInvalidoError("El nivel sugerido debe estar entre 1 (Rojo) y 5 (Azul).")
 
         self._id_triaje = id_triaje
         self._nivel_sugerido = nivel_sugerido
@@ -110,7 +111,7 @@ class Triaje:
         el historial completo que exige RN-09.
         """
         if nuevo_nivel not in range(1, 6):
-            raise ValueError("El nivel de triaje debe estar entre 1 (Rojo) y 5 (Azul).")
+            raise NivelTriajeInvalidoError("El nivel de triaje debe estar entre 1 (Rojo) y 5 (Azul).")
         if not justificacion or len(justificacion.strip()) < 10:
             raise ValueError("Debe proporcionar una justificación médica válida (mínimo 10 caracteres).")
 

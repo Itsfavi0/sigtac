@@ -8,3 +8,4 @@ vendor/
 Thumbs.db
 dist/
 build/
+.mwb
