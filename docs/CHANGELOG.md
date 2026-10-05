@@ -5,6 +5,36 @@
 
 ---
 
+## [2026-10-05] — Robustecimiento y corrección de excepciones en UsuarioDAO
+
+### Cambio
+Refactorización del método `autenticar` en `UsuarioDAO`:
+- Validación y saneamiento de entradas (`dni`, `password_plano`).
+- Uso de cursor en modo `buffered=True` dentro del bloque `try` para proteger el Singleton de MySQL (`ConexionBD`).
+- Reemplazo de captura genérica de excepciones (`Exception`) por `mysql.connector.Error as DBError`, eliminando la advertencia de inspección de PyCharm (`Too broad exception clause`).
+- Cierre seguro del cursor dentro del bloque `finally` protegido contra desconexiones inesperadas.
+- Migración de mensajes por consola (`print`) a la biblioteca estándar `logging`.
+
+### Archivos afectados
+- `dao/usuario_dao.py`
+
+### Motivo
+Evitar desincronizaciones de socket (`InternalError: Unread result found`) en la conexión compartida por la aplicación, prevenir excepciones no controladas ante entradas vacías o nulas y cumplir las directrices de inspección estática y manejo de excepciones específicas de Python y PyCharm.
+
+### Impacto
+- Módulo de Seguridad y Acceso (autenticación).
+- Robustez y resiliencia en la capa DAO y en el ciclo de vida de los cursores MySQL.
+
+### Decisiones
+- Se captura específicamente `DBError` (`mysql.connector.Error`) tanto en la consulta como en el cierre del cursor en `finally` para apegarse a las recomendaciones de PEP 8 y PyCharm.
+- Se mantiene el retorno del diccionario de sesión limpio (removiendo `hash_clave`) a la espera de la integración con `auth_controller.py`.
+
+### Pendientes
+- Actualizar `db_scripts/seed.sql` con un hash bcrypt válido para el administrador de pruebas.
+- Continuar con la implementación de `paciente_dao.py`.
+
+---
+
 ## [2026-10-05] — Estado inicial registrado
 
 ### Avance informado

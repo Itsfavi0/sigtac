@@ -20,11 +20,9 @@ El plan académico marca la **Fase 2 (models) como “En curso”**, pero actual
 
 ### Tarea actual
 
-**`dao_usuario.py`**
+**`dao/usuario_dao.py`**
 
-El usuario ha indicado que este archivo es el punto de avance actual.
-
-> Importante: el contenido de `dao_usuario.py` no ha sido inspeccionado en esta actualización. Por lo tanto, este documento no declara como completadas sus funciones internas hasta revisar el código real del repositorio.
+Revisión técnica, depuración de manejo de recursos e inspección estática completadas.
 
 ---
 
@@ -35,7 +33,7 @@ El usuario ha indicado que este archivo es el punto de avance actual.
 | Fase 0 — Entorno y estructura | Preparación documentada |
 | Fase 1 — Base de datos | Completada según documentación |
 | Fase 2 — Models | En curso según plan |
-| Fase 3 — DAO | Iniciada parcialmente |
+| Fase 3 — DAO | Iniciada (`usuario_dao.py` verificado) |
 | Fase 4 — Controllers | Pendiente |
 | Fase 5 — Utils | Parcial/adelantada según plan |
 | Fase 6 — Views | Pendiente |
@@ -43,7 +41,7 @@ El usuario ha indicado que este archivo es el punto de avance actual.
 
 ---
 
-## Trabajo actual: `dao_usuario.py`
+## Trabajo actual: `dao/usuario_dao.py`
 
 ### Requisitos funcionales conocidos
 
@@ -60,26 +58,24 @@ El DAO debe:
 
 ### Checklist de implementación
 
-> Estos checks deben marcarse únicamente después de revisar el código real.
-
-- [ ] Consulta `usuario`.
-- [ ] JOIN con `empleado`.
-- [ ] JOIN con `rol`.
-- [ ] Consulta parametrizada.
-- [ ] Verificación mediante `security.py`.
-- [ ] Validación de `usuario.activo`.
-- [ ] Manejo de credenciales incorrectas.
-- [ ] Manejo de usuario inexistente.
-- [ ] Manejo de errores de BD.
-- [ ] Cierre correcto de recursos.
-- [ ] Pruebas.
+- [x] Consulta `usuario`.
+- [x] JOIN con `empleado`.
+- [x] JOIN con `rol`.
+- [x] Consulta parametrizada.
+- [x] Verificación mediante `security.py`.
+- [x] Validación de `usuario.activo`.
+- [x] Manejo de credenciales incorrectas.
+- [x] Manejo de usuario inexistente.
+- [x] Manejo de errores de BD (`DBError`).
+- [x] Cierre correcto de recursos (`cursor.close()` con `buffered=True`).
+- [ ] Pruebas con base de datos poblada (`seed.sql` requiere hashes válidos).
 - [ ] Revisión de coherencia con `auth_controller.py`.
 
 ---
 
 ## Próximo trabajo previsto
 
-Una vez revisado y cerrado `dao_usuario.py`, continuar con los DAO restantes según dependencias:
+Una vez revisado y cerrado `usuario_dao.py`, continuar con los DAO restantes según dependencias:
 
 1. `paciente_dao.py`
 2. `cama_dao.py`

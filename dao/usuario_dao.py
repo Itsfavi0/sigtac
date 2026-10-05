@@ -1,5 +1,9 @@
+import logging
+from mysql.connector import Error as DBError
 from dao.db_connection import ConexionBD
 from utils.security import verificar_password
+
+logger = logging.getLogger(__name__)
 
 
 class UsuarioDAO:
@@ -14,13 +18,20 @@ class UsuarioDAO:
         Busca un empleado por su DNI, verifica que su acceso esté activo (activo = True),
         compara la clave plana con el hash almacenado usando bcrypt y retorna los datos de sesión.
         """
-        conexion = ConexionBD().obtener_conexion()
-        if not conexion:
+        # 1. Validación y saneamiento de entradas
+        if not dni or not isinstance(dni, str) or not password_plano or not isinstance(password_plano, str):
+            logger.warning("Intento de autenticación con credenciales nulas o en formato inválido.")
             return None
 
-        # Usamos dictionary=True para que las filas de MySQL se mapeen directamente como diccionarios
-        cursor = conexion.cursor(dictionary=True)
+        dni_limpio = dni.strip()
 
+        # 2. Conexión con la base de datos
+        conexion = ConexionBD().obtener_conexion()
+        if not conexion:
+            logger.error("No se pudo obtener una conexión válida a la base de datos.")
+            return None
+
+        cursor = None
         query = """
             SELECT 
                 e.id_empleado, e.dni, e.nombres, e.apellidos, e.colegiatura, 
@@ -35,54 +46,37 @@ class UsuarioDAO:
         """
 
         try:
-            cursor.execute(query, (dni,))
+            # 3. Cursor buffered dentro del try para proteger el Singleton
+            cursor = conexion.cursor(dictionary=True, buffered=True)
+            cursor.execute(query, (dni_limpio,))
             resultado = cursor.fetchone()
 
             if not resultado:
-                print(f"LOG: No se encontró ningún empleado activo con el DNI: {dni}")
+                logger.info(f"Fallo de autenticación para DNI: {dni_limpio} (Usuario no encontrado o dado de baja).")
                 return None
 
-            # Auditoría técnica / Regla de negocio: Validar si el usuario está inactivo
-            if not resultado['activo']:
-                print(f"LOG: Acceso denegado. La cuenta del DNI {dni} se encuentra desactivada.")
+            # 4. Validar si el usuario está inactivo en el sistema
+            if not bool(resultado.get('activo')):
+                logger.warning(f"Acceso denegado: La cuenta vinculada al DNI {dni_limpio} está desactivada.")
                 return None
 
-            # Verificación del hash de la contraseña con bcrypt
-            hash_guardado = resultado['hash_clave']
-            if verificar_password(password_plano, hash_guardado):
-                print(
-                    f"LOG: ¡Autenticación exitosa para {resultado['nombres']} {resultado['apellidos']} (Rol: {resultado['nombre_rol']})!")
-                # Retornamos el diccionario limpio (removiendo el hash por seguridad)
+            # 5. Verificación de hash seguro
+            hash_guardado = resultado.get('hash_clave')
+            if hash_guardado and verificar_password(password_plano, hash_guardado):
+                logger.info(f"Autenticación exitosa: {resultado['nombres']} {resultado['apellidos']} ({resultado['nombre_rol']}).")
                 usuario_sesion = resultado.copy()
                 usuario_sesion.pop('hash_clave', None)
                 return usuario_sesion
             else:
-                print("LOG: Contraseña incorrecta.")
+                logger.info(f"Fallo de autenticación para DNI: {dni_limpio} (Contraseña incorrecta).")
                 return None
 
-        except Exception as e:
-            print(f"ERROR DAO [autenticar]: Ocurrió un error al consultar la base de datos. Detalles: {e}")
+        except DBError as e:
+            logger.error(f"ERROR DAO [autenticar]: Ocurrió un error al consultar la base de datos. Detalles: {e}")
             return None
         finally:
-            cursor.close()
-
-
-# ==========================================
-# PRUEBA RÁPIDA DEL DAO DE USUARIO
-# ==========================================
-if __name__ == "__main__":
-    print("--- PRUEBA DE AUTENTICACIÓN (LOGIN) ---")
-
-    # Probamos con el Administrador que configuramos en el seed.sql (DNI: 11111111, Clave: admin123)
-    dni_prueba = "11111111"
-    clave_prueba = "admin123"
-
-    print(f"Intentando iniciar sesión con DNI: {dni_prueba} y Clave: {clave_prueba}")
-    sesion = UsuarioDAO.autenticar(dni_prueba, clave_prueba)
-
-    if sesion:
-        print("Datos de sesión obtenidos con éxito:")
-        for k, v in sesion.items():
-            print(f"  - {k}: {v}")
-    else:
-        print("La prueba de autenticación falló.")
+            if cursor:
+                try:
+                    cursor.close()
+                except DBError:
+                    pass
