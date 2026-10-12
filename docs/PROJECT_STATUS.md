@@ -2,7 +2,7 @@
 
 > Estado de trabajo actual del proyecto.
 > Este archivo debe mantenerse pequeño y actualizado después de cada sesión importante.
-> Última actualización: 2026-10-05.
+> Última actualización: 2026-10-12.
 
 ---
 
@@ -14,15 +14,15 @@
 
 ### Situación actual
 
-El proyecto ya cuenta con una base de datos definida e implementada según la documentación del proyecto y la ruta de desarrollo.
-
-El plan académico marca la **Fase 2 (models) como “En curso”**, pero actualmente también se ha iniciado trabajo en la **Fase 3 (DAO)**.
+- Base de datos (21 tablas) implementada con las restricciones de RN-05 y RN-10 y el bloqueo temporal de cuentas.
+- **Fase 2 (models) cerrada:** todas las clases del plan existen y tienen pruebas automáticas.
+- **Fase 3 (DAO) iniciada:** `db_connection.py` y `usuario_dao.py` están terminados y probados.
+- Pruebas: **183 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
 
 ### Tarea actual
 
-**`dao/usuario_dao.py`**
-
-Revisión técnica, depuración de manejo de recursos e inspección estática completadas.
+Ninguna en curso. Siguiente tarea: **`dao/paciente_dao.py`**, pero antes hay que resolver el
+problema 1 de la sección "Problemas abiertos" (`Paciente` no tiene `sexo`).
 
 ---
 
@@ -30,78 +30,94 @@ Revisión técnica, depuración de manejo de recursos e inspección estática co
 
 | Fase | Estado |
 |---|---|
-| Fase 0 — Entorno y estructura | Preparación documentada |
-| Fase 1 — Base de datos | Completada según documentación |
-| Fase 2 — Models | En curso según plan |
-| Fase 3 — DAO | Iniciada (`usuario_dao.py` verificado) |
-| Fase 4 — Controllers | Pendiente |
-| Fase 5 — Utils | Parcial/adelantada según plan |
-| Fase 6 — Views | Pendiente |
+| Fase 0 — Entorno y estructura | Completada (`.venv` recreado dentro del proyecto el 2026-10-11) |
+| Fase 1 — Base de datos | Completada. Verificada en MariaDB 11.8; falta probarla en MySQL 8.0 |
+| Fase 2 — Models | Completada (2026-10-12) |
+| Fase 3 — DAO | En curso: `db_connection.py` y `usuario_dao.py` terminados |
+| Fase 4 — Controllers | Pendiente (la carpeta `controllers/` aún no existe) |
+| Fase 5 — Utils | Parcial: `security.py` y `logging_config.py` hechos; falta `pdf_generator.py` |
+| Fase 6 — Views | Pendiente (la carpeta `views/` aún no existe) |
 | Fase 7 — Integración y pruebas | Pendiente |
 
 ---
 
-## Trabajo actual: `dao/usuario_dao.py`
+## Completado y verificado
 
-### Requisitos funcionales conocidos
+### Fase 2 — Models
 
-El DAO debe:
+| Archivo | Contenido | Pruebas |
+|---|---|---|
+| `models/persona.py` | `Persona`, `Paciente`, `Empleado`, `Enfermero`, `Medico`, `PersonalLimpieza` | `test_persona.py` (29) |
+| `models/cama.py` | `Cama` y 4 subtipos, máquina de estados, `es_compatible` | `test_cama.py` (32) |
+| `models/estrategias.py` | `EstrategiaTriaje`, `ReglaManchester`, `ReglaMINSA` | `test_estrategias.py` (32) |
+| `models/triaje.py` | `EpisodioEmergencia`, `Triaje`, `SignosVitales`, `Sintoma` | `test_triaje.py` (38) |
+| `models/estados.py` | `EstadoCama`, `EstadoEpisodio` | `test_estados_vs_bd.py` (2) |
+| `models/excepciones.py` | `SigtacError` y 7 excepciones derivadas | Se usan en las pruebas anteriores |
 
-- consultar la tabla `usuario`;
-- relacionarla con `empleado`;
-- relacionarla con `rol`;
-- verificar la contraseña utilizando `utils/security.py`;
-- comprobar `usuario.activo`;
-- impedir el acceso de un usuario desactivado;
-- retornar la información necesaria para la sesión;
-- utilizar consultas parametrizadas.
+### Fase 3 — DAO
 
-### Checklist de implementación
+- `dao/db_connection.py`: Singleton, credenciales obligatorias desde `.env`, `autocommit=True`, reconexión (`test_db_connection.py`, 11 pruebas).
+- `dao/usuario_dao.py`: login con JOIN a `empleado` y `rol`, bcrypt, usuario inactivo, señuelo, validación de DNI y bloqueo de 5 intentos durante 15 min (`test_usuario_dao.py`, 33 pruebas).
+- `seed.sql` tiene hashes bcrypt válidos. El login con un usuario del seed se verificó a mano contra una base temporal (ver CHANGELOG del 2026-10-11).
 
-- [x] Consulta `usuario`.
-- [x] JOIN con `empleado`.
-- [x] JOIN con `rol`.
-- [x] Consulta parametrizada.
-- [x] Verificación mediante `security.py`.
-- [x] Validación de `usuario.activo`.
-- [x] Manejo de credenciales incorrectas.
-- [x] Manejo de usuario inexistente.
-- [x] Manejo de errores de BD (`DBError`).
-- [x] Cierre correcto de recursos (`cursor.close()` con `buffered=True`).
-- [ ] Pruebas con base de datos poblada (`seed.sql` requiere hashes válidos).
-- [ ] Revisión de coherencia con `auth_controller.py`.
+---
+
+## Problemas abiertos
+
+Diferencias entre el código y la BD encontradas al cerrar la Fase 2. **No se corrigieron:**
+cada una requiere una decisión del equipo antes de escribir el DAO correspondiente.
+
+1. **`Paciente` no tiene `sexo`.** La tabla `paciente` exige `sexo CHAR(1) NOT NULL` con `CHECK (sexo IN ('M','F'))`,
+   pero la clase no tiene ese atributo. `paciente_dao.py` no podrá insertar un paciente creado desde la clase. **Bloquea `paciente_dao.py`.**
+2. **`Paciente.seguro` es texto** (por ejemplo, `"EsSalud"`) y la tabla guarda `id_seguro` (FK a `seguro`). El DAO tendrá que traducir entre los dos.
+3. **`Empleado` no refleja `estado_registro`.** La tabla `empleado` lo tiene (el seed incluye un empleado anulado), pero la clase no tiene `activo` ni `anular()`, a diferencia de `Paciente`.
+4. **Atributos de subclase sin columna en la BD:** `Enfermero.area`, `Medico.especialidad` y `PersonalLimpieza.turno` no existen en `empleado`. Además, no tienen `@property`, así que no se pueden leer desde fuera de la clase.
+5. **`Persona` no valida sus datos.** No comprueba el formato del DNI ni que `fecha_nac` no sea futura (con una fecha futura, `calcular_edad()` devuelve un valor negativo). `UsuarioDAO` sí valida el DNI (8 dígitos), pero la columna admite `VARCHAR(15)`.
+6. **Permisos duplicados:** la tabla `rol` y `tiene_permiso()` en cada subclase. Se decidirá en la Fase 4. Las pruebas actuales fijan el comportamiento de `tiene_permiso()`.
+7. **Transacciones:** `ConexionBD` usa `autocommit=True` y una sola conexión. `triaje_dao.py` y `asignacion_dao.py` necesitan transacciones explícitas; hay que decidir cómo implementarlas antes de escribirlos.
+
+---
+
+## Pendientes conocidos (sin bloqueo inmediato)
+
+- Actualizar `db_scripts/diagrama.png` (faltan `fecha_nac`, `intentos_fallidos`, `bloqueado_hasta` y las columnas generadas de `asignacion_cama`).
+- Probar `schema.sql` y `seed.sql` en un MySQL 8.0 real.
+- Pruebas de integración contra una BD real (temporal).
+- Revisar la coherencia de `usuario_dao.py` con `auth_controller.py` cuando exista.
+- Decidir si `seed.sql` mantiene los datos reales de los integrantes.
+- PyCharm: cada integrante debe seleccionar `SIGTAC/.venv` como intérprete.
 
 ---
 
 ## Próximo trabajo previsto
 
-Una vez revisado y cerrado `usuario_dao.py`, continuar con los DAO restantes según dependencias:
+1. Resolver el problema 1 (y decidir el 2) → `paciente_dao.py`.
+2. `cama_dao.py`.
+3. `auditoria_dao.py`.
+4. Decidir el manejo de transacciones (problema 7).
+5. `triaje_dao.py`.
+6. `asignacion_dao.py`.
 
-1. `paciente_dao.py`
-2. `cama_dao.py`
-3. `triaje_dao.py`
-4. `asignacion_dao.py`
-5. `auditoria_dao.py`
-
-El orden exacto puede cambiar si el código existente introduce una dependencia diferente. Cualquier cambio de orden debe registrarse en `CHANGELOG.md`.
+El orden respecto al plan original cambia en un punto: `auditoria_dao.py` pasa antes que `triaje_dao.py` y `asignacion_dao.py`,
+porque es de una sola tabla y no depende de transacciones. El motivo queda registrado en `CHANGELOG.md`.
 
 ---
 
 ## Dependencias importantes
 
-### `usuario_dao.py`
+### `paciente_dao.py`
 
 Depende de:
-- `db_connection.py`
-- `utils/security.py`
-- estructura real de las tablas `usuario`, `empleado` y `rol`.
+- `models/persona.py` (`Paciente`);
+- tablas `paciente` y `seguro`;
+- RN-11 (`estado_registro = FALSE`).
 
 ### `cama_dao.py`
 
 Depende de:
 - jerarquía de clases de `models/cama.py`;
 - método `es_compatible(nivel)`;
-- estructura de `tipo_cama`, `cama` y estados.
+- estructura de `tipo_cama`, `cama` y estados (`EstadoCama`).
 
 ### `triaje_dao.py`
 
@@ -110,7 +126,8 @@ Depende de:
 - `Triaje`;
 - `SignosVitales`;
 - `Sintoma`;
-- estructura de `triaje_sintoma`.
+- estructura de `triaje_sintoma`;
+- decisión sobre transacciones.
 
 ---
 

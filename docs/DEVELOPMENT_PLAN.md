@@ -20,13 +20,16 @@
   - `matplotlib`
 - [x] `.env` para credenciales.
 - [x] `.gitignore` para excluir `.env`, cachés y archivos sensibles.
-- [x] Estructura:
-  - `models/`
-  - `dao/`
-  - `controllers/`
-  - `views/`
-  - `views/assets/`
-  - `utils/`
+- [x] `requirements-dev.txt` (dependencias de la aplicación + `pytest`) y `pytest.ini`.
+- [x] `.env.example` como plantilla versionada.
+- [x] `tests/` con pytest.
+- [ ] Estructura:
+  - [x] `models/`
+  - [x] `dao/`
+  - [ ] `controllers/` (se crea en la Fase 4)
+  - [ ] `views/` (se crea en la Fase 6)
+  - [ ] `views/assets/` (se crea en la Fase 6)
+  - [x] `utils/`
 - [x] `utils/security.py`
   - hash con bcrypt
   - verificación de contraseñas
@@ -63,25 +66,41 @@
 
 ## Fase 2 — Lógica de negocio (`models/`)
 
-**Estado documentado en el plan:** en curso.
+**Estado:** completada (2026-10-12). Todas las clases tienen pruebas en `tests/`.
 
 **Objetivo:** traducir reglas clínicas y operativas a Python/POO sin tocar la base de datos.
 
 ### `excepciones.py`
 
+- [x] `SigtacError` (clase base)
 - [x] `CamaEstadoInvalidoError`
+- [x] `CamaNoDisponibleError`
 - [x] `UsuarioSinPermisoError`
+- [x] `NivelTriajeInvalidoError`
+- [x] `ReglaNegocioError`
+- [x] `ConexionBDError`
+- [x] `SignosVitalesIncompletosError`
 
 > `UsuarioSinPermisoError` se utiliza conceptualmente en controladores, no debe mezclarse con la responsabilidad de los modelos.
+
+### `estados.py`
+
+- [x] `EstadoCama` (`StrEnum`)
+- [x] `EstadoEpisodio` (`StrEnum`)
+- [x] Prueba que compara sus valores con los catálogos de `seed.sql`
 
 ### `persona.py`
 
 - [x] Clase abstracta `Persona`
-- [] Clase `Empleado`
-- [x] `Paciente`
+- [x] Clase abstracta `Empleado`
+- [x] `Paciente` (con baja lógica `anular()`, RN-11)
 - [x] `Enfermero`
 - [x] `Medico`
 - [x] `PersonalLimpieza`
+- [x] Pruebas (`tests/test_persona.py`)
+
+> Diferencias pendientes entre `persona.py` y las tablas `paciente`/`empleado` (por ejemplo, falta `sexo` en `Paciente`):
+> ver "Problemas abiertos" en `PROJECT_STATUS.md`. Hay que resolverlas antes de `paciente_dao.py`.
 
 ### `cama.py`
 
@@ -125,18 +144,22 @@
 
 ### `usuario_dao.py`
 
-**Prioridad actual del desarrollo.**
+**Estado:** completado y probado (`tests/test_usuario_dao.py`).
 
-Debe:
+- [x] Consultar `usuario`.
+- [x] Cruzar con `empleado`.
+- [x] Cruzar con `rol`.
+- [x] Recuperar los datos necesarios para la sesión.
+- [x] Verificar la contraseña con `utils/security.py`.
+- [x] Comprobar `usuario.activo`.
+- [x] Rechazar usuarios desactivados.
+- [x] Utilizar consultas parametrizadas.
+- [x] Bloqueo temporal tras 5 intentos fallidos (15 min).
 
-1. Consultar `usuario`.
-2. Cruzar con `empleado`.
-3. Cruzar con `rol`.
-4. Recuperar los datos necesarios para la sesión.
-5. Verificar la contraseña con `utils/security.py`.
-6. Comprobar `usuario.activo`.
-7. Rechazar usuarios desactivados.
-8. Utilizar consultas parametrizadas.
+### Orden de implementación de los DAO restantes
+
+`paciente_dao.py` → `cama_dao.py` → `auditoria_dao.py` → (decisión sobre transacciones) → `triaje_dao.py` → `asignacion_dao.py`.
+Motivo del orden: ver `CHANGELOG.md` (2026-10-12).
 
 ### `paciente_dao.py`
 
@@ -216,7 +239,12 @@ Debe:
 
 ### `security.py`
 
-- [x/adelantado] Hash/verificación con bcrypt.
+- [x] Hash/verificación con bcrypt (adelantado a la Fase 0).
+- [x] `simular_verificacion()` (señuelo contra ataques de tiempo).
+
+### `logging_config.py`
+
+- [x] `configurar_logging()`, que se llama una sola vez desde el punto de entrada.
 
 ### `pdf_generator.py`
 

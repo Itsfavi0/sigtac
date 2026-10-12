@@ -5,6 +5,46 @@
 
 ---
 
+## [2026-10-12] — Cierre de la Fase 2: pruebas de `persona.py` y documentación al día
+
+### Cambio
+- Nuevo `tests/test_persona.py` con 29 pruebas de `Persona`, `Paciente`, `Empleado`, `Enfermero`, `Medico` y `PersonalLimpieza`:
+  - `Persona` y `Empleado` son abstractas (no se pueden instanciar).
+  - Propiedades de solo lectura.
+  - `Paciente`: activo por defecto, reconstrucción como inactivo desde la BD y `anular()` como baja lógica (RN-11).
+  - `calcular_edad()` con valores límite: el día antes, el día del cumpleaños y el día después; recién nacido; nacido el 29 de febrero en años bisiestos y no bisiestos. La fecha de hoy se fija con `monkeypatch` para que la prueba no dependa del día en que se ejecute.
+  - `obtener_resumen()` polimórfico, con y sin colegiatura.
+  - `tiene_permiso()` de cada subclase, incluidos módulos no permitidos y vacíos.
+- `PROJECT_STATUS.md` reescrito con el estado real: Fase 2 completada, Fase 3 en curso, problemas abiertos y próximo trabajo.
+- `DEVELOPMENT_PLAN.md`: casillas alineadas con el código (`Empleado` estaba sin marcar aunque existía; faltaban `estados.py`, 6 excepciones, `logging_config.py` y los archivos de pruebas; `controllers/` y `views/` figuraban como creados y no existen).
+
+### Archivos afectados
+- `tests/test_persona.py` (nuevo)
+- `docs/PROJECT_STATUS.md`, `docs/DEVELOPMENT_PLAN.md`, `docs/CHANGELOG.md`
+
+### Motivo
+- `Paciente` y `Empleado` eran las únicas clases del dominio sin pruebas (pendiente registrado el 2026-10-11). `paciente_dao.py` construirá objetos `Paciente`, así que su comportamiento debía quedar fijado antes.
+- `PROJECT_STATUS.md` llevaba fecha del 2026-10-05 y no recogía los cambios del 2026-10-11. Como el proyecto lo usa como fuente de verdad del estado actual, estaba induciendo a error.
+
+### Impacto
+- Pruebas: 183 pasan (antes 154). No se modificó código de producción.
+- La Fase 2 se da por cerrada.
+
+### Decisiones
+- **No se añadieron validaciones nuevas a `Persona`** (formato de DNI, fecha de nacimiento futura): ninguna regla del proyecto las define todavía. Se registran como problema abierto en `PROJECT_STATUS.md`, en lugar de inventarlas o marcarlas como `xfail`.
+- Las pruebas de `tiene_permiso()` fijan el comportamiento actual. Si en la Fase 4 los permisos pasan a depender solo de la tabla `rol`, habrá que actualizarlas.
+- **Cambio de orden de los DAO:** `auditoria_dao.py` se adelanta antes que `triaje_dao.py` y `asignacion_dao.py`. Es de una sola tabla, no necesita transacciones y lo usarán todos los controladores. Los dos DAO de varios pasos esperan la decisión sobre transacciones (`ConexionBD` usa `autocommit=True`).
+
+### Pendientes
+Diferencias entre el código y la BD encontradas al escribir las pruebas (detalle en `PROJECT_STATUS.md`, "Problemas abiertos"):
+- `Paciente` no tiene `sexo`, que es `NOT NULL` en la tabla `paciente`. **Bloquea `paciente_dao.py`.**
+- `Paciente.seguro` es texto; la tabla guarda `id_seguro`.
+- `Empleado` no refleja `estado_registro`.
+- `Enfermero.area`, `Medico.especialidad` y `PersonalLimpieza.turno` no tienen columna en la BD ni `@property`.
+- `Persona` no valida el DNI ni la fecha de nacimiento.
+
+---
+
 ## [2026-10-11] — Entorno virtual recreado dentro del proyecto
 
 ### Cambio
