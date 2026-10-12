@@ -1,3 +1,5 @@
+import getpass
+
 import bcrypt
 
 # ==========================================
@@ -36,15 +38,31 @@ def verificar_password(password_plano: str, hash_guardado: str) -> bool:
         return False
 
 
+# Hash bcrypt válido (mismo costo que los reales) que no corresponde a ninguna clave.
+# Se calcula una vez al importar el módulo, para que el primer login fallido no tarde más.
+_HASH_SENUELO = generar_hash("senuelo-no-corresponde-a-ningun-usuario")
+
+
+def simular_verificacion(password_plano: str) -> None:
+    """
+    Ejecuta una verificación bcrypt contra un hash señuelo y descarta el resultado.
+
+    Se usa cuando el login falla antes de comparar contra un hash real (usuario
+    inexistente o desactivado), para que esas respuestas tarden lo mismo que una
+    clave incorrecta y no se pueda deducir qué DNI existen midiendo tiempos.
+    """
+    verificar_password(password_plano, _HASH_SENUELO)
+
+
 # ==========================================
 # SCRIPT DE UTILIDAD
 # ==========================================
 if __name__ == "__main__":
     # Este bloque solo se ejecuta si corres este archivo directamente.
-    # Úsalo una sola vez para generar los hashes que pondrás en tu seed.sql
-    print("--- GENERADOR DE HASH PARA SEED.SQL ---")
-    claves_prueba = ["admin123", "123456", "enfermero2026"]
-
-    for clave in claves_prueba:
-        hash_result = generar_hash(clave)
-        print(f"Clave: {clave} -> Hash: {hash_result}")
+    # Genera un hash para pegarlo en seed.sql o en un alta de usuario.
+    # La clave se pide sin mostrarla en pantalla ni dejarla en el historial del shell.
+    print("--- GENERADOR DE HASH BCRYPT ---")
+    clave = getpass.getpass("Clave a hashear: ")
+    if clave != getpass.getpass("Repite la clave: "):
+        raise SystemExit("Las claves no coinciden.")
+    print(generar_hash(clave))

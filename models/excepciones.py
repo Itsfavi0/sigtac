@@ -25,3 +25,11 @@ class NivelTriajeInvalidoError(SigtacError):
 class ReglaNegocioError(SigtacError):
     """Se lanza cuando se viola una regla fundamental (ej. intentar dar de alta a un paciente que no tiene cama)."""
     pass
+
+class ConexionBDError(SigtacError):
+    """Se lanza cuando falta configuración (.env) o no se puede conectar a la base de datos."""
+    pass
+
+class SignosVitalesIncompletosError(SigtacError):
+    """Se lanza cuando falta un signo vital que el algoritmo de triaje necesita para clasificar."""
+    pass

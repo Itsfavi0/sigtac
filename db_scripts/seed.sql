@@ -76,22 +76,22 @@ INSERT INTO sintoma (id_sintoma, nombre_sintoma, peso_clinico) VALUES
 (9, 'Herida Superficial', 1.00), (10, 'Tos Leve', 0.50);
 
 -- ==============================================================================
--- 2. TABLAS MAESTRAS
+-- 2. TABLAS MAESTRAS (las fechas de nacimiento son ficticias)
 -- ==============================================================================
-INSERT INTO empleado (id_empleado, dni, nombres, apellidos, colegiatura, id_cargo, estado_registro) VALUES
-(1, '11111111', 'Admin', 'Sistema', 'CIP-12345', 6, 1),
-(2, '22222222', 'Héctor', 'Salazar Mendoza', 'CMP-54321', 1, 1),
-(3, '33333333', 'Favio Enrique', 'Brañez Choquemamani', 'CEP-98765', 3, 1),
-(4, '44444444', 'Renzo Alexander', 'Moya Ángeles', NULL, 5, 1),
-(5, '55555555', 'Leonardo', 'Veliz Neyra', 'CMP-67890', 2, 1),
-(6, '99999999', 'Médico', 'Despedido', 'CMP-00000', 2, 0); -- Empleado inactivo para probar borrado lógico
+INSERT INTO empleado (id_empleado, dni, nombres, apellidos, fecha_nac, colegiatura, id_cargo, estado_registro) VALUES
+(1, '11111111', 'Admin', 'Sistema', '1990-01-01', 'CIP-12345', 6, 1),
+(2, '22222222', 'Héctor', 'Salazar Mendoza', '1978-03-15', 'CMP-54321', 1, 1),
+(3, '33333333', 'Favio Enrique', 'Brañez Choquemamani', '1998-07-20', 'CEP-98765', 3, 1),
+(4, '44444444', 'Renzo Alexander', 'Moya Ángeles', '1999-11-05', NULL, 5, 1),
+(5, '55555555', 'Leonardo', 'Veliz Neyra', '1985-09-30', 'CMP-67890', 2, 1),
+(6, '99999999', 'Médico', 'Despedido', '1975-12-12', 'CMP-00000', 2, 0); -- Empleado inactivo para probar borrado lógico
 
 INSERT INTO usuario (id_usuario, id_empleado, id_rol, hash_clave, activo) VALUES
-(1, 1, 1, '$2b$12$EjemploHash1234567890123456789012345678901234567890123', 1),
-(2, 2, 2, '$2b$12$EjemploHash1234567890123456789012345678901234567890123', 1),
-(3, 3, 4, '$2b$12$EjemploHash1234567890123456789012345678901234567890123', 1),
-(4, 4, 5, '$2b$12$EjemploHash1234567890123456789012345678901234567890123', 1),
-(5, 6, 3, '$2b$12$EjemploHash1234567890123456789012345678901234567890123', 0); -- Usuario desactivado
+(1, 1, 1, '$2b$12$Kx6Fi0botsesFpvqW3KwZ.C6GmZ3TrcA3oRU1lGRsL51tNMWc1jZC', 1),
+(2, 2, 2, '$2b$12$kmUGssmSTQva6xjH0KD6WuJlBgp6iCQXwPqcaxuQaHKgDIrFfgAJ6', 1),
+(3, 3, 4, '$2b$12$fMB5vLsZZWGBkxMwiAKwDOpcaEjapNPCH5pvNVo9doSO0wc/pHQX.', 1),
+(4, 4, 5, '$2b$12$6NyKLTdaDDiRnwyC7v/EheyivOh8k7wpmJp/0ucVgGyxRwlug6LeS', 1),
+(5, 6, 3, '$2b$12$LlWJNQC.mWXbMt7Q5uTWI.EnkvnjmBydy8AMrc69HXCknF60ieyLO', 0); -- Usuario desactivado
 
 INSERT INTO paciente (id_paciente, dni, nombres, apellidos, fecha_nac, sexo, id_seguro) VALUES
 (1, '70123456', 'Rosa', 'Mendoza Flores', '1959-05-14', 'F', 1),

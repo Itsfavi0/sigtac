@@ -1,9 +1,14 @@
 import logging
+import re
 from mysql.connector import Error as DBError
 from dao.db_connection import ConexionBD
-from utils.security import verificar_password
+from models.excepciones import ConexionBDError
+from utils.security import simular_verificacion, verificar_password
 
 logger = logging.getLogger(__name__)
+
+# DNI peruano: exactamente 8 dígitos
+PATRON_DNI = re.compile(r"[0-9]{8}")
 
 
 class UsuarioDAO:
@@ -24,11 +29,15 @@ class UsuarioDAO:
             return None
 
         dni_limpio = dni.strip()
+        if not PATRON_DNI.fullmatch(dni_limpio):
+            logger.warning("Intento de autenticación con DNI de formato inválido.")
+            return None
 
         # 2. Conexión con la base de datos
-        conexion = ConexionBD().obtener_conexion()
-        if not conexion:
-            logger.error("No se pudo obtener una conexión válida a la base de datos.")
+        try:
+            conexion = ConexionBD().obtener_conexion()
+        except ConexionBDError as e:
+            logger.error("No se pudo obtener una conexión válida a la base de datos: %s", e)
             return None
 
         cursor = None
@@ -52,27 +61,31 @@ class UsuarioDAO:
             resultado = cursor.fetchone()
 
             if not resultado:
-                logger.info(f"Fallo de autenticación para DNI: {dni_limpio} (Usuario no encontrado o dado de baja).")
+                simular_verificacion(password_plano)  # iguala el tiempo de respuesta
+                logger.info("Fallo de autenticación: usuario no encontrado o dado de baja.")
                 return None
 
             # 4. Validar si el usuario está inactivo en el sistema
             if not bool(resultado.get('activo')):
-                logger.warning(f"Acceso denegado: La cuenta vinculada al DNI {dni_limpio} está desactivada.")
+                simular_verificacion(password_plano)  # iguala el tiempo de respuesta
+                logger.warning("Acceso denegado: cuenta desactivada (id_empleado=%s).", resultado["id_empleado"])
                 return None
 
             # 5. Verificación de hash seguro
             hash_guardado = resultado.get('hash_clave')
+            if not hash_guardado:
+                simular_verificacion(password_plano)  # iguala el tiempo de respuesta
             if hash_guardado and verificar_password(password_plano, hash_guardado):
-                logger.info(f"Autenticación exitosa: {resultado['nombres']} {resultado['apellidos']} ({resultado['nombre_rol']}).")
+                logger.info("Autenticación exitosa (id_empleado=%s, rol=%s).", resultado["id_empleado"], resultado["nombre_rol"])
                 usuario_sesion = resultado.copy()
                 usuario_sesion.pop('hash_clave', None)
                 return usuario_sesion
             else:
-                logger.info(f"Fallo de autenticación para DNI: {dni_limpio} (Contraseña incorrecta).")
+                logger.info("Fallo de autenticación: contraseña incorrecta (id_empleado=%s).", resultado["id_empleado"])
                 return None
 
         except DBError as e:
-            logger.error(f"ERROR DAO [autenticar]: Ocurrió un error al consultar la base de datos. Detalles: {e}")
+            logger.error("ERROR DAO [autenticar]: error al consultar la base de datos: %s", e)
             return None
         finally:
             if cursor:

@@ -1,7 +1,22 @@
+import logging
 import os
+import threading
+
 import mysql.connector
-from mysql.connector import Error
 from dotenv import load_dotenv
+from mysql.connector import Error
+
+from models.excepciones import ConexionBDError
+
+logger = logging.getLogger(__name__)
+
+
+def _variable_requerida(nombre: str) -> str:
+    """Lee una variable de entorno obligatoria; falla con un mensaje claro si no existe."""
+    valor = os.getenv(nombre)
+    if valor is None:
+        raise ConexionBDError(f"Falta la variable de entorno {nombre} (revisa tu archivo .env).")
+    return valor
 
 
 class ConexionBD:
@@ -11,66 +26,57 @@ class ConexionBD:
     de saturar el servidor abriendo conexiones nuevas.
     """
     _instancia = None
-    _conexion = None
+    _lock = threading.Lock()
 
     def __new__(cls):
-        # Implementación estricta del patrón Singleton
+        # Doble comprobación con lock: seguro aunque dos hilos lo pidan a la vez
         if cls._instancia is None:
-            cls._instancia = super(ConexionBD, cls).__new__(cls)
-            cls._instancia._inicializar_conexion()
+            with cls._lock:
+                if cls._instancia is None:
+                    instancia = super().__new__(cls)
+                    instancia._conexion = None
+                    cls._instancia = instancia
         return cls._instancia
 
-    def _inicializar_conexion(self):
+    def _conectar(self):
         """Lee el archivo .env y establece la conexión física con MySQL."""
         load_dotenv()  # Carga las variables de entorno desde el archivo .env
 
+        # Sin valores por defecto inseguros: si falta algo, se detiene con un error claro
+        config = {
+            "host": _variable_requerida("DB_HOST"),
+            "port": int(os.getenv("DB_PORT", "3306")),
+            "user": _variable_requerida("DB_USER"),
+            "password": _variable_requerida("DB_PASS"),
+            "database": _variable_requerida("DB_NAME"),
+            "autocommit": True,
+        }
+
         try:
-            self._conexion = mysql.connector.connect(
-                host=os.getenv("DB_HOST", "localhost"),
-                user=os.getenv("DB_USER", "root"),
-                password=os.getenv("DB_PASS", ""),
-                database=os.getenv("DB_NAME", "sigtac_db")
-            )
-            if self._conexion.is_connected():
-                print("LOG: Conexión a MySQL (sigtac_db) establecida con éxito.")
+            self._conexion = mysql.connector.connect(**config)
         except Error as e:
-            print(f"ERROR FATAL: No se pudo conectar a la base de datos.\nDetalles: {e}")
             self._conexion = None
+            raise ConexionBDError(f"No se pudo conectar a la base de datos: {e}") from e
+
+        logger.info("Conexión a MySQL (%s) establecida con éxito.", config["database"])
 
     def obtener_conexion(self):
         """
         Retorna la conexión activa. Si el servidor de BD cerró la conexión
         por inactividad (timeout), la vuelve a levantar automáticamente.
+        Lanza ConexionBDError si no es posible conectar.
         """
-        if self._conexion is None or not self._conexion.is_connected():
-            print("LOG: Reconectando a la base de datos...")
-            self._inicializar_conexion()
-        return self._conexion
+        with self._lock:
+            if self._conexion is None or not self._conexion.is_connected():
+                if self._conexion is not None:
+                    logger.warning("Conexión perdida, reconectando a la base de datos...")
+                self._conectar()
+            return self._conexion
 
     def cerrar_conexion(self):
         """Cierra la conexión de forma segura al apagar el sistema."""
-        if self._conexion and self._conexion.is_connected():
-            self._conexion.close()
-            print("LOG: Conexión a MySQL cerrada correctamente.")
+        with self._lock:
+            if self._conexion and self._conexion.is_connected():
+                self._conexion.close()
+                logger.info("Conexión a MySQL cerrada correctamente.")
             self._conexion = None
-
-
-# ==========================================
-# PRUEBA DE CONEXIÓN
-# ==========================================
-if __name__ == "__main__":
-    # Este bloque solo se ejecuta si corres este archivo directamente.
-    # Demostración del Singleton:
-    print("Iniciando prueba de Singleton...")
-
-    bd1 = ConexionBD()
-    con1 = bd1.obtener_conexion()
-
-    bd2 = ConexionBD()
-    con2 = bd2.obtener_conexion()
-
-    # Comprobación de que ambas variables apuntan exactamente al mismo objeto en memoria
-    if bd1 is bd2:
-        print("¡ÉXITO! El patrón Singleton funciona: ambas instancias son la misma.")
-
-    bd1.cerrar_conexion()
