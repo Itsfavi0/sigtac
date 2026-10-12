@@ -1,36 +1,45 @@
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
 
-from models.excepciones import NivelTriajeInvalidoError
+from models.estados import EstadoEpisodio
+from models.excepciones import NivelTriajeInvalidoError, ReglaNegocioError
 
 # CATÁLOGO: SÍNTOMA
+@dataclass(frozen=True)
 class Sintoma:
     """Clase inmutable que representa un catálogo de síntomas con su peso clínico."""
+    id_sintoma: int
+    nombre: str
+    peso_clinico: float
 
-    def __init__(self, id_sintoma: int, nombre: str, peso_clinico: float):
-        self._id_sintoma = id_sintoma
-        self._nombre = nombre
-        self._peso_clinico = peso_clinico
-
-    @property
-    def id_sintoma(self): return self._id_sintoma
-
-    @property
-    def nombre(self): return self._nombre
-
-    @property
-    def peso_clinico(self): return self._peso_clinico
+    def __post_init__(self):
+        if self.peso_clinico < 0:
+            raise ValueError("El peso clínico no puede ser negativo.")
 
 # COMPONENTE: SIGNOS VITALES
 class SignosVitales:
     """Objeto de valor que encapsula las mediciones de un momento dado."""
 
+    # Rangos amplios, pensados solo para rechazar valores imposibles (errores de digitación),
+    # no para decidir si un valor es clínicamente normal.
+    RANGOS = {
+        'pa_sis': (20, 300),
+        'pa_dia': (0, 250),
+        'fc': (0, 300),
+        'fr': (0, 80),
+        'temp': (25.0, 45.0),
+        'sato2': (0, 100),
+    }
+
     def __init__(self, pa_sis: int, pa_dia: int, fc: int, fr: int, temp: float, sato2: int, id_si: int):
-        # Validaciones de integridad básicas antes de instanciar
+        # Validaciones de integridad antes de instanciar
+        valores = {'pa_sis': pa_sis, 'pa_dia': pa_dia, 'fc': fc, 'fr': fr, 'temp': temp, 'sato2': sato2}
+        for nombre, valor in valores.items():
+            minimo, maximo = self.RANGOS[nombre]
+            if not (minimo <= valor <= maximo):
+                raise ValueError(f"{nombre} fuera del rango admitido ({minimo}-{maximo}): {valor}")
         if pa_sis <= pa_dia:
             raise ValueError("La presión sistólica debe ser mayor a la diastólica.")
-        if not (0 <= sato2 <= 100):
-            raise ValueError("La saturación de oxígeno debe estar entre 0 y 100.")
 
         self._id_si = id_si
         self._pa_sis = pa_sis
@@ -127,16 +136,16 @@ class Triaje:
 class EpisodioEmergencia:
     """Clase principal que orquesta la visita del paciente."""
 
-    ESTADO_EN_ESPERA_TRIAJE = "EN ESPERA DE TRIAJE"
-    ESTADO_EN_ESPERA = "EN ESPERA DE CAMA"
-    ESTADO_EN_ATENCION = "EN ATENCIÓN (CON CAMA)"
-    ESTADO_ALTA = "ALTA MÉDICA"
+    ESTADO_EN_ESPERA_TRIAJE = EstadoEpisodio.EN_ESPERA_TRIAJE
+    ESTADO_EN_ESPERA = EstadoEpisodio.EN_ESPERA
+    ESTADO_EN_ATENCION = EstadoEpisodio.EN_ATENCION
+    ESTADO_ALTA = EstadoEpisodio.ALTA
 
     def __init__(self, id_episodio: int, id_paciente: int, motivo_consulta: str, estado: str = ESTADO_EN_ESPERA_TRIAJE):
         self._id_episodio = id_episodio
         self._id_paciente = id_paciente
         self._motivo_consulta = motivo_consulta
-        self._estado = estado
+        self._estado = EstadoEpisodio(estado)  # ValueError si el estado no existe
         self._fecha_ingreso = datetime.now()
         self._fecha_alta = None
         self._activo = True  # Espejo de episodio_emergencia.estado_registro (RN-11)
@@ -177,20 +186,26 @@ class EpisodioEmergencia:
         if self._estado == self.ESTADO_EN_ESPERA_TRIAJE:
             self._estado = self.ESTADO_EN_ESPERA
 
-    def obtener_triaje_actual(self) -> Any | None:
-        """Devuelve el triaje más reciente (el válido en este momento)."""
-        if not self._historial_triajes:
-            return None
-        # Ordenamos por fecha y devolvemos el último
-        return sorted(self._historial_triajes, key=lambda t: t.fecha_hora)[-1]
+    def obtener_triaje_actual(self) -> Triaje | None:
+        """Devuelve el triaje activo más reciente (los anulados no cuentan)."""
+        activos = [t for t in self._historial_triajes if t.activo]
+        return max(activos, key=lambda t: t.fecha_hora) if activos else None
 
     def agregar_signos_vitales(self, signos: SignosVitales):
         self._signos_vitales.append(signos)
 
     def asignar_cama(self):
+        """RN-01: solo un episodio en espera de cama y con un triaje activo puede recibir cama."""
+        if self._estado != self.ESTADO_EN_ESPERA:
+            raise ReglaNegocioError(f"No se puede asignar cama a un episodio en estado {self._estado}.")
+        if self.obtener_triaje_actual() is None:
+            raise ReglaNegocioError("No se puede asignar cama sin un triaje activo (RN-01).")
         self._estado = self.ESTADO_EN_ATENCION
 
     def dar_alta(self):
+        """Solo se da de alta a un paciente que está siendo atendido en una cama."""
+        if self._estado != self.ESTADO_EN_ATENCION:
+            raise ReglaNegocioError(f"No se puede dar de alta un episodio en estado {self._estado}.")
         self._estado = self.ESTADO_ALTA
         self._fecha_alta = datetime.now()
 

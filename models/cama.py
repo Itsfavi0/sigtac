@@ -1,20 +1,21 @@
 from abc import ABC, abstractmethod
+from models.estados import EstadoCama
 from models.excepciones import CamaEstadoInvalidoError
 
 #CLASE PADRE
 class Cama(ABC):
     """"Superclase abstracta para el manejo de camas y sus estados"""
-    ESTADO_DISPONIBLE = "DISPONIBLE"
-    ESTADO_RESERVADA = "RESERVADA"
-    ESTADO_OCUPADA = "OCUPADA"
-    ESTADO_EN_LIMPIEZA = "EN LIMPIEZA"
-    ESTADO_FUERA_SERVICIO = "FUERA DE SERVICIO"
+    ESTADO_DISPONIBLE = EstadoCama.DISPONIBLE
+    ESTADO_RESERVADA = EstadoCama.RESERVADA
+    ESTADO_OCUPADA = EstadoCama.OCUPADA
+    ESTADO_EN_LIMPIEZA = EstadoCama.EN_LIMPIEZA
+    ESTADO_FUERA_SERVICIO = EstadoCama.FUERA_SERVICIO
 
     def __init__(self, id_cama, codigo, area, estado : str = ESTADO_DISPONIBLE):
         self._id_cama = id_cama
         self._codigo = codigo
         self._area = area
-        self._estado = estado
+        self._estado = EstadoCama(estado)  # ValueError si el estado no existe
 
     @property
     def id_cama(self): return self._id_cama

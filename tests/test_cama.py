@@ -100,3 +100,14 @@ def test_es_compatible_por_tipo_de_cama(clase, niveles_validos):
     cama = clase(1, "C-01", "Área", Cama.ESTADO_DISPONIBLE)
     for nivel in range(1, 6):
         assert cama.es_compatible(nivel) == (nivel in niveles_validos), f"{clase.__name__} nivel {nivel}"
+
+
+def test_estado_inexistente_se_rechaza():
+    with pytest.raises(ValueError):
+        nueva_cama("INVENTADO")
+
+
+def test_el_estado_sigue_comparandose_con_texto():
+    # EstadoCama es un StrEnum: los valores coinciden con los de la BD
+    assert nueva_cama().estado == "DISPONIBLE"
+    assert str(nueva_cama(Cama.ESTADO_EN_LIMPIEZA).estado) == "EN LIMPIEZA"
