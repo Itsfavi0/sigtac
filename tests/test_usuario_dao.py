@@ -17,23 +17,26 @@ def hash_clave():
     return generar_hash(CLAVE)  # bcrypt es lento: se calcula una sola vez
 
 
-def fila(hash_clave, activo=1):
+def fila(hash_clave, activo=1, intentos=0, bloqueada=0, bloqueado_hasta=None):
     return {
         "id_empleado": 3, "dni": DNI, "nombres": "Ana", "apellidos": "Pérez", "colegiatura": None,
         "cargo_nombre": "Licenciado(a) en Enfermería", "cargo_tipo": "Enfermería",
         "id_usuario": 3, "hash_clave": hash_clave, "activo": activo,
         "id_rol": 4, "nombre_rol": "Enfermero de Triaje",
+        "intentos_fallidos": intentos, "bloqueado_hasta": bloqueado_hasta, "bloqueada": bloqueada,
     }
 
 
 class BD:
     """Conexión simulada: devuelve la fila indicada y recuerda cómo se usó."""
 
-    def __init__(self, monkeypatch, row=None, error_en_execute=None, error_de_conexion=None):
+    def __init__(self, monkeypatch, row=None, error_en_execute=None, error_de_conexion=None, errores_en_secuencia=None):
         self.cursor = MagicMock()
         self.cursor.fetchone.return_value = row
         if error_en_execute:
             self.cursor.execute.side_effect = error_en_execute
+        if errores_en_secuencia:  # p. ej. [None, DBError(..)]: el 1.º execute (SELECT) funciona y el 2.º falla
+            self.cursor.execute.side_effect = errores_en_secuencia
         conexion = MagicMock()
         conexion.cursor.return_value = self.cursor
         self.clase = MagicMock()
@@ -58,7 +61,7 @@ def test_login_correcto_devuelve_la_sesion_sin_el_hash(monkeypatch, senuelo, has
     sesion = UsuarioDAO.autenticar(DNI, CLAVE)
     assert sesion["nombre_rol"] == "Enfermero de Triaje"
     assert sesion["id_empleado"] == 3
-    assert "hash_clave" not in sesion
+    assert not {"hash_clave", "intentos_fallidos", "bloqueado_hasta", "bloqueada"} & sesion.keys()
     senuelo.assert_not_called()
 
 
@@ -144,3 +147,68 @@ def test_los_logs_no_contienen_dni_ni_nombres(monkeypatch, senuelo, hash_clave, 
     UsuarioDAO.autenticar(DNI, "mala")
     texto = caplog.text
     assert DNI not in texto and "Ana" not in texto and "Pérez" not in texto
+
+
+# ---- Bloqueo temporal por intentos fallidos
+def sentencias(bd):
+    return [" ".join(c.args[0].split()) for c in bd.cursor.execute.call_args_list]
+
+
+def test_clave_incorrecta_registra_el_intento_fallido(monkeypatch, senuelo, hash_clave):
+    bd = BD(monkeypatch, fila(hash_clave))
+    assert UsuarioDAO.autenticar(DNI, "otra-clave") is None
+    assert len(sentencias(bd)) == 2
+    assert sentencias(bd)[1].startswith("UPDATE usuario SET bloqueado_hasta = IF(intentos_fallidos + 1 >=")
+    assert bd.cursor.execute.call_args_list[1].args[1] == (
+        usuario_dao.MAX_INTENTOS_FALLIDOS, usuario_dao.MINUTOS_BLOQUEO, 3)
+
+
+def test_cuenta_bloqueada_se_rechaza_aunque_la_clave_sea_correcta(monkeypatch, senuelo, hash_clave):
+    bd = BD(monkeypatch, fila(hash_clave, intentos=5, bloqueada=1, bloqueado_hasta="2099-01-01"))
+    assert UsuarioDAO.autenticar(DNI, CLAVE) is None
+    senuelo.assert_called_once_with(CLAVE)
+    assert len(sentencias(bd)) == 1  # solo el SELECT: un intento bloqueado no suma ni reinicia nada
+
+
+def test_login_correcto_tras_fallos_reinicia_el_contador(monkeypatch, senuelo, hash_clave):
+    bd = BD(monkeypatch, fila(hash_clave, intentos=3))
+    assert UsuarioDAO.autenticar(DNI, CLAVE) is not None
+    assert "intentos_fallidos = 0" in sentencias(bd)[1]
+
+
+def test_login_correcto_sin_fallos_previos_no_escribe_en_la_bd(monkeypatch, senuelo, hash_clave):
+    bd = BD(monkeypatch, fila(hash_clave, intentos=0))
+    UsuarioDAO.autenticar(DNI, CLAVE)
+    assert len(sentencias(bd)) == 1
+
+
+def test_bloqueo_vencido_se_reinicia_antes_de_evaluar(monkeypatch, senuelo, hash_clave):
+    bd = BD(monkeypatch, fila(hash_clave, intentos=5, bloqueada=0, bloqueado_hasta="2020-01-01"))
+    assert UsuarioDAO.autenticar(DNI, CLAVE) is not None
+    reinicios = [q for q in sentencias(bd) if "intentos_fallidos = 0" in q]
+    assert len(reinicios) == 1  # una sola vez, no dos
+
+
+def test_bloqueo_vencido_y_clave_incorrecta_vuelve_a_contar_desde_cero(monkeypatch, senuelo, hash_clave):
+    bd = BD(monkeypatch, fila(hash_clave, intentos=5, bloqueada=0, bloqueado_hasta="2020-01-01"))
+    UsuarioDAO.autenticar(DNI, "mala")
+    q = sentencias(bd)
+    assert "intentos_fallidos = 0" in q[1] and q[2].startswith("UPDATE usuario SET bloqueado_hasta = IF(")
+
+
+def test_usuario_inexistente_o_desactivado_no_escribe_en_la_bd(monkeypatch, senuelo, hash_clave):
+    bd = BD(monkeypatch, row=None)
+    UsuarioDAO.autenticar(DNI, CLAVE)
+    bd2 = BD(monkeypatch, fila(hash_clave, activo=0))
+    UsuarioDAO.autenticar(DNI, CLAVE)
+    assert len(sentencias(bd)) == 1 and len(sentencias(bd2)) == 1
+
+
+def test_si_falla_el_reinicio_el_login_correcto_igual_se_permite(monkeypatch, senuelo, hash_clave):
+    BD(monkeypatch, fila(hash_clave, intentos=2), errores_en_secuencia=[None, DBError("sin permiso UPDATE")])
+    assert UsuarioDAO.autenticar(DNI, CLAVE) is not None
+
+
+def test_si_falla_el_registro_del_fallo_se_deniega_igual(monkeypatch, senuelo, hash_clave):
+    BD(monkeypatch, fila(hash_clave), errores_en_secuencia=[None, DBError("sin permiso UPDATE")])
+    assert UsuarioDAO.autenticar(DNI, "mala") is None

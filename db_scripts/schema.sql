@@ -1,4 +1,8 @@
 -- ==============================================================================
+-- !! SOLO PARA BASES DE DESARROLLO !!
+-- Este script ELIMINA (DROP TABLE) todas las tablas existentes de sigtac_db y sus datos.
+-- ==============================================================================
+-- ==============================================================================
 -- SISTEMA INTEGRADO DE GESTIÓN DE TRIAJE Y ASIGNACIÓN DE CAMAS (SIGTAC)
 -- Orden de creación: Catálogos -> Maestras -> Transaccionales -> Auditoría
 --
@@ -140,7 +144,7 @@ CREATE TABLE empleado (
     fecha_nac DATE NOT NULL,
     colegiatura VARCHAR(20) NULL,
     id_cargo INT NOT NULL,
-    estado_registro BOOLEAN DEFAULT TRUE COMMENT 'TRUE=Activo, FALSE=Anulado',
+    estado_registro BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'TRUE=Activo, FALSE=Anulado',
     
     CONSTRAINT PK_empleado PRIMARY KEY (id_empleado),
     CONSTRAINT UN_empleado_dni UNIQUE (dni),
@@ -152,6 +156,8 @@ CREATE TABLE usuario (
     id_empleado INT NOT NULL,
     id_rol INT NOT NULL,
     hash_clave VARCHAR(255) NOT NULL,
+    intentos_fallidos INT NOT NULL DEFAULT 0 COMMENT 'Intentos de login fallidos consecutivos',
+    bloqueado_hasta DATETIME NULL COMMENT 'Si es futuro, la cuenta está bloqueada temporalmente por intentos fallidos',
     activo BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Permite desactivar el acceso de un empleado sin eliminar su registro ni su historial de auditoría',
     
     CONSTRAINT PK_usuario PRIMARY KEY (id_usuario),
@@ -168,7 +174,7 @@ CREATE TABLE paciente (
     fecha_nac DATE NOT NULL,
     sexo CHAR(1) NOT NULL,
     id_seguro INT NOT NULL,
-    estado_registro BOOLEAN DEFAULT TRUE COMMENT 'TRUE=Activo, FALSE=Anulado',
+    estado_registro BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'TRUE=Activo, FALSE=Anulado',
     
     CONSTRAINT PK_paciente PRIMARY KEY (id_paciente),
     CONSTRAINT UN_paciente_dni UNIQUE (dni),
@@ -182,7 +188,7 @@ CREATE TABLE cama (
     id_area INT NOT NULL,
     id_tipo_cama INT NOT NULL,
     id_estado_cama INT NOT NULL,
-    estado_registro BOOLEAN DEFAULT TRUE,
+    estado_registro BOOLEAN NOT NULL DEFAULT TRUE,
     
     CONSTRAINT PK_cama PRIMARY KEY (id_cama),
     CONSTRAINT UN_cama_codigo UNIQUE (codigo),
@@ -202,7 +208,7 @@ CREATE TABLE episodio_emergencia (
     fecha_alta DATETIME NULL,
     motivo_consulta TEXT NOT NULL,
     id_estado_ep INT NOT NULL,
-    estado_registro BOOLEAN DEFAULT TRUE,
+    estado_registro BOOLEAN NOT NULL DEFAULT TRUE,
     
     CONSTRAINT PK_episodio_emergencia PRIMARY KEY (id_episodio),
     CONSTRAINT CH_episodio_fechas CHECK (fecha_alta IS NULL OR fecha_alta >= fecha_ingreso),
@@ -235,12 +241,14 @@ CREATE TABLE triaje (
     id_empleado INT NOT NULL,
     fecha_hora DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     justificacion TEXT NULL COMMENT 'RN-10: obligatoria cuando id_nivel difiere de id_nivel_sugerido',
-    estado_registro BOOLEAN DEFAULT TRUE,
+    estado_registro BOOLEAN NOT NULL DEFAULT TRUE,
     
     CONSTRAINT PK_triaje PRIMARY KEY (id_triaje),
+    -- Las FK de id_nivel e id_nivel_sugerido usan ON UPDATE RESTRICT: una columna usada en un CHECK no admite CASCADE.
+    CONSTRAINT CH_triaje_rn10 CHECK (id_nivel_sugerido IS NULL OR id_nivel = id_nivel_sugerido OR (justificacion IS NOT NULL AND CHAR_LENGTH(TRIM(justificacion)) >= 10)),
     CONSTRAINT FK_triaje_episodio FOREIGN KEY (id_episodio) REFERENCES episodio_emergencia(id_episodio) ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT FK_triaje_nivel FOREIGN KEY (id_nivel) REFERENCES nivel_triaje(id_nivel) ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT FK_triaje_nivel_sugerido FOREIGN KEY (id_nivel_sugerido) REFERENCES nivel_triaje(id_nivel) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT FK_triaje_nivel FOREIGN KEY (id_nivel) REFERENCES nivel_triaje(id_nivel) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT FK_triaje_nivel_sugerido FOREIGN KEY (id_nivel_sugerido) REFERENCES nivel_triaje(id_nivel) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT FK_triaje_empleado FOREIGN KEY (id_empleado) REFERENCES empleado(id_empleado) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
@@ -260,9 +268,15 @@ CREATE TABLE asignacion_cama (
     id_empleado INT NOT NULL,
     fecha_asignacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     fecha_liberacion DATETIME NULL,
-    estado_registro BOOLEAN DEFAULT TRUE,
+    estado_registro BOOLEAN NOT NULL DEFAULT TRUE,
+    -- Columnas generadas: valen id_cama / id_episodio solo mientras la asignación sigue vigente (NULL en otro caso).
+    -- Con su índice UNIQUE, la BD impide dos asignaciones vigentes de la misma cama (RN-05) o del mismo episodio.
+    cama_vigente INT GENERATED ALWAYS AS (IF(fecha_liberacion IS NULL AND estado_registro, id_cama, NULL)) VIRTUAL,
+    episodio_vigente INT GENERATED ALWAYS AS (IF(fecha_liberacion IS NULL AND estado_registro, id_episodio, NULL)) VIRTUAL,
     
     CONSTRAINT PK_asignacion_cama PRIMARY KEY (id_asignacion),
+    CONSTRAINT UN_asignacion_cama_vigente UNIQUE (cama_vigente),
+    CONSTRAINT UN_asignacion_episodio_vigente UNIQUE (episodio_vigente),
     CONSTRAINT CH_asignacion_fechas CHECK (fecha_liberacion IS NULL OR fecha_liberacion >= fecha_asignacion),
     CONSTRAINT FK_asig_episodio FOREIGN KEY (id_episodio) REFERENCES episodio_emergencia(id_episodio) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT FK_asig_cama FOREIGN KEY (id_cama) REFERENCES cama(id_cama) ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -304,7 +318,7 @@ CREATE TABLE bitacora_auditoria (
     accion VARCHAR(50) NOT NULL,
     fecha_hora DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     id_registro_afectado INT NOT NULL,
-    detalles_json TEXT,
+    detalles_json JSON,
     
     CONSTRAINT PK_bitacora_auditoria PRIMARY KEY (id_bitacora),
     CONSTRAINT FK_auditoria_usuario FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE RESTRICT ON UPDATE CASCADE

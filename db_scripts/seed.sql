@@ -1,4 +1,8 @@
 -- ==============================================================================
+-- !! SOLO PARA BASES DE DESARROLLO !!
+-- Este script VACÍA (TRUNCATE) todas las tablas de sigtac_db antes de insertar los datos de prueba.
+-- ==============================================================================
+-- ==============================================================================
 -- SISTEMA INTEGRADO DE GESTIÓN DE TRIAJE Y ASIGNACIÓN DE CAMAS (SIGTAC)
 -- Script de Poblamiento Inicial (Seed Data) - REFACTORIZADO FASE 3
 -- ==============================================================================
