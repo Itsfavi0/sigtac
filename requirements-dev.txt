@@ -1,4 +1,4 @@
 # Dependencias de desarrollo (pruebas). Incluye las de la aplicación.
 -r requirements.txt
 
-pytest>=8.0
+pytest==9.1.1

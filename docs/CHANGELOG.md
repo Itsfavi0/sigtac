@@ -5,6 +5,61 @@
 
 ---
 
+## [2026-10-11] — Cierre de la revisión: reglas en modelos y BD, bloqueo de cuentas y dependencias (paso 7)
+
+### Cambio
+**Modelos**
+- `EpisodioEmergencia.asignar_cama()` exige estado "en espera de cama" y un triaje activo (RN-01); `dar_alta()` exige estar en atención con cama. Ambos lanzan `ReglaNegocioError`.
+- `obtener_triaje_actual()` ignora los triajes anulados, usa `max()` y su tipo de retorno es `Triaje | None`.
+- Nuevo `models/estados.py` con `EstadoCama` y `EstadoEpisodio` (`StrEnum`). `Cama` y `EpisodioEmergencia` validan el estado recibido (un estado inexistente lanza `ValueError`). Las constantes `ESTADO_*` se conservan como alias. El Enum de episodio incluye `REFERIDO` y `FUGADO`, que ya existían en la BD.
+- `SignosVitales` rechaza valores fisiológicamente imposibles (rangos amplios en `RANGOS`).
+- `Sintoma` es ahora un `dataclass(frozen=True)` realmente inmutable y rechaza pesos negativos.
+- Añadidos `__init__.py` en `dao/`, `models/` y `utils/`.
+
+**Base de datos** (`schema.sql`, `seed.sql`)
+- `usuario`: nuevas columnas `intentos_fallidos` y `bloqueado_hasta`.
+- `triaje`: `CHECK` que hace cumplir la RN-10 en la BD (si el nivel final difiere del sugerido, la justificación es obligatoria y de al menos 10 caracteres).
+- `asignacion_cama`: columnas generadas `cama_vigente` y `episodio_vigente` con índice `UNIQUE`: la BD impide dos asignaciones vigentes de la misma cama (RN-05) o del mismo episodio.
+- Todas las columnas `estado_registro` son `NOT NULL`; `bitacora_auditoria.detalles_json` pasa a tipo `JSON`.
+- Aviso visible al inicio de ambos scripts: destruyen datos, solo para desarrollo.
+
+**Autenticación** (`UsuarioDAO`)
+- Bloqueo temporal: 5 intentos fallidos consecutivos bloquean la cuenta 15 minutos (`MAX_INTENTOS_FALLIDOS`, `MINUTOS_BLOQUEO`). Un bloqueo se rechaza aunque la clave sea correcta, usa el señuelo y no suma intentos. Un login correcto reinicia el contador; un bloqueo vencido se reinicia antes de evaluar.
+- El contador se incrementa dentro de la propia BD (operación atómica).
+
+**Dependencias**: versiones fijadas con `==` en `requirements.txt` y `requirements-dev.txt`.
+
+### Archivos afectados
+`models/estados.py` (nuevo), `models/cama.py`, `models/triaje.py`, `dao/usuario_dao.py`, `db_scripts/schema.sql`, `db_scripts/seed.sql`, `requirements.txt`, `requirements-dev.txt`, `README.md`, `tests/` y los `__init__.py`.
+
+### Motivo
+Cerrar los hallazgos pendientes de la revisión: reglas de negocio que solo existían como comentarios, estados como texto repetido sin validar, ausencia de límite de intentos de login y dependencias sin versión fija.
+
+### Impacto
+- Es necesario volver a ejecutar `schema.sql` y `seed.sql` (borra los datos de desarrollo).
+- El usuario de BD de la aplicación necesita `UPDATE` sobre `usuario` (ya contemplado en el README).
+- Un servicio que llame a `asignar_cama()` o `dar_alta()` debe capturar `ReglaNegocioError`.
+- Pruebas: 154 pasan. Se eliminaron los dos `xfail` porque las brechas están corregidas, y un nuevo test compara los Enum con los catálogos de `seed.sql`.
+- Las restricciones de la BD y el bloqueo se verificaron contra una base temporal real (ya eliminada): datos inválidos rechazados, válidos aceptados, y simulación de un ataque de 5 claves erróneas.
+
+### Decisiones
+- **Servidor de desarrollo:** es MariaDB 11.8.8, no MySQL 8. **Corrección:** el README afirmaba que el proyecto no funciona en MariaDB; era una suposición no verificada y es falsa para esta versión. Las verificaciones de los pasos 5 a 7 se hicieron en MariaDB; el objetivo documentado sigue siendo MySQL 8.0.
+- Los `CHECK` de `triaje` obligaron a cambiar las FK de `id_nivel` e `id_nivel_sugerido` a `ON UPDATE RESTRICT` (una columna usada en un `CHECK` no admite `CASCADE`). Es inocuo: los ids de catálogo no cambian.
+- Criterio de excepciones: `ValueError` para datos de entrada inválidos (fuera de rango, formato) y excepciones de `SigtacError` para reglas de negocio violadas.
+- El bloqueo es temporal (15 min) y no permanente, para que un atacante no pueda dejar fuera a un empleado de forma indefinida. Aun así permite un bloqueo temporal intencional; es el costo conocido de esta medida.
+- Los rangos de `SignosVitales` son amplios y solo descartan errores de digitación; no definen qué es clínicamente normal.
+- Las versiones se fijaron a las instaladas en desarrollo. `customtkinter`, `reportlab` y `matplotlib` aún no se usan en el código, por lo que no se han probado.
+
+### Pendientes (fuera del alcance de la revisión)
+- Permisos duplicados entre la tabla `rol` y `tiene_permiso` en las clases: se decidirá en la Fase 4 (controladores).
+- Actualizar `db_scripts/diagrama.png` (faltan `fecha_nac`, `intentos_fallidos`, `bloqueado_hasta` y las columnas generadas).
+- Probar `schema.sql` y `seed.sql` en un MySQL 8.0 real (aquí solo había MariaDB).
+- Pruebas de integración contra una BD real y pruebas de `Paciente`/`Empleado`.
+- Recrear el `.venv` dentro del proyecto (su `pip` apunta aún a otro entorno; usar `python -m pip`).
+- Datos reales de integrantes en `seed.sql`: decisión del equipo.
+
+---
+
 ## [2026-10-11] — Pruebas automáticas con pytest (revisión de seguridad, paso 6)
 
 ### Cambio

@@ -18,8 +18,9 @@ y registro de cambios en [`docs/CHANGELOG.md`](docs/CHANGELOG.md).
 ## Requisitos
 
 - Python 3.12 o superior
-- MySQL 8.0 o superior (el esquema usa `utf8mb4_0900_ai_ci` y restricciones `CHECK`;
-  no funciona en MariaDB)
+- MySQL 8.0 o superior (el esquema usa `utf8mb4_0900_ai_ci`, restricciones `CHECK`, columnas
+  generadas y el tipo `JSON`). También se ha probado con MariaDB 11.8; no con versiones
+  anteriores de MariaDB.
 
 ## Instalación
 
@@ -47,6 +48,7 @@ pip install -r requirements.txt
    GRANT SELECT, INSERT, UPDATE ON sigtac_db.* TO 'sigtac_app'@'localhost';
    ```
 
+   `UPDATE` es necesario para el bloqueo temporal de cuentas por intentos fallidos.
    (Para ejecutar los scripts de la sección siguiente usa una cuenta con más permisos.)
 
 ## Base de datos

@@ -1,16 +1,20 @@
 # ==========================================
 # DEPENDENCIAS DEL PROYECTO SIGTAC
 # ==========================================
+# Versiones fijadas (las usadas en el desarrollo y las pruebas) para que una instalación
+# futura no se rompa por una actualización inesperada. Para actualizar, cambia el número,
+# ejecuta las pruebas (python -m pytest) y registra el cambio en docs/CHANGELOG.md.
+
 # Interfaz gráfica moderna
-customtkinter>=5.2.2
+customtkinter==6.0.0
 
 # Conector de base de datos MySQL
-mysql-connector-python>=8.3.0
+mysql-connector-python==26.7.0
 
 # Variables de entorno y seguridad
-python-dotenv>=1.0.1
-bcrypt>=4.1.2
+python-dotenv==1.2.4
+bcrypt==5.0.0
 
 # Generación de reportes
-reportlab>=4.1.0
-matplotlib>=3.8.3
+reportlab==5.0.1
+matplotlib==3.11.2
