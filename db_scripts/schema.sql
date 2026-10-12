@@ -146,7 +146,7 @@ CREATE TABLE empleado (
     id_cargo INT NOT NULL,
     id_area INT NULL COMMENT 'Área asignada. La usa la clase Enfermero; NULL para el resto del personal',
     especialidad VARCHAR(100) NULL COMMENT 'Especialidad médica. La usa la clase Medico; NULL para el resto del personal',
-    turno VARCHAR(10) NULL COMMENT 'Turno de trabajo. Lo usa la clase PersonalLimpieza; NULL para el resto del personal',
+    turno VARCHAR(10) COLLATE utf8mb4_bin NULL COMMENT 'Turno de trabajo. Lo usa la clase PersonalLimpieza; NULL para el resto del personal. utf8mb4_bin: el CHECK distingue mayúsculas y acentos',
     estado_registro BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'TRUE=Activo, FALSE=Anulado',
 
     CONSTRAINT PK_empleado PRIMARY KEY (id_empleado),
@@ -177,7 +177,7 @@ CREATE TABLE paciente (
     nombres VARCHAR(100) NOT NULL,
     apellidos VARCHAR(100) NOT NULL,
     fecha_nac DATE NOT NULL,
-    sexo CHAR(1) NOT NULL,
+    sexo CHAR(1) COLLATE utf8mb4_bin NOT NULL COMMENT 'utf8mb4_bin: el CHECK distingue mayúsculas (rechaza m/f)',
     id_seguro INT NOT NULL,
     estado_registro BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'TRUE=Activo, FALSE=Anulado',
     

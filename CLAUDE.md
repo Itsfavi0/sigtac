@@ -82,6 +82,8 @@ views → controllers → models (dominio) → dao → MySQL
   (asignar cama, dar de alta) necesitarán transacciones explícitas y un pool de conexiones.
 - Las reglas críticas viven también en la BD (RN-05 y RN-10 con `UNIQUE`/`CHECK`). Cambios de esquema:
   actualizar `schema.sql`, `seed.sql`, los modelos, las pruebas y `diagrama.png`.
+- Un `CHECK` que compare texto (`IN ('A', 'B')`) necesita la columna con `COLLATE utf8mb4_bin`: la collation
+  por defecto (`utf8mb4_0900_ai_ci`) ignora mayúsculas y acentos y aceptaría `'mañana'` por `'MAÑANA'`.
 - La compatibilidad cama–triaje se decide en Python (`Cama.es_compatible`), **no** con `tipo_cama.nivel_min`.
 
 ## Reglas de negocio (resumen)

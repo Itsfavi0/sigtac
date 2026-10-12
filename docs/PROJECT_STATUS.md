@@ -23,7 +23,7 @@
 ### Tarea actual
 
 Ninguna en curso. Siguiente tarea: **`dao/paciente_dao.py`** (ya no está bloqueado).
-Antes conviene verificar `schema.sql`/`seed.sql` en una base temporal (ver "Problemas abiertos", punto 1).
+Antes hay que volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db`: tiene el esquema anterior al 2026-10-12.
 
 ---
 
@@ -32,7 +32,7 @@ Antes conviene verificar `schema.sql`/`seed.sql` en una base temporal (ver "Prob
 | Fase | Estado |
 |---|---|
 | Fase 0 — Entorno y estructura | Completada (`.venv` recreado dentro del proyecto el 2026-10-11) |
-| Fase 1 — Base de datos | Completada. Verificada en MariaDB 11.8; falta probarla en MySQL 8.0 |
+| Fase 1 — Base de datos | Completada. Verificada en MySQL 8.0.46 (2026-10-12) y antes en MariaDB 11.8 |
 | Fase 2 — Models | Completada (2026-10-12) |
 | Fase 3 — DAO | En curso: `db_connection.py` y `usuario_dao.py` terminados |
 | Fase 4 — Controllers | Pendiente (la carpeta `controllers/` aún no existe) |
@@ -65,9 +65,7 @@ Antes conviene verificar `schema.sql`/`seed.sql` en una base temporal (ver "Prob
 
 ## Problemas abiertos
 
-1. **`schema.sql` y `seed.sql` sin verificar contra una BD real** desde el cambio del 2026-10-12 (columnas `id_area`,
-   `especialidad` y `turno` de `empleado`). El usuario del `.env` fue rechazado por el servidor (`Access denied`).
-   Hay que cargarlos en una base temporal con un usuario administrador.
+1. **`sigtac_db` desactualizada:** no se ha vuelto a ejecutar `schema.sql`/`seed.sql` sobre ella tras los cambios del 2026-10-12. Hacerlo borra los datos de desarrollo.
 2. **Pacientes sin DNI peruano** (extranjeros o pacientes sin identificar): `Persona` exige 8 dígitos, así que hoy no se pueden registrar. Requiere una decisión del equipo.
 3. **Permisos duplicados:** la tabla `rol` y `tiene_permiso()` en cada subclase. Se decidirá en la Fase 4. Las pruebas actuales fijan el comportamiento de `tiene_permiso()`.
 4. **Transacciones:** `ConexionBD` usa `autocommit=True` y una sola conexión. `triaje_dao.py` y `asignacion_dao.py` necesitan transacciones explícitas; hay que decidir cómo implementarlas antes de escribirlos.
@@ -78,14 +76,15 @@ Antes conviene verificar `schema.sql`/`seed.sql` en una base temporal (ver "Prob
 - `Empleado` tiene `activo` y `anular()` (espejo de `estado_registro`).
 - `area`, `especialidad` y `turno` tienen columna en `empleado` y `@property` en su subclase.
 - `Persona` y sus subclases validan sus datos (DNI, nombres, fecha de nacimiento, ids, sexo, turno).
+- `schema.sql` y `seed.sql` verificados en MySQL 8.0.46 con una base temporal (32 comprobaciones, incluidas RN-05 y RN-10).
+- Los `CHECK` de `sexo` y `turno` aceptaban minúsculas y variantes sin acento por la *collation*; corregido con `utf8mb4_bin`.
 
 ---
 
 ## Pendientes conocidos (sin bloqueo inmediato)
 
 - Actualizar `db_scripts/diagrama.png` (faltan `fecha_nac`, `id_area`, `especialidad`, `turno`, `intentos_fallidos`, `bloqueado_hasta`, las columnas generadas de `asignacion_cama` y el área "Triaje").
-- Probar `schema.sql` y `seed.sql` en un MySQL 8.0 real (hasta ahora solo en MariaDB 11.8).
-- Pruebas de integración contra una BD real (temporal).
+- Pruebas de integración permanentes contra una BD real (la verificación del 2026-10-12 fue un script temporal).
 - Revisar la coherencia de `usuario_dao.py` con `auth_controller.py` cuando exista.
 - Decidir si `seed.sql` mantiene los datos reales de los integrantes.
 - PyCharm: cada integrante debe seleccionar `SIGTAC/.venv` como intérprete.
@@ -95,7 +94,7 @@ Antes conviene verificar `schema.sql`/`seed.sql` en una base temporal (ver "Prob
 
 ## Próximo trabajo previsto
 
-1. Verificar `schema.sql` y `seed.sql` en una base temporal (problema 1).
+1. Volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db` (problema 1).
 2. `paciente_dao.py`: debe convertir `estado_registro` (0/1) a `bool` y obtener `nombre_seguro` con un JOIN.
 3. `cama_dao.py`.
 4. `auditoria_dao.py`.

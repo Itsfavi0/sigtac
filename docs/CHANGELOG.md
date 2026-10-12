@@ -5,6 +5,40 @@
 
 ---
 
+## [2026-10-12] — Verificación en MySQL 8.0 real y CHECK de texto sensibles a mayúsculas
+
+### Cambio
+- `schema.sql`: las columnas `paciente.sexo` y `empleado.turno` usan ahora `COLLATE utf8mb4_bin`.
+- Se cargaron `schema.sql` y `seed.sql` en una base temporal (`sigtac_scratch_tmp`, ya eliminada) en **MySQL 8.0.46** y se ejecutaron 32 comprobaciones; todas pasaron:
+  - Carga de ambos scripts sin errores; 21 tablas.
+  - Columnas nuevas de `empleado` con los datos del seed (área "Triaje", especialidades, turno `MAÑANA` con su acento intacto).
+  - `CHECK` de `turno` y `sexo`: rechazan `MADRUGADA`, `mañana`, `MANANA`, `Mañana`, `noche`, `m`, `f` y `X`; aceptan `NOCHE` y `NULL`. La FK de `id_area` rechaza un área inexistente.
+  - RN-10 (`CH_triaje_rn10`): rechaza la reclasificación sin justificación, con 9 caracteres y con solo espacios; acepta 10 caracteres.
+  - RN-05 (columnas generadas con `UNIQUE`): rechaza una segunda asignación vigente de la misma cama o del mismo episodio; acepta una cama libre y una asignación ya liberada.
+  - Los modelos aceptan los datos reales: los 3 pacientes y los 5 empleados con subclase se construyen sin errores desde las filas de la BD.
+  - `UsuarioDAO.autenticar` contra la base real: login correcto, clave incorrecta, usuario desactivado y DNI inválido.
+
+### Archivos afectados
+- `db_scripts/schema.sql`, `docs/`
+
+### Motivo
+La primera ejecución de la verificación mostró que la BD **aceptaba `'mañana'`** aunque el `CHECK` solo permite `'MAÑANA'`. La *collation* de la base (`utf8mb4_0900_ai_ci`) no distingue acentos (`ai`) ni mayúsculas (`ci`), así que `IN ('MAÑANA', ...)` daba por iguales `'mañana'` y `'MANANA'`. Lo mismo ocurría con `sexo` (`'m'` pasaba como `'M'`). Python rechaza esas variantes, de modo que un dato así entraría en la BD y luego fallaría al reconstruir el objeto. Con `utf8mb4_bin`, la comparación es exacta, igual que en Python.
+
+### Impacto
+- Pruebas: 341 pasan. La verificación en BD se hizo con un script temporal (no versionado), según la regla de `CLAUDE.md`.
+- `sigtac_db` **no se modificó**. Para aplicar los cambios del 2026-10-12 hay que volver a ejecutar `schema.sql` y `seed.sql` sobre ella (borra los datos de desarrollo).
+- Queda cerrado el pendiente "Probar `schema.sql` y `seed.sql` en un MySQL 8.0 real".
+
+### Decisiones
+- La *collation* binaria se aplica **solo a las dos columnas** cuyo `CHECK` compara texto. El resto de la base conserva `utf8mb4_0900_ai_ci`: es lo deseable para las búsquedas (por ejemplo, encontrar "Pérez" al buscar "perez").
+- **Corrección:** el CHANGELOG del 2026-10-11 dice que el servidor de desarrollo es MariaDB 11.8. En este equipo el servidor es MySQL 8.0.46 (servicio `MySQL80`). Las verificaciones anteriores probablemente se hicieron en otra máquina.
+
+### Pendientes
+- El `.env` local usa `root`. Sirvió para crear la base temporal, pero la aplicación debería usar un usuario con solo `SELECT, INSERT, UPDATE`.
+- Convertir la verificación en pruebas de integración permanentes (opcionales, que se salten si no hay BD).
+
+---
+
 ## [2026-10-12] — Alineación de `persona.py` con la BD y validaciones de entrada
 
 ### Cambio
