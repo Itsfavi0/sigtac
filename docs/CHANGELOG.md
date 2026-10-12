@@ -5,6 +5,40 @@
 
 ---
 
+## [2026-10-11] — Pruebas automáticas con pytest (revisión de seguridad, paso 6)
+
+### Cambio
+- Nueva carpeta `tests/` con 127 pruebas (125 pasan, 2 `xfail`):
+  - `test_cama.py`: máquina de estados de `Cama` (RN-05, RN-07, RN-08) y `es_compatible` por tipo.
+  - `test_triaje.py`: `Triaje`, `SignosVitales` y `EpisodioEmergencia` (RN-01, RN-09, RN-10, RN-11).
+  - `test_estrategias.py`: umbrales y límites de `ReglaManchester` y `ReglaMINSA`, y signos vitales obligatorios.
+  - `test_security.py`: bcrypt (formato, sal, hash inválido).
+  - `test_db_connection.py`: variables obligatorias, `autocommit`, Singleton y reconexión.
+  - `test_usuario_dao.py`: login, cuenta desactivada, señuelo, validación de DNI, consulta parametrizada, cierre del cursor y logs sin datos personales.
+- Nuevos `pytest.ini` y `requirements-dev.txt` (dependencias de desarrollo separadas de las de la aplicación).
+- Sección "Pruebas" en el README.
+
+### Archivos afectados
+- `tests/` (nuevo), `pytest.ini` (nuevo), `requirements-dev.txt` (nuevo), `README.md`
+
+### Motivo
+Hasta ahora las comprobaciones de los pasos 1 a 5 eran scripts desechables. Con pruebas permanentes, cualquier cambio que reintroduzca uno de los fallos corregidos se detecta de inmediato.
+
+### Impacto
+- Las pruebas no necesitan MySQL ni `.env`: la conexión se simula.
+- Verificado reintroduciendo a propósito 4 fallos (`\d` en el DNI, `sato2` por defecto, falta del señuelo y `autocommit` desactivado): las pruebas detectaron los 4.
+
+### Decisiones
+- Las dos brechas conocidas están como `xfail(strict=True)`: `asignar_cama` sin triaje (RN-01) y `obtener_triaje_actual` que no ignora triajes anulados. Cuando se corrijan, la prueba fallará y obligará a quitar la marca.
+- No se miden tiempos en las pruebas (serían inestables): se comprueba que se invoque el señuelo.
+- Pendiente de cobertura: pruebas de integración contra MySQL real (por ahora solo se verificó a mano).
+
+### Pendientes
+- Corregir las dos brechas marcadas como `xfail` en `models/triaje.py`.
+- Pruebas de `Paciente`, `Empleado` y sus subclases.
+
+---
+
 ## [2026-10-11] — Alineación del modelo con la BD: fecha_nac y nivel_min (revisión de seguridad, paso 5)
 
 ### Cambio

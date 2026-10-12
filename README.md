@@ -68,6 +68,15 @@ mysql -u <usuario_admin> -p < db_scripts/seed.sql
 Los usuarios de prueba del seed comparten la clave de desarrollo indicada en
 [`docs/CHANGELOG.md`](docs/CHANGELOG.md). Nunca la uses fuera de un entorno local.
 
+## Pruebas
+
+Las pruebas usan `pytest` y **no necesitan MySQL ni un `.env`**: la base de datos se simula.
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest
+```
+
 ## Estructura
 
 ```text
@@ -76,6 +85,7 @@ SIGTAC/
 ├── models/        Modelos del dominio, estrategias de triaje y excepciones
 ├── utils/         Seguridad (bcrypt) y configuración de logging
 ├── db_scripts/    Esquema, datos de prueba y diagrama de la BD
+├── tests/         Pruebas automáticas (pytest)
 ├── docs/          Contexto, plan de desarrollo, estado y changelog
 └── requirements.txt
 ```
