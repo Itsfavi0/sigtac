@@ -5,6 +5,27 @@
 
 ---
 
+## [2026-10-11] — Entorno virtual recreado dentro del proyecto
+
+### Cambio
+Se eliminó y se recreó `.venv` con `python -m venv` e instalando `requirements-dev.txt`.
+
+### Archivos afectados
+- `.venv/` (no versionado), `CLAUDE.md`
+
+### Motivo
+El `.venv` original era una copia de otro entorno (`Proyectos Personales/.venv`) y su script `pip` seguía apuntando a esa carpeta: un `pip install` instalaba los paquetes fuera del proyecto. Los entornos virtuales guardan rutas absolutas y no deben copiarse ni moverse.
+
+### Impacto
+- `pip` y `python` del `.venv` apuntan ahora a `SIGTAC/.venv`. Verificado con `pip --version` y 154 pruebas en verde.
+- El entorno antiguo de la carpeta padre no se tocó.
+- PyCharm: el intérprete configurado en `.idea/misc.xml` sigue apuntando al entorno de la carpeta padre; hay que seleccionar `SIGTAC/.venv` en la configuración del proyecto (archivo local no versionado).
+
+### Pendientes
+- Cada integrante del equipo debe crear su propio `.venv` (no se comparte).
+
+---
+
 ## [2026-10-11] — Cierre de la revisión: reglas en modelos y BD, bloqueo de cuentas y dependencias (paso 7)
 
 ### Cambio

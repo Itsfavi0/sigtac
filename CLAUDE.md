@@ -28,8 +28,9 @@ python -m pytest tests/test_cama.py -v         # un archivo
 python -m pytest -k "bloqueo" -x               # filtrar por nombre, parar al primer fallo
 ```
 
-- Usa siempre `python -m pip` y `python -m pytest`, no `pip`/`pytest` a secas: el `pip` del `.venv`
-  puede apuntar a otro entorno (el `.venv` se copió desde otra carpeta).
+- Usa `python -m pip` y `python -m pytest` (con el `.venv` activado): garantiza que se use el intérprete del entorno.
+  No copiar ni mover la carpeta `.venv`; los entornos virtuales guardan rutas absolutas. Para recrearlo:
+  `rm -rf .venv && python -m venv .venv && python -m pip install -r requirements-dev.txt`.
 - Aún no existe `main.py` ni linter configurado. Si se añaden, documentar aquí su comando.
 
 ## Estructura
