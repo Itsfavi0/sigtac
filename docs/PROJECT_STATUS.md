@@ -88,7 +88,7 @@ Antes hay que volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db`: tie
 - Revisar la coherencia de `usuario_dao.py` con `auth_controller.py` cuando exista.
 - Decidir si `seed.sql` mantiene los datos reales de los integrantes.
 - PyCharm: cada integrante debe seleccionar `SIGTAC/.venv` como intérprete.
-- El `.env` local usa `root`; `CLAUDE.md` indica un usuario con solo `SELECT, INSERT, UPDATE`.
+- El `.env` local usa `root`: crear `sigtac_app` con `db_scripts/crear_usuario_app.sql` y cambiar `DB_USER`/`DB_PASS`.
 
 ---
 

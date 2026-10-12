@@ -21,6 +21,8 @@ cp .env.example .env                   # completar DB_USER, DB_PASS, etc.
 # Base de datos (solo desarrollo: DESTRUYEN los datos existentes)
 mysql -u <admin> -p < db_scripts/schema.sql    # DROP TABLE + CREATE
 mysql -u <admin> -p < db_scripts/seed.sql      # TRUNCATE + datos de prueba
+# Usuario de la app (una vez; reemplazar <una_clave_segura> antes): SELECT, INSERT, UPDATE sobre sigtac_db
+mysql -u <admin> -p < db_scripts/crear_usuario_app.sql
 
 # Pruebas (no necesitan MySQL ni .env: la BD se simula)
 python -m pytest                               # todas
@@ -39,7 +41,7 @@ python -m pytest -k "bloqueo" -x               # filtrar por nombre, parar al pr
 dao/          Acceso a datos: db_connection.py (Singleton ConexionBD) y un *_dao.py por entidad
 models/       Dominio: persona, cama, triaje, estrategias, estados (Enum), excepciones
 utils/        security.py (bcrypt) y logging_config.py
-db_scripts/   schema.sql, seed.sql y diagrama.png
+db_scripts/   schema.sql, seed.sql, crear_usuario_app.sql y diagrama.png
 tests/        pytest: un test_*.py por módulo
 docs/         PROJECT_CONTEXT, DEVELOPMENT_PLAN, PROJECT_STATUS y CHANGELOG
 ```

@@ -41,12 +41,16 @@ pip install -r requirements.txt
 2. Edita `.env` con el host, usuario, contraseña y nombre de la base de datos.
    Si falta alguna variable obligatoria, la aplicación se detiene con un mensaje claro.
 
-3. Recomendado: no uses `root`. Crea un usuario con permisos solo sobre la base de datos:
+3. Recomendado: no uses `root`. Crea un usuario con permisos solo sobre la base de datos ejecutando
+   `db_scripts/crear_usuario_app.sql` como administrador (por ejemplo, en MySQL Workbench), tras reemplazar
+   `<una_clave_segura>`. Equivale a:
 
    ```sql
    CREATE USER 'sigtac_app'@'localhost' IDENTIFIED BY '<una_clave_segura>';
    GRANT SELECT, INSERT, UPDATE ON sigtac_db.* TO 'sigtac_app'@'localhost';
    ```
+
+   Sin `DELETE` (RN-11: no hay borrado físico) ni `DROP`/`CREATE`/`ALTER`.
 
    `UPDATE` es necesario para el bloqueo temporal de cuentas por intentos fallidos.
    (Para ejecutar los scripts de la sección siguiente usa una cuenta con más permisos.)

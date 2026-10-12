@@ -5,6 +5,32 @@
 
 ---
 
+## [2026-10-12] — Script para crear el usuario de BD de la aplicación
+
+### Cambio
+- Nuevo `db_scripts/crear_usuario_app.sql`: crea `sigtac_app@localhost` con `SELECT, INSERT, UPDATE` sobre `sigtac_db.*` y muestra sus permisos. La clave va como marcador (`<una_clave_segura>`).
+- `README.md` remite al script.
+
+### Archivos afectados
+- `db_scripts/crear_usuario_app.sql` (nuevo), `README.md`, `docs/`
+
+### Motivo
+El `.env` local usaba `root`. Con mínimo privilegio, un error de programación, una inyección SQL o un `.env` filtrado solo pueden leer y escribir datos de `sigtac_db`. No pueden borrar, alterar tablas ni tocar otras bases del servidor.
+
+### Impacto
+- Verificado en MySQL 8.0.46 con un usuario temporal (`sigtac_verif_tmp`, ya eliminado):
+  - El script se ejecuta sin errores y se puede repetir.
+  - `SHOW GRANTS` muestra solo `USAGE` global y `SELECT, INSERT, UPDATE` en `sigtac_db`.
+  - El usuario puede leer `cama`; MySQL le deniega `DELETE`, `DROP`, `CREATE` y leer otra base (error 1142).
+- `schema.sql`, `seed.sql` y las verificaciones con base temporal siguen necesitando una cuenta de administrador.
+
+### Decisiones
+- Sin `DELETE`: la BD hace cumplir la RN-11 (baja lógica) aunque un DAO intente borrar.
+- `CREATE USER IF NOT EXISTS` + `ALTER USER`: el script se puede ejecutar de nuevo sin error y deja la clave indicada.
+- La clave nunca se escribe en el archivo versionado.
+
+---
+
 ## [2026-10-12] — Verificación en MySQL 8.0 real y CHECK de texto sensibles a mayúsculas
 
 ### Cambio
