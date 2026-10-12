@@ -101,7 +101,7 @@ CREATE TABLE area (
 CREATE TABLE tipo_cama (
     id_tipo_cama INT AUTO_INCREMENT,
     nombre_tipo_cama VARCHAR(100) NOT NULL,
-    nivel_min INT NOT NULL COMMENT 'Nivel mínimo (1-5) que admite esta cama',
+    nivel_min INT NOT NULL COMMENT 'SOLO INFORMATIVO: no decide la compatibilidad. La regla real es Cama.es_compatible(nivel) en Python, porque un único umbral no representa los rangos de cada tipo de cama',
     
     CONSTRAINT PK_tipo_cama PRIMARY KEY (id_tipo_cama),
     CONSTRAINT UN_tipo_cama_nombre UNIQUE (nombre_tipo_cama),
@@ -137,6 +137,7 @@ CREATE TABLE empleado (
     dni VARCHAR(15) NOT NULL,
     nombres VARCHAR(100) NOT NULL,
     apellidos VARCHAR(100) NOT NULL,
+    fecha_nac DATE NOT NULL,
     colegiatura VARCHAR(20) NULL,
     id_cargo INT NOT NULL,
     estado_registro BOOLEAN DEFAULT TRUE COMMENT 'TRUE=Activo, FALSE=Anulado',
