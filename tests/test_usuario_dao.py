@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 from mysql.connector import Error as DBError
 
-from dao import usuario_dao
+from dao import base_dao, usuario_dao
 from dao.usuario_dao import UsuarioDAO
 from models.excepciones import ConexionBDError
 from utils.security import generar_hash
@@ -44,7 +44,8 @@ class BD:
             self.clase.return_value.obtener_conexion.side_effect = error_de_conexion
         else:
             self.clase.return_value.obtener_conexion.return_value = conexion
-        monkeypatch.setattr(usuario_dao, "ConexionBD", self.clase)
+        # La conexión se pide en BaseDAO: se reemplaza ahí
+        monkeypatch.setattr(base_dao, "ConexionBD", self.clase)
 
 
 @pytest.fixture

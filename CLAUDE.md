@@ -38,7 +38,7 @@ python -m pytest -k "bloqueo" -x               # filtrar por nombre, parar al pr
 ## Estructura
 
 ```text
-dao/          Acceso a datos: db_connection.py (Singleton ConexionBD) y un *_dao.py por entidad
+dao/          Acceso a datos: db_connection.py (Singleton ConexionBD), base_dao.py y un *_dao.py por entidad
 models/       Dominio: persona, cama, triaje, estrategias, estados (Enum), excepciones
 utils/        security.py (bcrypt) y logging_config.py
 db_scripts/   schema.sql, seed.sql, crear_usuario_app.sql y diagrama.png
@@ -79,8 +79,10 @@ views → controllers → models (dominio) → dao → MySQL
 - Todo SQL con parámetros: `cursor.execute(sql, (valor,))`. Prohibido concatenar o usar f-strings en SQL.
   Si un nombre de tabla/columna/`ORDER BY` es dinámico, validarlo contra una lista blanca.
 - No hay borrado físico (RN-11): se usa `estado_registro = FALSE`.
-- Cada DAO nuevo: cursor cerrado en `finally`, `except mysql.connector.Error`, y captura de `ConexionBDError`
-  al pedir la conexión. `ConexionBD` usa `autocommit=True`; las operaciones multi-paso de escritura
+- Cada DAO nuevo hereda de `BaseDAO` (`dao/base_dao.py`) y usa `_consultar_uno`, `_consultar_varios`, `_insertar`
+  y `_ejecutar`: ahí se cierran los cursores y los errores de MySQL se traducen a `PersistenciaError`
+  (o `RegistroDuplicadoError`, o `ConexionBDError`). `None`/lista vacía = no encontrado; un fallo lanza excepción.
+  Excepción: `UsuarioDAO.autenticar` devuelve `None` ante todo fallo, para no revelar la causa. `ConexionBD` usa `autocommit=True`; las operaciones multi-paso de escritura
   (asignar cama, dar de alta) necesitarán transacciones explícitas y un pool de conexiones.
 - Las reglas críticas viven también en la BD (RN-05 y RN-10 con `UNIQUE`/`CHECK`). Cambios de esquema:
   actualizar `schema.sql`, `seed.sql`, los modelos, las pruebas y `diagrama.png`.

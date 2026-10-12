@@ -26,10 +26,18 @@ class ReglaNegocioError(SigtacError):
     """Se lanza cuando se viola una regla fundamental (ej. intentar dar de alta a un paciente que no tiene cama)."""
     pass
 
-class ConexionBDError(SigtacError):
+class SignosVitalesIncompletosError(SigtacError):
+    """Se lanza cuando falta un signo vital que el algoritmo de triaje necesita para clasificar."""
+    pass
+
+class PersistenciaError(SigtacError):
+    """Se lanza cuando una operación sobre la base de datos no se pudo completar."""
+    pass
+
+class ConexionBDError(PersistenciaError):
     """Se lanza cuando falta configuración (.env) o no se puede conectar a la base de datos."""
     pass
 
-class SignosVitalesIncompletosError(SigtacError):
-    """Se lanza cuando falta un signo vital que el algoritmo de triaje necesita para clasificar."""
+class RegistroDuplicadoError(PersistenciaError):
+    """Se lanza cuando se intenta guardar un registro que viola una restricción de unicidad (p. ej. DNI repetido)."""
     pass

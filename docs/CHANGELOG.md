@@ -5,6 +5,34 @@
 
 ---
 
+## [2026-10-12] — `BaseDAO` y política de errores de la capa DAO
+
+### Cambio
+- Nuevo `dao/base_dao.py`: clase `BaseDAO` con `_consultar_uno`, `_consultar_varios`, `_insertar` (devuelve el id generado) y `_ejecutar` (devuelve las filas afectadas). Pide la conexión, abre y cierra el cursor y traduce los errores de MySQL.
+- `models/excepciones.py`: nuevas `PersistenciaError` y `RegistroDuplicadoError`. `ConexionBDError` pasa a derivar de `PersistenciaError`.
+- `dao/usuario_dao.py`: `UsuarioDAO` hereda de `BaseDAO`; ya no maneja cursores. Su comportamiento no cambia (las 33 pruebas pasan sin modificar sus aserciones).
+- Nuevo `tests/test_base_dao.py` (23 pruebas).
+
+### Archivos afectados
+- `dao/base_dao.py` (nuevo), `dao/usuario_dao.py`, `models/excepciones.py`, `tests/test_base_dao.py` (nuevo), `tests/test_usuario_dao.py`, `CLAUDE.md`, `docs/`
+
+### Motivo
+Cada DAO repetía unas 15 líneas (conexión, cursor, `try/except`, cierre en `finally`). Con cinco DAO más, un error en una copia sería difícil de encontrar. Además, devolver `None` ante cualquier fallo, como hace el login, no sirve en el resto de DAO: el controlador no podría distinguir "el paciente no existe" de "MySQL está caído".
+
+### Impacto
+- Política de errores de los DAO (salvo `UsuarioDAO.autenticar`): `None` o lista vacía significan "no encontrado"; los fallos lanzan `PersistenciaError` o una subclase (`ConexionBDError`, `RegistroDuplicadoError` para el error 1062).
+- Pruebas: 364 pasan. Las pruebas de `usuario_dao` reemplazan `ConexionBD` en `base_dao`, que es donde ahora se usa.
+
+### Decisiones
+- **Jerarquía:** `SigtacError → PersistenciaError → {ConexionBDError, RegistroDuplicadoError}`. Un controlador puede capturar todos los fallos de BD con una sola cláusula y, si quiere, tratar el duplicado aparte.
+- **Sin `commit()`/`rollback()` en `BaseDAO`:** con `autocommit=True` no tienen efecto, y dentro de la futura transacción de asignar cama un `commit` por sentencia la rompería. Las transacciones se decidirán aparte (problema 4 de `PROJECT_STATUS.md`).
+- **Los logs y mensajes no incluyen el texto de MySQL**, solo el código (`errno`): MySQL arma la consulta en el cliente y sus mensajes pueden traer los valores enviados (por ejemplo `Duplicate entry '12345678'`). El error original queda encadenado (`raise ... from e`) para depurar.
+- Solo se traducen errores de `mysql.connector`; un error de programación (p. ej. `KeyError`) se propaga tal cual para no ocultarlo.
+- `params` debe ser una tupla (`TypeError` si no): evita el error clásico de pasar `(valor)` en lugar de `(valor,)`.
+- `BaseDAO` no es abstracta: no tiene métodos que las subclases deban implementar, solo métodos que heredan.
+
+---
+
 ## [2026-10-12] — Script para crear el usuario de BD de la aplicación
 
 ### Cambio

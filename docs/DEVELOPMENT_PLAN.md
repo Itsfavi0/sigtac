@@ -154,6 +154,14 @@
 - [x] Utilizar consultas parametrizadas.
 - [x] Bloqueo temporal tras 5 intentos fallidos (15 min).
 
+### `base_dao.py`
+
+**Estado:** completado y probado (`tests/test_base_dao.py`).
+
+- [x] Conexión, cursor y cierre en un solo lugar.
+- [x] Errores de MySQL → `PersistenciaError` / `RegistroDuplicadoError`.
+- [x] `usuario_dao.py` hereda de `BaseDAO`.
+
 ### Orden de implementación de los DAO restantes
 
 `paciente_dao.py` → `cama_dao.py` → `auditoria_dao.py` → (decisión sobre transacciones) → `triaje_dao.py` → `asignacion_dao.py`.
