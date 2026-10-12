@@ -5,6 +5,7 @@ import threading
 import mysql.connector
 from dotenv import load_dotenv
 from mysql.connector import Error
+from mysql.connector.constants import ClientFlag
 
 from models.excepciones import ConexionBDError
 
@@ -50,6 +51,9 @@ class ConexionBD:
             "password": _variable_requerida("DB_PASS"),
             "database": _variable_requerida("DB_NAME"),
             "autocommit": True,
+            # rowcount de un UPDATE = filas encontradas, no solo las modificadas: así 0 significa "no existe"
+            # aunque los datos nuevos sean iguales a los guardados.
+            "client_flags": [ClientFlag.FOUND_ROWS],
         }
 
         try:

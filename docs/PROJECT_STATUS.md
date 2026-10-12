@@ -16,13 +16,13 @@
 
 - Base de datos (21 tablas) implementada con las restricciones de RN-05 y RN-10 y el bloqueo temporal de cuentas.
 - **Fase 2 (models) cerrada:** todas las clases del plan existen y tienen pruebas automáticas.
-- **Fase 3 (DAO) iniciada:** `db_connection.py`, `base_dao.py` y `usuario_dao.py` están terminados y probados.
+- **Fase 3 (DAO) iniciada:** `db_connection.py`, `base_dao.py`, `usuario_dao.py` y `paciente_dao.py` están terminados y probados.
 - `models/persona.py` alineado con las tablas `paciente` y `empleado`, con validaciones de entrada (2026-10-12).
-- Pruebas: **364 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
+- Pruebas: **393 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
 
 ### Tarea actual
 
-Ninguna en curso. Siguiente tarea: **`dao/paciente_dao.py`** (ya no está bloqueado).
+Ninguna en curso. Siguiente tarea: **`dao/cama_dao.py`**.
 Antes hay que volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db`: tiene el esquema anterior al 2026-10-12.
 
 ---
@@ -34,7 +34,7 @@ Antes hay que volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db`: tie
 | Fase 0 — Entorno y estructura | Completada (`.venv` recreado dentro del proyecto el 2026-10-11) |
 | Fase 1 — Base de datos | Completada. Verificada en MySQL 8.0.46 (2026-10-12) y antes en MariaDB 11.8 |
 | Fase 2 — Models | Completada (2026-10-12) |
-| Fase 3 — DAO | En curso: `db_connection.py`, `base_dao.py` y `usuario_dao.py` terminados |
+| Fase 3 — DAO | En curso: `db_connection.py`, `base_dao.py`, `usuario_dao.py` y `paciente_dao.py` terminados |
 | Fase 4 — Controllers | Pendiente (la carpeta `controllers/` aún no existe) |
 | Fase 5 — Utils | Parcial: `security.py` y `logging_config.py` hechos; falta `pdf_generator.py` |
 | Fase 6 — Views | Pendiente (la carpeta `views/` aún no existe) |
@@ -57,8 +57,9 @@ Antes hay que volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db`: tie
 
 ### Fase 3 — DAO
 
-- `dao/db_connection.py`: Singleton, credenciales obligatorias desde `.env`, `autocommit=True`, reconexión (`test_db_connection.py`, 11 pruebas).
+- `dao/db_connection.py`: Singleton, credenciales obligatorias desde `.env`, `autocommit=True`, `FOUND_ROWS`, reconexión (`test_db_connection.py`, 12 pruebas).
 - `dao/base_dao.py`: clase base de los DAO (cursor, cierre y traducción de errores a `PersistenciaError`/`RegistroDuplicadoError`) (`test_base_dao.py`, 23 pruebas).
+- `dao/paciente_dao.py`: buscar por id/DNI, crear, actualizar (sin tocar el DNI) y baja lógica (`test_paciente_dao.py`, 28 pruebas). Verificado en MySQL 8.0.46 con una base temporal (15 comprobaciones).
 - `dao/usuario_dao.py`: hereda de `BaseDAO`; login con JOIN a `empleado` y `rol`, bcrypt, usuario inactivo, señuelo, validación de DNI y bloqueo de 5 intentos durante 15 min (`test_usuario_dao.py`, 33 pruebas).
 - `seed.sql` tiene hashes bcrypt válidos. El login con un usuario del seed se verificó a mano contra una base temporal (ver CHANGELOG del 2026-10-11).
 
@@ -89,19 +90,17 @@ Antes hay que volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db`: tie
 - Revisar la coherencia de `usuario_dao.py` con `auth_controller.py` cuando exista.
 - Decidir si `seed.sql` mantiene los datos reales de los integrantes.
 - PyCharm: cada integrante debe seleccionar `SIGTAC/.venv` como intérprete.
-- El `.env` local usa `root`: crear `sigtac_app` con `db_scripts/crear_usuario_app.sql` y cambiar `DB_USER`/`DB_PASS`.
 
 ---
 
 ## Próximo trabajo previsto
 
 1. Volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db` (problema 1).
-2. `paciente_dao.py`: debe convertir `estado_registro` (0/1) a `bool` y obtener `nombre_seguro` con un JOIN.
-3. `cama_dao.py`.
-4. `auditoria_dao.py`.
-5. Decidir el manejo de transacciones (problema 4).
-6. `triaje_dao.py`.
-7. `asignacion_dao.py`.
+2. `cama_dao.py`.
+3. `auditoria_dao.py`.
+4. Decidir el manejo de transacciones (problema 4).
+5. `triaje_dao.py`.
+6. `asignacion_dao.py`.
 
 El orden respecto al plan original cambia en un punto: `auditoria_dao.py` pasa antes que `triaje_dao.py` y `asignacion_dao.py`,
 porque es de una sola tabla y no depende de transacciones. El motivo queda registrado en `CHANGELOG.md`.

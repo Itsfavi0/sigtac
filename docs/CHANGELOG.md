@@ -5,6 +5,42 @@
 
 ---
 
+## [2026-10-12] — `PacienteDAO` y `FOUND_ROWS` en la conexión
+
+### Cambio
+- Nuevo `dao/paciente_dao.py` (`PacienteDAO`, hereda de `BaseDAO`): `buscar_por_id`, `buscar_por_dni`, `crear`, `actualizar` y `anular`.
+- `dao/db_connection.py`: la conexión se abre con `ClientFlag.FOUND_ROWS`.
+- Nuevo `tests/test_paciente_dao.py` (28 pruebas) y 1 prueba nueva en `tests/test_db_connection.py`.
+
+### Archivos afectados
+- `dao/paciente_dao.py` (nuevo), `dao/db_connection.py`, `tests/test_paciente_dao.py` (nuevo), `tests/test_db_connection.py`, `docs/`
+
+### Motivo
+Siguiente paso de la Fase 3. `FOUND_ROWS` es necesario para `actualizar`: sin él, MySQL devuelve en `rowcount` las filas *modificadas*, y guardar un paciente sin cambios daría 0, que el DAO confundiría con "no existe". Con `FOUND_ROWS`, `rowcount` cuenta las filas *encontradas*.
+
+### Impacto
+- Pruebas: 393 pasan.
+- Verificado en MySQL 8.0.46 con una base temporal (`sigtac_scratch_tmp`, ya eliminada), creada con una cuenta de administrador porque `sigtac_app` no puede crear bases. 15 comprobaciones pasaron:
+  - Búsqueda por DNI e id, JOIN a `seguro`, `fecha_nac` como `date`, DNI inexistente → `None`.
+  - `crear` devuelve el id; DNI duplicado → `RegistroDuplicadoError` (1062); seguro inexistente → `PersistenciaError` (1452), no duplicado.
+  - `actualizar` sin cambios devuelve `True` (confirma `FOUND_ROWS`); con cambios los guarda; id inexistente → `False`.
+  - `anular`: el paciente sigue existiendo con `activo=False`; anular dos veces devuelve `True`; id inexistente → `False`.
+  - Los mensajes de error registrados solo muestran el `errno`, sin el DNI.
+
+### Decisiones
+- **El DNI no se actualiza:** `actualizar` solo modifica nombres, apellidos, fecha de nacimiento, sexo y seguro. El DNI identifica a la persona; un DNI mal registrado se corrige anulando el registro y creando uno nuevo.
+- **`buscar_por_dni` incluye a los anulados:** el `UNIQUE` del DNI también los cubre, así que el controlador debe saber que el paciente existe (para reactivarlo) en lugar de intentar un `INSERT` que fallaría.
+- `actualizar` y `anular` devuelven `False` si el id no existe; `anular` es idempotente (anular dos veces devuelve `True`).
+- `crear` rechaza un paciente que ya tiene id o que está anulado (`ValueError`), sin consultar la BD.
+- El DAO no repite validaciones: si una fila tiene datos inválidos, el constructor de `Paciente` lanza `ValueError`.
+- Los logs solo registran `id_paciente`, nunca DNI ni nombres.
+
+### Pendientes
+- Reactivar un paciente anulado (`estado_registro = TRUE`): se añadirá cuando el controlador lo necesite.
+- Búsqueda por nombre o listado: se añadirá cuando la vista lo necesite.
+
+---
+
 ## [2026-10-12] — `BaseDAO` y política de errores de la capa DAO
 
 ### Cambio

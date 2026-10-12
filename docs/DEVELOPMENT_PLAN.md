@@ -171,11 +171,13 @@ Motivo del orden: ver `CHANGELOG.md` (2026-10-12).
 
 > Requisitos del modelo: convertir `estado_registro` (0/1) a `bool` para `activo` y obtener `nombre_seguro` con un JOIN a `seguro`.
 
-- [ ] Crear paciente.
-- [ ] Buscar paciente.
-- [ ] Buscar por DNI.
-- [ ] Actualizar paciente.
-- [ ] Borrado lógico con `estado_registro = FALSE`.
+**Estado:** completado, probado (`tests/test_paciente_dao.py`) y verificado en MySQL 8.0.46 con una base temporal.
+
+- [x] Crear paciente.
+- [x] Buscar paciente.
+- [x] Buscar por DNI.
+- [x] Actualizar paciente (el DNI no se modifica).
+- [x] Borrado lógico con `estado_registro = FALSE`.
 
 ### `cama_dao.py`
 

@@ -2,6 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from mysql.connector import Error as DBError
+from mysql.connector.constants import ClientFlag
 
 from dao import db_connection
 from dao.db_connection import ConexionBD
@@ -38,6 +39,11 @@ def test_conecta_con_autocommit_y_puerto_por_defecto(connect):
     assert kwargs["autocommit"] is True
     assert kwargs["port"] == 3306
     assert kwargs["database"] == "sigtac_db"
+
+
+def test_rowcount_cuenta_filas_encontradas(connect):
+    ConexionBD().obtener_conexion()
+    assert ClientFlag.FOUND_ROWS in connect.call_args.kwargs["client_flags"]
 
 
 def test_lee_el_puerto_del_entorno(connect, monkeypatch):
