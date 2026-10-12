@@ -91,16 +91,14 @@
 
 ### `persona.py`
 
-- [x] Clase abstracta `Persona`
-- [x] Clase abstracta `Empleado`
-- [x] `Paciente` (con baja lógica `anular()`, RN-11)
-- [x] `Enfermero`
-- [x] `Medico`
-- [x] `PersonalLimpieza`
+- [x] Clase abstracta `Persona` (valida DNI de 8 dígitos, nombres y fecha de nacimiento)
+- [x] Clase abstracta `Empleado` (con `activo` y baja lógica `anular()`, RN-11)
+- [x] `Paciente` (con `sexo`, `id_seguro` y baja lógica `anular()`, RN-11)
+- [x] `Enfermero` (`area`)
+- [x] `Medico` (`especialidad`)
+- [x] `PersonalLimpieza` (`turno`)
+- [x] Alineado con las tablas `paciente` y `empleado` (2026-10-12)
 - [x] Pruebas (`tests/test_persona.py`)
-
-> Diferencias pendientes entre `persona.py` y las tablas `paciente`/`empleado` (por ejemplo, falta `sexo` en `Paciente`):
-> ver "Problemas abiertos" en `PROJECT_STATUS.md`. Hay que resolverlas antes de `paciente_dao.py`.
 
 ### `cama.py`
 
@@ -162,6 +160,8 @@
 Motivo del orden: ver `CHANGELOG.md` (2026-10-12).
 
 ### `paciente_dao.py`
+
+> Requisitos del modelo: convertir `estado_registro` (0/1) a `bool` para `activo` y obtener `nombre_seguro` con un JOIN a `seguro`.
 
 - [ ] Crear paciente.
 - [ ] Buscar paciente.

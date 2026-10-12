@@ -62,7 +62,8 @@ INSERT INTO estado_cama (id_estado_cama, nombre_estado_cama) VALUES
 
 INSERT INTO area (id_area, nombre_area, piso) VALUES
 (1, 'Trauma Shock', 'Piso 1 - Emergencia'), (2, 'Unidad de Cuidados Intensivos (UCI)', 'Piso 2'),
-(3, 'Sala de Observación Adultos', 'Piso 1 - Emergencia'), (4, 'Pabellón de Hospitalización A', 'Piso 3');
+(3, 'Sala de Observación Adultos', 'Piso 1 - Emergencia'), (4, 'Pabellón de Hospitalización A', 'Piso 3'),
+(5, 'Triaje', 'Piso 1 - Emergencia'); -- Área sin camas: solo se asigna a personal de enfermería
 
 INSERT INTO tipo_cama (id_tipo_cama, nombre_tipo_cama, nivel_min) VALUES
 (1, 'Cama de Trauma Shock', 1), (2, 'Cama UCI con Ventilador', 2), 
@@ -82,13 +83,14 @@ INSERT INTO sintoma (id_sintoma, nombre_sintoma, peso_clinico) VALUES
 -- ==============================================================================
 -- 2. TABLAS MAESTRAS (las fechas de nacimiento son ficticias)
 -- ==============================================================================
-INSERT INTO empleado (id_empleado, dni, nombres, apellidos, fecha_nac, colegiatura, id_cargo, estado_registro) VALUES
-(1, '11111111', 'Admin', 'Sistema', '1990-01-01', 'CIP-12345', 6, 1),
-(2, '22222222', 'Héctor', 'Salazar Mendoza', '1978-03-15', 'CMP-54321', 1, 1),
-(3, '33333333', 'Favio Enrique', 'Brañez Choquemamani', '1998-07-20', 'CEP-98765', 3, 1),
-(4, '44444444', 'Renzo Alexander', 'Moya Ángeles', '1999-11-05', NULL, 5, 1),
-(5, '55555555', 'Leonardo', 'Veliz Neyra', '1985-09-30', 'CMP-67890', 2, 1),
-(6, '99999999', 'Médico', 'Despedido', '1975-12-12', 'CMP-00000', 2, 0); -- Empleado inactivo para probar borrado lógico
+-- id_area, especialidad y turno solo se llenan según el tipo de empleado (Enfermero, Medico, PersonalLimpieza)
+INSERT INTO empleado (id_empleado, dni, nombres, apellidos, fecha_nac, colegiatura, id_cargo, id_area, especialidad, turno, estado_registro) VALUES
+(1, '11111111', 'Admin', 'Sistema', '1990-01-01', 'CIP-12345', 6, NULL, NULL, NULL, 1),
+(2, '22222222', 'Héctor', 'Salazar Mendoza', '1978-03-15', 'CMP-54321', 1, NULL, 'Medicina Intensiva', NULL, 1),
+(3, '33333333', 'Favio Enrique', 'Brañez Choquemamani', '1998-07-20', 'CEP-98765', 3, 5, NULL, NULL, 1),
+(4, '44444444', 'Renzo Alexander', 'Moya Ángeles', '1999-11-05', NULL, 5, NULL, NULL, 'MAÑANA', 1),
+(5, '55555555', 'Leonardo', 'Veliz Neyra', '1985-09-30', 'CMP-67890', 2, NULL, 'Medicina Interna', NULL, 1),
+(6, '99999999', 'Médico', 'Despedido', '1975-12-12', 'CMP-00000', 2, NULL, 'Medicina Interna', NULL, 0); -- Empleado inactivo para probar borrado lógico
 
 INSERT INTO usuario (id_usuario, id_empleado, id_rol, hash_clave, activo) VALUES
 (1, 1, 1, '$2b$12$Kx6Fi0botsesFpvqW3KwZ.C6GmZ3TrcA3oRU1lGRsL51tNMWc1jZC', 1),

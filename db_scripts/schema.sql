@@ -144,11 +144,16 @@ CREATE TABLE empleado (
     fecha_nac DATE NOT NULL,
     colegiatura VARCHAR(20) NULL,
     id_cargo INT NOT NULL,
+    id_area INT NULL COMMENT 'Área asignada. La usa la clase Enfermero; NULL para el resto del personal',
+    especialidad VARCHAR(100) NULL COMMENT 'Especialidad médica. La usa la clase Medico; NULL para el resto del personal',
+    turno VARCHAR(10) NULL COMMENT 'Turno de trabajo. Lo usa la clase PersonalLimpieza; NULL para el resto del personal',
     estado_registro BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'TRUE=Activo, FALSE=Anulado',
-    
+
     CONSTRAINT PK_empleado PRIMARY KEY (id_empleado),
     CONSTRAINT UN_empleado_dni UNIQUE (dni),
-    CONSTRAINT FK_empleado_cargo FOREIGN KEY (id_cargo) REFERENCES cargo(id_cargo) ON DELETE RESTRICT ON UPDATE CASCADE
+    CONSTRAINT CH_empleado_turno CHECK (turno IS NULL OR turno IN ('MAÑANA', 'TARDE', 'NOCHE')),
+    CONSTRAINT FK_empleado_cargo FOREIGN KEY (id_cargo) REFERENCES cargo(id_cargo) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT FK_empleado_area FOREIGN KEY (id_area) REFERENCES area(id_area) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE usuario (

@@ -1,14 +1,11 @@
 import logging
-import re
 from mysql.connector import Error as DBError
 from dao.db_connection import ConexionBD
 from models.excepciones import ConexionBDError
+from models.persona import es_dni_valido
 from utils.security import simular_verificacion, verificar_password
 
 logger = logging.getLogger(__name__)
-
-# DNI peruano: exactamente 8 dígitos
-PATRON_DNI = re.compile(r"[0-9]{8}")
 
 # Bloqueo temporal tras intentos fallidos consecutivos
 MAX_INTENTOS_FALLIDOS = 5
@@ -66,7 +63,7 @@ class UsuarioDAO:
             return None
 
         dni_limpio = dni.strip()
-        if not PATRON_DNI.fullmatch(dni_limpio):
+        if not es_dni_valido(dni_limpio):
             logger.warning("Intento de autenticación con DNI de formato inválido.")
             return None
 

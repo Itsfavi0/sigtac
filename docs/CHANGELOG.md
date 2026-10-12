@@ -5,6 +5,72 @@
 
 ---
 
+## [2026-10-12] — Alineación de `persona.py` con la BD y validaciones de entrada
+
+### Cambio
+**Modelos (`models/persona.py`)**
+- `Paciente`:
+  - Nuevo atributo `sexo` (`'M'` o `'F'`, igual que `CH_paciente_sexo`).
+  - `seguro` (texto) se reemplaza por `id_seguro` (entero obligatorio, FK a `seguro`) y `nombre_seguro` (opcional, solo para mostrar; el DAO lo obtendrá con un JOIN).
+  - `id_paciente` admite `None` para un paciente aún no guardado en la BD.
+  - Nueva firma: `Paciente(id_paciente, dni, nombres, apellidos, fecha_nac, sexo, id_seguro, activo=True, nombre_seguro=None)`.
+- `Empleado`: nuevo atributo `activo` y método `anular()` (espejo de `empleado.estado_registro`, RN-11), igual que `Paciente`. Las tres subclases reciben `activo=True` como último parámetro.
+- Subclases: `Enfermero.area`, `Medico.especialidad` y `PersonalLimpieza.turno` ahora tienen `@property` y aparecen en `obtener_resumen()`.
+- Validaciones nuevas (lanzan `ValueError`):
+  - DNI de exactamente 8 dígitos (`[0-9]`, sin espacios).
+  - `nombres`, `apellidos`, `cargo`, `area` y `especialidad` obligatorios y no vacíos; se guardan sin espacios en los extremos.
+  - `fecha_nac` debe ser `date` (no `datetime` ni texto) y no puede ser futura.
+  - Los ids son enteros positivos (o `None` si aún no se guardaron); se rechaza `bool`.
+  - `activo` debe ser `bool`: el DAO debe convertir el 0/1 de MySQL.
+  - `colegiatura` es opcional, pero si se envía no puede estar vacía.
+  - `turno` debe ser `MAÑANA`, `TARDE` o `NOCHE`.
+  - Los mensajes de error no incluyen el valor recibido, porque podría ser un dato personal y acabar en un log.
+- Nueva función `es_dni_valido()` y constante `PATRON_DNI` en `models/persona.py`.
+
+**DAO (`dao/usuario_dao.py`)**
+- Usa `es_dni_valido()` de `models/persona.py` en lugar de su propio `PATRON_DNI`. El comportamiento no cambia.
+
+**Base de datos**
+- `schema.sql`, tabla `empleado`: nuevas columnas `id_area` (FK a `area`), `especialidad` y `turno`, todas `NULL`, y la restricción `CH_empleado_turno`.
+- `seed.sql`: nueva área `(5, 'Triaje')`, sin camas. Los empleados tienen ahora área (enfermería), especialidad (médicos) o turno (limpieza).
+
+**Pruebas**
+- `tests/test_persona.py` reescrito: 29 → 185 pruebas. Cubre cada validación con valores límite (DNI de 7 y 9 dígitos, fecha de hoy frente a mañana, etc.), la baja lógica de `Empleado` y los atributos de las subclases.
+- `tests/test_estados_vs_bd.py`: nueva prueba que compara `Paciente.SEXOS_VALIDOS` y `PersonalLimpieza.TURNOS_VALIDOS` con los `CHECK` de `schema.sql`.
+
+### Archivos afectados
+`models/persona.py`, `dao/usuario_dao.py`, `db_scripts/schema.sql`, `db_scripts/seed.sql`, `tests/test_persona.py`, `tests/test_estados_vs_bd.py`, `docs/`
+
+### Motivo
+Resolver los problemas abiertos 1 a 5 de `PROJECT_STATUS.md`. `paciente_dao.py` no podía insertar un `Paciente` (faltaba `sexo`, que es `NOT NULL`). Un futuro `EmpleadoDAO` no podía reconstruir el estado ni los datos propios de cada subclase. Y los objetos aceptaban datos que la BD rechazaría (o peor, que aceptaría siendo incorrectos).
+
+### Eliminado
+- `Paciente.seguro` (texto): reemplazado por `id_seguro` + `nombre_seguro`. La tabla guarda un id, y con solo el nombre el DAO tendría que buscar el id por texto en cada inserción.
+- `PATRON_DNI` de `dao/usuario_dao.py`: movido a `models/persona.py`. Una regla, un dueño: si el formato del DNI cambia, se cambia en un solo lugar.
+- Comentario incorrecto en `Enfermero.registrar_triaje()` ("cerrar el episodio", copiado de `Medico.dar_alta`).
+
+### Impacto
+- Pruebas: 341 pasan (antes 183).
+- Hay que volver a ejecutar `schema.sql` y `seed.sql` en cada entorno de desarrollo (borra los datos).
+- **El SQL no se verificó contra una BD real:** el usuario del `.env` fue rechazado por el servidor (`Access denied`). Solo se comprobó de forma estática que cada fila del `INSERT INTO empleado` tenga 11 valores para 11 columnas.
+- Cualquier código que cree `Paciente` con el parámetro `seguro` debe cambiar a `id_seguro` (hoy solo las pruebas lo hacían).
+
+### Decisiones
+- **`area`, `especialidad` y `turno` se guardan en la tabla `empleado`** como columnas que admiten `NULL` (una sola tabla para toda la jerarquía), en lugar de crear una tabla por subclase. Es más simple para el alcance del curso. La desventaja: la BD no puede impedir que, por ejemplo, un operario de limpieza tenga especialidad, porque el tipo de empleado está en otra tabla (`cargo.tipo`). Esa coherencia la garantizan las clases Python, que exigen cada atributo a su subclase.
+- **`area` es una FK** a la tabla `area` ya existente, no texto libre. Se añadió el área "Triaje" porque el único enfermero del seed tiene rol "Enfermero de Triaje" y no existía un área que la representara.
+- **`especialidad` es texto libre** (`VARCHAR(100)`), no un catálogo. Se solapa en parte con `cargo` ("Médico Internista" / "Medicina Interna"), pero son conceptos distintos (el puesto frente al título profesional), con el mismo criterio con el que se separaron `rol` y `cargo`. Si se necesitan reportes por especialidad, conviene convertirla en catálogo.
+- **`turno` usa `CHECK`** con tres valores, como `sexo`; Python y la BD se mantienen sincronizados con una prueba.
+- **DNI solo de 8 dígitos**, como ya exigía el login. La columna sigue siendo `VARCHAR(15)` y no se cambió.
+- `activo` exige `bool` estricto, para que un 0/1 mal convertido en un DAO se detecte de inmediato.
+
+### Pendientes
+- Verificar `schema.sql` y `seed.sql` en una base temporal con un usuario administrador.
+- Pacientes sin DNI peruano (extranjeros) o sin identificar (inconscientes): hoy no se pueden registrar. Requiere una decisión del equipo.
+- Actualizar `db_scripts/diagrama.png` con las columnas nuevas de `empleado`.
+- El `.env` local usa `root`. `CLAUDE.md` indica usar un usuario con solo `SELECT, INSERT, UPDATE`.
+
+---
+
 ## [2026-10-12] — Cierre de la Fase 2: pruebas de `persona.py` y documentación al día
 
 ### Cambio

@@ -17,12 +17,13 @@
 - Base de datos (21 tablas) implementada con las restricciones de RN-05 y RN-10 y el bloqueo temporal de cuentas.
 - **Fase 2 (models) cerrada:** todas las clases del plan existen y tienen pruebas automáticas.
 - **Fase 3 (DAO) iniciada:** `db_connection.py` y `usuario_dao.py` están terminados y probados.
-- Pruebas: **183 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
+- `models/persona.py` alineado con las tablas `paciente` y `empleado`, con validaciones de entrada (2026-10-12).
+- Pruebas: **341 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
 
 ### Tarea actual
 
-Ninguna en curso. Siguiente tarea: **`dao/paciente_dao.py`**, pero antes hay que resolver el
-problema 1 de la sección "Problemas abiertos" (`Paciente` no tiene `sexo`).
+Ninguna en curso. Siguiente tarea: **`dao/paciente_dao.py`** (ya no está bloqueado).
+Antes conviene verificar `schema.sql`/`seed.sql` en una base temporal (ver "Problemas abiertos", punto 1).
 
 ---
 
@@ -47,11 +48,11 @@ problema 1 de la sección "Problemas abiertos" (`Paciente` no tiene `sexo`).
 
 | Archivo | Contenido | Pruebas |
 |---|---|---|
-| `models/persona.py` | `Persona`, `Paciente`, `Empleado`, `Enfermero`, `Medico`, `PersonalLimpieza` | `test_persona.py` (29) |
+| `models/persona.py` | `Persona`, `Paciente`, `Empleado`, `Enfermero`, `Medico`, `PersonalLimpieza`, `es_dni_valido` | `test_persona.py` (185) |
 | `models/cama.py` | `Cama` y 4 subtipos, máquina de estados, `es_compatible` | `test_cama.py` (32) |
 | `models/estrategias.py` | `EstrategiaTriaje`, `ReglaManchester`, `ReglaMINSA` | `test_estrategias.py` (32) |
 | `models/triaje.py` | `EpisodioEmergencia`, `Triaje`, `SignosVitales`, `Sintoma` | `test_triaje.py` (38) |
-| `models/estados.py` | `EstadoCama`, `EstadoEpisodio` | `test_estados_vs_bd.py` (2) |
+| `models/estados.py` | `EstadoCama`, `EstadoEpisodio` | `test_estados_vs_bd.py` (4: también comprueba sexo y turno contra los `CHECK`) |
 | `models/excepciones.py` | `SigtacError` y 7 excepciones derivadas | Se usan en las pruebas anteriores |
 
 ### Fase 3 — DAO
@@ -64,39 +65,43 @@ problema 1 de la sección "Problemas abiertos" (`Paciente` no tiene `sexo`).
 
 ## Problemas abiertos
 
-Diferencias entre el código y la BD encontradas al cerrar la Fase 2. **No se corrigieron:**
-cada una requiere una decisión del equipo antes de escribir el DAO correspondiente.
+1. **`schema.sql` y `seed.sql` sin verificar contra una BD real** desde el cambio del 2026-10-12 (columnas `id_area`,
+   `especialidad` y `turno` de `empleado`). El usuario del `.env` fue rechazado por el servidor (`Access denied`).
+   Hay que cargarlos en una base temporal con un usuario administrador.
+2. **Pacientes sin DNI peruano** (extranjeros o pacientes sin identificar): `Persona` exige 8 dígitos, así que hoy no se pueden registrar. Requiere una decisión del equipo.
+3. **Permisos duplicados:** la tabla `rol` y `tiene_permiso()` en cada subclase. Se decidirá en la Fase 4. Las pruebas actuales fijan el comportamiento de `tiene_permiso()`.
+4. **Transacciones:** `ConexionBD` usa `autocommit=True` y una sola conexión. `triaje_dao.py` y `asignacion_dao.py` necesitan transacciones explícitas; hay que decidir cómo implementarlas antes de escribirlos.
 
-1. **`Paciente` no tiene `sexo`.** La tabla `paciente` exige `sexo CHAR(1) NOT NULL` con `CHECK (sexo IN ('M','F'))`,
-   pero la clase no tiene ese atributo. `paciente_dao.py` no podrá insertar un paciente creado desde la clase. **Bloquea `paciente_dao.py`.**
-2. **`Paciente.seguro` es texto** (por ejemplo, `"EsSalud"`) y la tabla guarda `id_seguro` (FK a `seguro`). El DAO tendrá que traducir entre los dos.
-3. **`Empleado` no refleja `estado_registro`.** La tabla `empleado` lo tiene (el seed incluye un empleado anulado), pero la clase no tiene `activo` ni `anular()`, a diferencia de `Paciente`.
-4. **Atributos de subclase sin columna en la BD:** `Enfermero.area`, `Medico.especialidad` y `PersonalLimpieza.turno` no existen en `empleado`. Además, no tienen `@property`, así que no se pueden leer desde fuera de la clase.
-5. **`Persona` no valida sus datos.** No comprueba el formato del DNI ni que `fecha_nac` no sea futura (con una fecha futura, `calcular_edad()` devuelve un valor negativo). `UsuarioDAO` sí valida el DNI (8 dígitos), pero la columna admite `VARCHAR(15)`.
-6. **Permisos duplicados:** la tabla `rol` y `tiene_permiso()` en cada subclase. Se decidirá en la Fase 4. Las pruebas actuales fijan el comportamiento de `tiene_permiso()`.
-7. **Transacciones:** `ConexionBD` usa `autocommit=True` y una sola conexión. `triaje_dao.py` y `asignacion_dao.py` necesitan transacciones explícitas; hay que decidir cómo implementarlas antes de escribirlos.
+### Resueltos el 2026-10-12
+
+- `Paciente` tiene `sexo` e `id_seguro` (+ `nombre_seguro` opcional); ya no bloquea `paciente_dao.py`.
+- `Empleado` tiene `activo` y `anular()` (espejo de `estado_registro`).
+- `area`, `especialidad` y `turno` tienen columna en `empleado` y `@property` en su subclase.
+- `Persona` y sus subclases validan sus datos (DNI, nombres, fecha de nacimiento, ids, sexo, turno).
 
 ---
 
 ## Pendientes conocidos (sin bloqueo inmediato)
 
-- Actualizar `db_scripts/diagrama.png` (faltan `fecha_nac`, `intentos_fallidos`, `bloqueado_hasta` y las columnas generadas de `asignacion_cama`).
-- Probar `schema.sql` y `seed.sql` en un MySQL 8.0 real.
+- Actualizar `db_scripts/diagrama.png` (faltan `fecha_nac`, `id_area`, `especialidad`, `turno`, `intentos_fallidos`, `bloqueado_hasta`, las columnas generadas de `asignacion_cama` y el área "Triaje").
+- Probar `schema.sql` y `seed.sql` en un MySQL 8.0 real (hasta ahora solo en MariaDB 11.8).
 - Pruebas de integración contra una BD real (temporal).
 - Revisar la coherencia de `usuario_dao.py` con `auth_controller.py` cuando exista.
 - Decidir si `seed.sql` mantiene los datos reales de los integrantes.
 - PyCharm: cada integrante debe seleccionar `SIGTAC/.venv` como intérprete.
+- El `.env` local usa `root`; `CLAUDE.md` indica un usuario con solo `SELECT, INSERT, UPDATE`.
 
 ---
 
 ## Próximo trabajo previsto
 
-1. Resolver el problema 1 (y decidir el 2) → `paciente_dao.py`.
-2. `cama_dao.py`.
-3. `auditoria_dao.py`.
-4. Decidir el manejo de transacciones (problema 7).
-5. `triaje_dao.py`.
-6. `asignacion_dao.py`.
+1. Verificar `schema.sql` y `seed.sql` en una base temporal (problema 1).
+2. `paciente_dao.py`: debe convertir `estado_registro` (0/1) a `bool` y obtener `nombre_seguro` con un JOIN.
+3. `cama_dao.py`.
+4. `auditoria_dao.py`.
+5. Decidir el manejo de transacciones (problema 4).
+6. `triaje_dao.py`.
+7. `asignacion_dao.py`.
 
 El orden respecto al plan original cambia en un punto: `auditoria_dao.py` pasa antes que `triaje_dao.py` y `asignacion_dao.py`,
 porque es de una sola tabla y no depende de transacciones. El motivo queda registrado en `CHANGELOG.md`.
@@ -108,8 +113,8 @@ porque es de una sola tabla y no depende de transacciones. El motivo queda regis
 ### `paciente_dao.py`
 
 Depende de:
-- `models/persona.py` (`Paciente`);
-- tablas `paciente` y `seguro`;
+- `models/persona.py` (`Paciente`: `sexo`, `id_seguro`, `nombre_seguro`, `activo`);
+- tablas `paciente` y `seguro` (JOIN para `nombre_seguro`);
 - RN-11 (`estado_registro = FALSE`).
 
 ### `cama_dao.py`

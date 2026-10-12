@@ -3,7 +3,7 @@
 > Documento de contexto técnico y funcional para asistentes de IA.
 > Fuente principal: `SIGTAC_Proyecto_POO_II_Actualizado(1).docx`.
 > Complemento de planificación: `Plan_de_Desarrollo_de_Software.md`.
-> Última actualización: 2026-10-05.
+> Última actualización: 2026-10-12.
 
 ---
 
@@ -232,6 +232,8 @@ La base utiliza:
 
 - `usuario` se separa de `empleado` porque no todo empleado necesita acceso al sistema y el historial del empleado no debe depender de eliminar sus credenciales.
 - `rol` se separa de `cargo` porque el cargo laboral y los permisos del software son conceptos distintos.
+- La jerarquía `Empleado` se guarda en una sola tabla `empleado`. Los atributos propios de cada subclase (`id_area` para `Enfermero`, `especialidad` para `Medico`, `turno` para `PersonalLimpieza`) son columnas que admiten `NULL`. La coherencia entre tipo de empleado y atributo la garantizan las clases Python, no la BD.
+- El formato del DNI (8 dígitos) se define una sola vez en `models/persona.py` (`es_dni_valido`); `UsuarioDAO` lo reutiliza.
 - Se conserva el estado actual de la cama en `cama` y el historial en `historial_estado_cama`.
 - `triaje_sintoma` resuelve la relación muchos-a-muchos entre triaje y síntomas.
 - La relación episodio → triaje es uno-a-muchos para conservar reclasificaciones.

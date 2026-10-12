@@ -1,12 +1,15 @@
-"""Garantiza que los Enum de Python y los catálogos del seed.sql no se desincronicen."""
+"""Garantiza que los valores fijos de Python y los de la BD (seed.sql y CHECK de schema.sql) no se desincronicen."""
 import re
 from pathlib import Path
 
 import pytest
 
 from models.estados import EstadoCama, EstadoEpisodio
+from models.persona import Paciente, PersonalLimpieza
 
-SEED = (Path(__file__).resolve().parent.parent / "db_scripts" / "seed.sql").read_text(encoding="utf-8")
+DB_SCRIPTS = Path(__file__).resolve().parent.parent / "db_scripts"
+SEED = (DB_SCRIPTS / "seed.sql").read_text(encoding="utf-8")
+SCHEMA = (DB_SCRIPTS / "schema.sql").read_text(encoding="utf-8")
 
 
 def nombres_en_seed(tabla):
@@ -17,3 +20,18 @@ def nombres_en_seed(tabla):
 @pytest.mark.parametrize("tabla, enum", [("estado_cama", EstadoCama), ("estado_episodio", EstadoEpisodio)])
 def test_los_enum_coinciden_con_los_catalogos_de_la_bd(tabla, enum):
     assert {e.value for e in enum} == nombres_en_seed(tabla)
+
+
+def valores_del_check(nombre_check):
+    """Valores permitidos por un CHECK (... IN ('A', 'B')) de schema.sql."""
+    linea = re.search(rf"CONSTRAINT {nombre_check} CHECK (.*)", SCHEMA).group(1)
+    lista = re.search(r"IN \((.*?)\)", linea).group(1)
+    return set(re.findall(r"'([^']+)'", lista))
+
+
+@pytest.mark.parametrize("nombre_check, valores", [
+    ("CH_paciente_sexo", Paciente.SEXOS_VALIDOS),
+    ("CH_empleado_turno", PersonalLimpieza.TURNOS_VALIDOS),
+])
+def test_valores_validos_coinciden_con_los_check_de_la_bd(nombre_check, valores):
+    assert set(valores) == valores_del_check(nombre_check)
