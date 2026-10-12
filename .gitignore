@@ -1,11 +1,31 @@
+# IDEs
 .idea
 .vscode
+
+# Entorno virtual de Python
+.venv
+
+# Variables de entorno (credenciales). La plantilla .env.example sí se versiona.
 .env
-node_modules/
-vendor/
+.env.*
+!.env.example
+
+# Archivos generados por Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Logs
 *.log
+
+# Sistema operativo
 .DS_Store
 Thumbs.db
+
+# Compilados
 dist/
 build/
-.mwb
+
+# Modelos de MySQL Workbench
+*.mwb
+*.mwb.bak
