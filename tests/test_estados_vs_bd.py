@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from dao.cama_dao import CamaDAO
 from models.estados import EstadoCama, EstadoEpisodio
 from models.persona import Paciente, PersonalLimpieza
 
@@ -35,3 +36,10 @@ def valores_del_check(nombre_check):
 ])
 def test_valores_validos_coinciden_con_los_check_de_la_bd(nombre_check, valores):
     assert set(valores) == valores_del_check(nombre_check)
+
+
+def test_la_fabrica_de_camas_cubre_los_tipos_de_la_bd():
+    bloque = re.search(r"INSERT INTO tipo_cama \(.*?\) VALUES(.*?);", SEED, re.S).group(1)
+    tipos_en_seed = set(re.findall(r"\(\d+, '([^']+)', \d+\)", bloque))
+    assert tipos_en_seed  # la expresión regular encontró filas
+    assert set(CamaDAO.CLASES_POR_TIPO) == tipos_en_seed

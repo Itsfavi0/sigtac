@@ -5,6 +5,42 @@
 
 ---
 
+## [2026-10-13] — `CamaDAO` (lectura) y reglas nuevas en `CLAUDE.md`
+
+### Cambio
+- Nuevo `dao/cama_dao.py` (`CamaDAO`, hereda de `BaseDAO`): `buscar_por_id`, `buscar_por_codigo`, `listar_activas` y `listar_disponibles`. Una fábrica (`CLASES_POR_TIPO`) convierte cada fila en su subclase de `Cama`.
+- Nuevo `tests/test_cama_dao.py` (25 pruebas) y una prueba en `tests/test_estados_vs_bd.py` que compara la fábrica con los tipos de `seed.sql`.
+- `CLAUDE.md`: no añadir `Co-Authored-By` de Claude; mensajes con cuerpo con `git commit -F` en PowerShell; no reescribir commits ya subidos; método `_a_<entidad>` en cada DAO; `FOUND_ROWS`; no escribir operaciones multi-paso antes de decidir las transacciones; la verificación en base temporal requiere cuenta de administrador.
+
+### Archivos afectados
+- `dao/cama_dao.py` (nuevo), `tests/test_cama_dao.py` (nuevo), `tests/test_estados_vs_bd.py`, `CLAUDE.md`, `docs/`
+
+### Motivo
+Siguiente DAO del plan. Las reglas de `CLAUDE.md` recogen lo aprendido el 2026-10-12/13: un commit con varios `-m` quedó con el título roto en PowerShell y tuvo que reescribirse, y el usuario pidió que Claude no figure como coautor.
+
+### Impacto
+- Pruebas: 419 pasan.
+- Verificado en MySQL 8.0.46 con una base temporal (`sigtac_scratch_tmp`, ya eliminada). 11 comprobaciones pasaron:
+  - La fábrica crea la subclase correcta con los nombres reales de `tipo_cama`, y todos los estados de la BD existen en `EstadoCama`.
+  - `listar_activas` devuelve las 8 camas del seed; `listar_disponibles`, solo las 4 `DISPONIBLE`, ordenadas por área y código.
+  - Compatibilidad por polimorfismo sobre datos reales: nivel 1 → Trauma Shock y UCI; nivel 4 → solo Observación.
+  - Búsqueda por código e id con JOIN a área y estado; inexistente → `None`.
+  - Una cama dada de baja no aparece en búsquedas, en el mapa ni entre las disponibles.
+
+### Decisiones
+- **Solo lectura por ahora.** Cambiar el estado de una cama son dos escrituras (`UPDATE cama` + `INSERT historial_estado_cama`); sin transacción, un fallo en la segunda dejaría un cambio sin historial. Se implementará después de decidir las transacciones (problema 4).
+- **La fábrica usa el nombre del tipo, no el id:** `nombre_tipo_cama` es `UNIQUE` y los ids dependen del orden de inserción. Un tipo sin clase lanza `ValueError`, y una prueba asegura que la fábrica y `seed.sql` coincidan.
+- **La compatibilidad no se filtra en el DAO ni en SQL:** `listar_disponibles` filtra solo por estado; el controlador aplica `cama.es_compatible(nivel)`. Así la regla tiene un solo dueño (el modelo) y el DAO no contiene reglas de negocio.
+- **Solo camas activas:** el modelo `Cama` no tiene `activo`, así que una cama dada de baja (`estado_registro = FALSE`) no se devuelve en ninguna consulta.
+- El estado se filtra con un parámetro tomado del Enum (`EstadoCama.DISPONIBLE.value`), no escrito en el SQL.
+- Las partes fijas del SQL (`_SELECT`, `_ORDEN`) se concatenan entre sí; los valores siempre van como parámetros.
+- `listar_activas` (todas las camas en cualquier estado) se añade para el futuro mapa de camas.
+
+### Pendientes
+- `cambiar_estado` + `historial_estado_cama`, tras la decisión sobre transacciones.
+
+---
+
 ## [2026-10-12] — `PacienteDAO` y `FOUND_ROWS` en la conexión
 
 ### Cambio

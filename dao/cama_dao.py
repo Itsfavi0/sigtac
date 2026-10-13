@@ -1,0 +1,73 @@
+from dao.base_dao import BaseDAO
+from models.cama import Cama, CamaHospitalizacion, CamaObservacion, CamaTraumaShock, CamaUCI
+from models.estados import EstadoCama
+
+
+class CamaDAO(BaseDAO):
+    """
+    DAO de la tabla cama (solo lectura). Convierte cada fila en la subclase de Cama que
+    corresponde a su tipo (fábrica simple), para que la compatibilidad con el nivel de triaje
+    se decida por polimorfismo con cama.es_compatible(nivel), no en SQL.
+
+    Solo devuelve camas activas (estado_registro = TRUE): el modelo Cama no representa la baja.
+    """
+
+    # Fábrica: nombre del tipo en la tabla tipo_cama → subclase. Se usa el nombre (UNIQUE)
+    # y no el id, porque los ids dependen del orden de inserción del seed.
+    # tests/test_estados_vs_bd.py comprueba que coincida con seed.sql.
+    CLASES_POR_TIPO = {
+        "Cama de Trauma Shock": CamaTraumaShock,
+        "Cama UCI con Ventilador": CamaUCI,
+        "Cama de Observación con Monitor": CamaObservacion,
+        "Cama de Hospitalización General": CamaHospitalizacion,
+    }
+
+    _SELECT = """
+        SELECT c.id_cama, c.codigo, a.nombre_area, t.nombre_tipo_cama, e.nombre_estado_cama
+        FROM cama c
+        JOIN area a ON c.id_area = a.id_area
+        JOIN tipo_cama t ON c.id_tipo_cama = t.id_tipo_cama
+        JOIN estado_cama e ON c.id_estado_cama = e.id_estado_cama
+        WHERE c.estado_registro = TRUE
+    """
+    _ORDEN = " ORDER BY a.nombre_area, c.codigo"
+
+    @staticmethod
+    def _a_cama(fila: dict) -> Cama:
+        """Crea la subclase de Cama que corresponde al tipo de la fila."""
+        clase = CamaDAO.CLASES_POR_TIPO.get(fila["nombre_tipo_cama"])
+        if clase is None:
+            raise ValueError("Tipo de cama sin clase asociada en CamaDAO.CLASES_POR_TIPO.")
+        # EstadoCama(...) lanza ValueError si el estado de la BD no existe en el Enum
+        return clase(fila["id_cama"], fila["codigo"], fila["nombre_area"], EstadoCama(fila["nombre_estado_cama"]))
+
+    @staticmethod
+    def buscar_por_id(id_cama: int) -> Cama | None:
+        """Devuelve la cama activa con ese id, o None si no existe o está dada de baja."""
+        fila = CamaDAO._consultar_uno(CamaDAO._SELECT + " AND c.id_cama = %s", (id_cama,))
+        return CamaDAO._a_cama(fila) if fila else None
+
+    @staticmethod
+    def buscar_por_codigo(codigo: str) -> Cama | None:
+        """Devuelve la cama activa con ese código (p. ej. 'UCI-01'), o None si no existe."""
+        if not isinstance(codigo, str) or not codigo.strip():
+            raise ValueError("El código de cama es obligatorio.")
+        fila = CamaDAO._consultar_uno(CamaDAO._SELECT + " AND c.codigo = %s", (codigo.strip(),))
+        return CamaDAO._a_cama(fila) if fila else None
+
+    @staticmethod
+    def listar_activas() -> list[Cama]:
+        """Todas las camas activas, en cualquier estado, ordenadas por área y código (mapa de camas)."""
+        return [CamaDAO._a_cama(f) for f in CamaDAO._consultar_varios(CamaDAO._SELECT + CamaDAO._ORDEN)]
+
+    @staticmethod
+    def listar_disponibles() -> list[Cama]:
+        """
+        Camas activas en estado DISPONIBLE. El filtro por estado se hace en SQL; la
+        compatibilidad con el nivel de triaje la decide el controlador con es_compatible().
+        """
+        filas = CamaDAO._consultar_varios(
+            CamaDAO._SELECT + " AND e.nombre_estado_cama = %s" + CamaDAO._ORDEN,
+            (EstadoCama.DISPONIBLE.value,),
+        )
+        return [CamaDAO._a_cama(f) for f in filas]

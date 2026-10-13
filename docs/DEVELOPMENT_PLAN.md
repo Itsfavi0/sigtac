@@ -181,11 +181,14 @@ Motivo del orden: ver `CHANGELOG.md` (2026-10-12).
 
 ### `cama_dao.py`
 
-- [ ] Consultar camas disponibles.
-- [ ] Mapear registros a subclases.
-- [ ] Utilizar fábrica simple.
-- [ ] Filtrar SQL por disponibilidad.
-- [ ] Evaluar compatibilidad con `cama.es_compatible(nivel)` en Python.
+**Estado:** lectura completada, probada (`tests/test_cama_dao.py`) y verificada en MySQL 8.0.46 con una base temporal.
+
+- [x] Consultar camas disponibles.
+- [x] Mapear registros a subclases.
+- [x] Utilizar fábrica simple (`CLASES_POR_TIPO`, por `nombre_tipo_cama`).
+- [x] Filtrar SQL por disponibilidad.
+- [x] Evaluar compatibilidad con `cama.es_compatible(nivel)` en Python: lo hace el controlador sobre `listar_disponibles()`.
+- [ ] Cambiar estado + registrar en `historial_estado_cama` (después de decidir las transacciones).
 
 ### `triaje_dao.py`
 

@@ -2,7 +2,7 @@
 
 > Estado de trabajo actual del proyecto.
 > Este archivo debe mantenerse pequeño y actualizado después de cada sesión importante.
-> Última actualización: 2026-10-12.
+> Última actualización: 2026-10-13.
 
 ---
 
@@ -16,13 +16,13 @@
 
 - Base de datos (21 tablas) implementada con las restricciones de RN-05 y RN-10 y el bloqueo temporal de cuentas.
 - **Fase 2 (models) cerrada:** todas las clases del plan existen y tienen pruebas automáticas.
-- **Fase 3 (DAO) iniciada:** `db_connection.py`, `base_dao.py`, `usuario_dao.py` y `paciente_dao.py` están terminados y probados.
+- **Fase 3 (DAO) iniciada:** `db_connection.py`, `base_dao.py`, `usuario_dao.py`, `paciente_dao.py` y `cama_dao.py` (lectura) están terminados y probados.
 - `models/persona.py` alineado con las tablas `paciente` y `empleado`, con validaciones de entrada (2026-10-12).
-- Pruebas: **393 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
+- Pruebas: **419 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
 
 ### Tarea actual
 
-Ninguna en curso. Siguiente tarea: **`dao/cama_dao.py`**.
+Ninguna en curso. Siguiente tarea: **`dao/auditoria_dao.py`**.
 Antes hay que volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db`: tiene el esquema anterior al 2026-10-12.
 
 ---
@@ -34,7 +34,7 @@ Antes hay que volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db`: tie
 | Fase 0 — Entorno y estructura | Completada (`.venv` recreado dentro del proyecto el 2026-10-11) |
 | Fase 1 — Base de datos | Completada. Verificada en MySQL 8.0.46 (2026-10-12) y antes en MariaDB 11.8 |
 | Fase 2 — Models | Completada (2026-10-12) |
-| Fase 3 — DAO | En curso: `db_connection.py`, `base_dao.py`, `usuario_dao.py` y `paciente_dao.py` terminados |
+| Fase 3 — DAO | En curso: `db_connection.py`, `base_dao.py`, `usuario_dao.py`, `paciente_dao.py` y `cama_dao.py` (lectura) terminados |
 | Fase 4 — Controllers | Pendiente (la carpeta `controllers/` aún no existe) |
 | Fase 5 — Utils | Parcial: `security.py` y `logging_config.py` hechos; falta `pdf_generator.py` |
 | Fase 6 — Views | Pendiente (la carpeta `views/` aún no existe) |
@@ -60,6 +60,7 @@ Antes hay que volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db`: tie
 - `dao/db_connection.py`: Singleton, credenciales obligatorias desde `.env`, `autocommit=True`, `FOUND_ROWS`, reconexión (`test_db_connection.py`, 12 pruebas).
 - `dao/base_dao.py`: clase base de los DAO (cursor, cierre y traducción de errores a `PersistenciaError`/`RegistroDuplicadoError`) (`test_base_dao.py`, 23 pruebas).
 - `dao/paciente_dao.py`: buscar por id/DNI, crear, actualizar (sin tocar el DNI) y baja lógica (`test_paciente_dao.py`, 28 pruebas). Verificado en MySQL 8.0.46 con una base temporal (15 comprobaciones).
+- `dao/cama_dao.py`: búsqueda por id/código y listados; fábrica de subclases por `nombre_tipo_cama` (`test_cama_dao.py`, 25 pruebas). Verificado en MySQL 8.0.46 con una base temporal (11 comprobaciones). Falta cambiar estado (requiere transacción).
 - `dao/usuario_dao.py`: hereda de `BaseDAO`; login con JOIN a `empleado` y `rol`, bcrypt, usuario inactivo, señuelo, validación de DNI y bloqueo de 5 intentos durante 15 min (`test_usuario_dao.py`, 33 pruebas).
 - `seed.sql` tiene hashes bcrypt válidos. El login con un usuario del seed se verificó a mano contra una base temporal (ver CHANGELOG del 2026-10-11).
 
@@ -96,9 +97,9 @@ Antes hay que volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db`: tie
 ## Próximo trabajo previsto
 
 1. Volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db` (problema 1).
-2. `cama_dao.py`.
-3. `auditoria_dao.py`.
-4. Decidir el manejo de transacciones (problema 4).
+2. `auditoria_dao.py`.
+3. Decidir el manejo de transacciones (problema 4).
+4. `cama_dao.cambiar_estado` con historial.
 5. `triaje_dao.py`.
 6. `asignacion_dao.py`.
 
