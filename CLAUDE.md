@@ -82,8 +82,12 @@ views → controllers → models (dominio) → dao → MySQL
 - Cada DAO nuevo hereda de `BaseDAO` (`dao/base_dao.py`) y usa `_consultar_uno`, `_consultar_varios`, `_insertar`
   y `_ejecutar`: ahí se cierran los cursores y los errores de MySQL se traducen a `PersistenciaError`
   (o `RegistroDuplicadoError`, o `ConexionBDError`). `None`/lista vacía = no encontrado; un fallo lanza excepción.
-  Excepción: `UsuarioDAO.autenticar` devuelve `None` ante todo fallo, para no revelar la causa. `ConexionBD` usa `autocommit=True`; las operaciones multi-paso de escritura
-  (asignar cama, dar de alta) necesitarán transacciones explícitas y un pool de conexiones.
+  Excepción: `UsuarioDAO.autenticar` devuelve `None` ante todo fallo, para no revelar la causa.
+- Cada DAO tiene un método `_a_<entidad>(fila)` que es el único punto que convierte una fila en un objeto; las
+  validaciones las hace el constructor del modelo, no el DAO. `estado_registro` llega como 0/1: convertir con `bool()`.
+- `ConexionBD` usa `autocommit=True` y `FOUND_ROWS`: el `rowcount` de un `UPDATE` cuenta las filas *encontradas*
+  (0 = no existe), aunque los valores no cambien. Las operaciones multi-paso de escritura (asignar cama, dar de alta,
+  cambiar estado de cama + historial) necesitan transacciones explícitas: no escribirlas antes de esa decisión.
 - Las reglas críticas viven también en la BD (RN-05 y RN-10 con `UNIQUE`/`CHECK`). Cambios de esquema:
   actualizar `schema.sql`, `seed.sql`, los modelos, las pruebas y `diagrama.png`.
 - Un `CHECK` que compare texto (`IN ('A', 'B')`) necesita la columna con `COLLATE utf8mb4_bin`: la collation
@@ -115,9 +119,17 @@ RN-10: reclasificar exige justificación escrita (≥ 10 caracteres) · RN-11: b
 - Cambios de SQL (`schema.sql`, consultas) se verifican contra una **base temporal** con otro nombre
   (p. ej. `sigtac_scratch_tmp`) que se elimina al terminar. Nunca ejecutar `schema.sql` o `seed.sql`
   contra `sigtac_db` sin que el usuario lo pida.
+- El `.env` usa `sigtac_app`, que no puede crear bases: la verificación en base temporal necesita una cuenta de
+  administrador. El script pide la clave con `getpass` y lo ejecuta el usuario; Claude nunca escribe ni guarda esa clave.
+- Los valores fijos de Python que reflejan catálogos o `CHECK` de la BD (Enum, tipos de cama, sexo, turno) se
+  comparan con `seed.sql`/`schema.sql` en `tests/test_estados_vs_bd.py`.
 
 ## Git
 
 - Commits al estilo `tipo(ámbito): mensaje` en español (`feat`, `fix`, `docs`, `test`, `refactor`), uno por cambio lógico.
 - No hacer commit ni push sin que el usuario lo pida; proponer el mensaje y los archivos.
+- No añadir líneas `Co-Authored-By` (ni otra atribución) de Claude en los mensajes de commit.
+- En PowerShell, un mensaje con cuerpo se pasa con `git commit -F archivo`: varios `-m` con comillas pueden quedar
+  pegados en el título. Un commit ya subido no se reescribe (`--amend`, `rebase`); uno local sí, comprobando antes
+  con `git status -sb` que siga `ahead`.
 - Antes de dar algo por terminado: `python -m pytest` en verde y `docs/CHANGELOG.md` actualizado.
