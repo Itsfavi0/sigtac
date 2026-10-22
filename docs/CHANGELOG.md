@@ -5,6 +5,40 @@
 
 ---
 
+## [2026-10-22] — Fase 4: `reporte_dao.py` y `reporte_controller.py` (indicadores)
+
+### Cambio
+- Nuevo `dao/reporte_dao.py` (`ReporteDAO`, solo lectura): `contar_camas_por_estado`, `contar_episodios_por_estado`, `contar_ingresos`, `contar_triajes_por_nivel`, `contar_reclasificaciones`, `promedio_espera_triaje_min`, `promedio_espera_cama_min` y `promedio_estancia_min`. Los períodos son `[desde, hasta)` con `datetime`.
+- Nuevo `controllers/reporte_controller.py` con `ReporteController(sesion)` (permiso `REPORTES`):
+  - `estado_actual() -> EstadoGuardia`: camas por estado, porcentaje de ocupación y pacientes en emergencia por estado.
+  - `indicadores(desde, hasta) -> IndicadoresPeriodo`: ingresos, triajes por nivel, porcentaje de reclasificación y tiempos promedio (puerta-triaje, espera de cama y estancia), entre dos días incluidos.
+- Pruebas: `tests/test_reporte_dao.py` (45) y `tests/test_reporte_controller.py` (16).
+
+### Archivos afectados
+- `dao/reporte_dao.py`, `controllers/reporte_controller.py` (nuevos), `tests/test_reporte_dao.py`, `tests/test_reporte_controller.py` (nuevos), `docs/`
+
+### Motivo
+Último controlador del plan de la Fase 4 ("consultar datos, preparar AVG/COUNT y KPIs, entregar datos a las vistas").
+
+### Impacto
+- Pruebas: 1099 pasan.
+- Las vistas reciben objetos inmutables (`dataclass(frozen=True)`) con los números ya calculados.
+
+### Decisiones
+- **SQL en el DAO, porcentajes en el controlador:** contar y promediar se hace en MySQL (no se traen miles de filas a Python); el plan pedía que el controlador "preparara AVG/COUNT", pero el SQL solo puede vivir en un DAO.
+- **LEFT JOIN desde los catálogos:** un estado o nivel sin filas aparece con 0, así la vista siempre recibe todas las categorías.
+- **Período `[desde, hasta)`:** el controlador recibe días (`date`) y consulta desde las 00:00 del primero hasta las 00:00 del día siguiente al último; así el último día entra completo sin depender de `23:59:59`.
+- **Ocupación = (reservadas + ocupadas) / (camas activas − fuera de servicio):** una cama reservada ya está comprometida; una en limpieza no está en uso pero sí en servicio.
+- **Pacientes en emergencia:** se descartan los estados cerrados con `EpisodioEmergencia.ESTADOS_CERRADOS` del modelo (la regla no se repite en el controlador).
+- **Lecturas en una transacción:** todas las cifras de un reporte salen de la misma foto de la BD.
+- **Las reservas canceladas no cuentan** en la espera de cama (`asignacion_cama.estado_registro = FALSE`).
+
+### Pendientes
+- Exportar los indicadores a PDF (`utils/pdf_generator.py`, Fase 5).
+- Indicador de pacientes atendidos dentro del tiempo máximo de su nivel (`nivel_triaje.tiempo_max_min`).
+
+---
+
 ## [2026-10-22] — Fase 4: `cama_controller.py` (ciclo de la cama)
 
 ### Cambio
