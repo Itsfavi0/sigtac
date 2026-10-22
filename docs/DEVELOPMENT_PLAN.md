@@ -26,7 +26,7 @@
 - [ ] Estructura:
   - [x] `models/`
   - [x] `dao/`
-  - [ ] `controllers/` (se crea en la Fase 4)
+  - [x] `controllers/` (Fase 4)
   - [ ] `views/` (se crea en la Fase 6)
   - [ ] `views/assets/` (se crea en la Fase 6)
   - [x] `utils/`
@@ -226,7 +226,7 @@ Motivo del orden: ver `CHANGELOG.md` (2026-10-12).
 
 - [x] `registrar(id_usuario, tabla, accion, id_registro, detalles=None)`: solo inserción; `AccionAuditoria` y lista blanca de tablas.
 - [x] `listar_por_registro(tabla, id_registro)`.
-- [ ] Mantener auditoría explícita desde los controladores (Fase 4).
+- [x] Mantener auditoría explícita desde los controladores (Fase 4): cada escritura sensible se audita dentro de su transacción.
 
 ---
 
@@ -245,35 +245,44 @@ Motivo del orden: ver `CHANGELOG.md` (2026-10-12).
 
 ### `paciente_controller.py`
 
-- [ ] Buscar o registrar al paciente (con documento o NN).
-- [ ] Abrir el episodio de emergencia.
-- [ ] Identificar y fusionar pacientes NN (con auditoría).
+**Estado:** completado y probado (`tests/test_paciente_controller.py`, 2026-10-22).
+
+- [x] Buscar o registrar al paciente (con documento o NN).
+- [x] Abrir el episodio de emergencia (uno abierto por paciente; bloqueo de fila contra la doble admisión).
+- [x] Identificar y fusionar pacientes NN (con auditoría).
 
 ### `triaje_controller.py`
 
-- [ ] Recibir datos del formulario.
-- [ ] Crear objetos de dominio.
-- [ ] Invocar Strategy.
-- [ ] Obtener clasificación sugerida.
-- [ ] Validar confirmación/reclasificación.
-- [ ] Exigir justificación cuando corresponda.
-- [ ] Persistir mediante DAO.
+**Estado:** completado y probado (`tests/test_triaje_controller.py`, 2026-10-22).
+
+- [x] Recibir datos del formulario (diccionario de signos vitales e ids de síntomas).
+- [x] Crear objetos de dominio.
+- [x] Invocar Strategy (recibida en el constructor; Manchester por defecto).
+- [x] Obtener clasificación sugerida (`sugerir`; al registrar se recalcula, no se recibe de la vista).
+- [x] Validar confirmación/reclasificación.
+- [x] Exigir justificación cuando corresponda (RN-10).
+- [x] Persistir mediante DAO (con bloqueo del episodio y auditoría).
 
 ### `cama_controller.py`
 
-- [ ] Orquestar asignación.
-- [ ] Obtener cola de espera (requiere un listado por estado en `EpisodioDAO`; orden: nivel de triaje y luego llegada).
-- [ ] Evaluar reglas de asignación.
-- [ ] Obtener camas compatibles.
-- [ ] Reservar mediante transacción atómica.
-- [ ] Evitar inconsistencias por concurrencia.
+**Estado:** completado y probado (`tests/test_cama_controller.py`, 2026-10-22).
+
+- [x] Orquestar asignación (y ocupar, cancelar, dar de alta y confirmar limpieza).
+- [x] Obtener cola de espera (`EpisodioDAO.listar_por_estado` + `ordenar_por_prioridad`: nivel de triaje y luego llegada).
+- [x] Evaluar reglas de asignación (RN-01, RN-05, compatibilidad).
+- [x] Obtener camas compatibles.
+- [x] Reservar mediante transacción atómica.
+- [x] Evitar inconsistencias por concurrencia (`UPDATE` condicional; verificado en MySQL).
+- [ ] Fuera de servicio / volver a servicio (pendiente de decidir quién puede).
 
 ### `reporte_controller.py`
 
-- [ ] Consultar datos.
-- [ ] Preparar AVG/COUNT y otros cálculos (el SQL va en un `dao/reporte_dao.py`; el controlador solo da formato).
-- [ ] Preparar KPIs.
-- [ ] Entregar datos a las vistas.
+**Estado:** completado y probado (`tests/test_reporte_controller.py` y `tests/test_reporte_dao.py`, 2026-10-22).
+
+- [x] Consultar datos.
+- [x] Preparar AVG/COUNT y otros cálculos (el SQL va en `dao/reporte_dao.py`; el controlador calcula porcentajes).
+- [x] Preparar KPIs (ocupación, reclasificación, tiempos de espera y estancia).
+- [x] Entregar datos a las vistas (`EstadoGuardia` e `IndicadoresPeriodo`, inmutables).
 
 ---
 
@@ -338,16 +347,18 @@ Debe permitir:
 
 ### Integración
 
-- [ ] Login → sesión → permisos.
-- [ ] Paciente → episodio.
-- [ ] Episodio → signos/síntomas.
-- [ ] Triaje → clasificación.
-- [ ] Triaje → cola.
-- [ ] Cola → camas compatibles.
-- [ ] Asignación → estados de cama.
-- [ ] Liberación → limpieza → disponibilidad.
-- [ ] Operaciones sensibles → auditoría.
-- [ ] Reportes → indicadores/PDF.
+En los controladores (sin interfaz), verificado en MySQL con `scripts/verificar_controladores.py` (2026-10-22); falta repetirlo desde las vistas:
+
+- [ ] Login → sesión → permisos (la sesión del script se crea a mano: falta el login con un usuario del seed).
+- [x] Paciente → episodio.
+- [x] Episodio → signos/síntomas.
+- [x] Triaje → clasificación.
+- [x] Triaje → cola.
+- [x] Cola → camas compatibles.
+- [x] Asignación → estados de cama.
+- [x] Liberación → limpieza → disponibilidad.
+- [x] Operaciones sensibles → auditoría.
+- [ ] Reportes → indicadores/PDF (indicadores hechos; falta el PDF).
 
 ### Pruebas
 

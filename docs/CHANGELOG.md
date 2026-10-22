@@ -5,6 +5,38 @@
 
 ---
 
+## [2026-10-22] — Verificación de la Fase 4 en MySQL 8.0.46 (`scripts/verificar_controladores.py`)
+
+### Cambio
+- Nuevo `scripts/verificar_controladores.py`: crea `sigtac_scratch_tmp`, carga `schema.sql` y `seed.sql`, recorre el flujo completo a través de los cinco controladores (admisión → triaje → cola → asignación → ocupación → alta → limpieza → reportes) y elimina la base al terminar. Es el primer script de verificación que queda en el repositorio (los anteriores eran temporales).
+- `CLAUDE.md`: comando del script y reglas de los controladores (patrón de cada operación, `bloquear`, pruebas con `CapaDatosFalsa`).
+
+### Archivos afectados
+- `scripts/verificar_controladores.py` (nuevo), `CLAUDE.md`, `docs/`
+
+### Motivo
+Las pruebas de los controladores simulan la BD; faltaba comprobar contra MySQL real el SQL nuevo (historial en bloque, `FOR UPDATE`, consultas de reportes) y el flujo de punta a punta.
+
+### Impacto
+- **56 de 56 comprobaciones correctas** en MySQL 8.0.46, entre ellas:
+  - Dos PCs admiten a la misma paciente a la vez: la segunda espera el bloqueo (1,5 s) y luego rechaza el segundo episodio; queda uno solo.
+  - Otra PC da de alta un episodio mientras se registra su triaje: el triaje espera el bloqueo, ve el alta y no guarda nada.
+  - El historial cargado en bloque (`listar_por_estado`) es igual al de `buscar_por_id`.
+  - Asignar a una cama incompatible o ya reservada se rechaza y no cambia el episodio; dar de alta una cama solo reservada se deshace por completo.
+  - Ciclo completo de la cama con historial, asignación, solicitud de limpieza y bitácora; cancelar una reserva no pasa por limpieza.
+  - Reportes: ocupación, pacientes en emergencia, ingresos, triajes por nivel, reclasificación y tiempos promedio coinciden con consultas directas (p. ej. estancia 30 min = (45 + 15) / 2).
+- No se tocó `sigtac_db`.
+
+### Decisiones
+- **El script queda en `scripts/`, no en `tests/`:** necesita MySQL y una cuenta de administrador; `python -m pytest` debe seguir funcionando sin BD.
+- **Clave por variable de entorno o `getpass`:** `SIGTAC_ADMIN_PWD` (solo para ese proceso) permite ejecutarlo sin escribir la clave; nunca se guarda en un archivo.
+- **Concurrencia con una segunda conexión real en otro hilo:** la única forma de comprobar que `FOR UPDATE` hace esperar y que, después de esperar, se ven los datos confirmados por la otra PC.
+
+### Pendientes
+- Convertirlo en pruebas de integración de pytest (marcadas y omitidas si no hay BD) cuando se acuerde cómo dar la cuenta de administrador en el equipo.
+
+---
+
 ## [2026-10-22] — Fase 4: `reporte_dao.py` y `reporte_controller.py` (indicadores)
 
 ### Cambio
@@ -12,7 +44,7 @@
 - Nuevo `controllers/reporte_controller.py` con `ReporteController(sesion)` (permiso `REPORTES`):
   - `estado_actual() -> EstadoGuardia`: camas por estado, porcentaje de ocupación y pacientes en emergencia por estado.
   - `indicadores(desde, hasta) -> IndicadoresPeriodo`: ingresos, triajes por nivel, porcentaje de reclasificación y tiempos promedio (puerta-triaje, espera de cama y estancia), entre dos días incluidos.
-- Pruebas: `tests/test_reporte_dao.py` (45) y `tests/test_reporte_controller.py` (16).
+- Pruebas: `tests/test_reporte_dao.py` (44) y `tests/test_reporte_controller.py` (17).
 
 ### Archivos afectados
 - `dao/reporte_dao.py`, `controllers/reporte_controller.py` (nuevos), `tests/test_reporte_dao.py`, `tests/test_reporte_controller.py` (nuevos), `docs/`

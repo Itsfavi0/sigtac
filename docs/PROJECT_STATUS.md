@@ -2,7 +2,7 @@
 
 > Estado de trabajo actual del proyecto.
 > Este archivo debe mantenerse pequeño y actualizado después de cada sesión importante.
-> Última actualización: 2026-10-21.
+> Última actualización: 2026-10-22.
 
 ---
 
@@ -21,11 +21,12 @@
 - `models/persona.py` alineado con las tablas `paciente` y `empleado`, con validaciones de entrada (2026-10-12).
 - Pacientes y empleados se identifican con `DocumentoIdentidad` (DNI, carné de extranjería, pasaporte o CPP) (2026-10-21).
 - Un paciente puede ingresar sin identificar (NN) e identificarse después (2026-10-21).
-- Pruebas: **848 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
+- **Fase 4 (controllers) cerrada (2026-10-22)**, en la rama `feat/fase4-controladores`: los cinco controladores del plan están hechos, probados y verificados en MySQL 8.0.46 (56 comprobaciones, `scripts/verificar_controladores.py`).
+- Pruebas: **1099 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
 
 ### Tarea actual
 
-**Fase 4, controladores.** Hecho: `auth_controller.py` (sesión y permisos). Siguiente: `paciente_controller.py` (admisión, episodio, pacientes NN).
+Ninguna en curso. La Fase 4 está en la rama `feat/fase4-controladores` (sin fusionar con `main` ni subir). Siguiente: revisar la rama y decidir entre la Fase 5 (`pdf_generator.py`) y la Fase 6 (vistas).
 
 ---
 
@@ -37,7 +38,7 @@
 | Fase 1 — Base de datos | Completada. Verificada en MySQL 8.0.46 (2026-10-12 y 2026-10-21) y antes en MariaDB 11.8 |
 | Fase 2 — Models | Completada (2026-10-12) |
 | Fase 3 — DAO | Completada (2026-10-21) |
-| Fase 4 — Controllers | En curso: `auth_controller.py` hecho (2026-10-21) |
+| Fase 4 — Controllers | Completada (2026-10-22, rama `feat/fase4-controladores`). Verificada en MySQL 8.0.46 |
 | Fase 5 — Utils | Parcial: `security.py` y `logging_config.py` hechos; falta `pdf_generator.py` |
 | Fase 6 — Views | Pendiente (la carpeta `views/` aún no existe) |
 | Fase 7 — Integración y pruebas | Pendiente |
@@ -73,7 +74,22 @@
 - `dao/triaje_dao.py`: catálogo de síntomas; `registrar` (signos vitales + triaje + síntomas en una transacción; solo inserción, RN-09) y lectura del historial de triajes y signos por episodio (`test_triaje_dao.py`, 31 pruebas).
 - `dao/episodio_dao.py`: crear, `buscar_por_id` (con su historial de signos y triajes) y `cambiar_estado` (`UPDATE` condicional; la fecha de alta la pone MySQL) (`test_episodio_dao.py`, 26 pruebas). Ambos verificados en MySQL 8.0.46 con una base temporal (ver CHANGELOG del 2026-10-21).
 - `dao/asignacion_dao.py`: crear, buscar la asignación vigente por episodio o por cama, `liberar` (alta) y `anular` (reserva cancelada), ambos `UPDATE` condicionales. `dao/solicitud_limpieza_dao.py`: crear, `listar_pendientes` y `atender` (`UPDATE` condicional) (`test_asignacion_dao.py`, 29 pruebas). Verificados con el ciclo completo de una cama en una base temporal (ver CHANGELOG del 2026-10-21).
+- `dao/reporte_dao.py`: COUNT/AVG para los indicadores (`test_reporte_dao.py`, 44 pruebas).
+- Carga en bloque del historial (`EpisodioDAO.listar_por_estado`/`listar_por_paciente`, `TriajeDAO.listar_historial`) y bloqueo de filas (`EpisodioDAO.bloquear`, `PacienteDAO.bloquear`, `SELECT ... FOR UPDATE`). Verificados en MySQL 8.0.46 (ver CHANGELOG del 2026-10-22).
 - `seed.sql` tiene hashes bcrypt válidos. El login con un usuario del seed se verificó a mano contra una base temporal (ver CHANGELOG del 2026-10-11).
+
+### Fase 4 — Controllers
+
+| Archivo | Contenido | Pruebas |
+|---|---|---|
+| `controllers/auth_controller.py` | `Sesion`, `exigir_permiso`, `AuthController` (login y logout) | `test_auth_controller.py` (73) |
+| `controllers/paciente_controller.py` | Registro (con documento o NN), abrir episodio (uno abierto por paciente), identificar y fusionar NN | `test_paciente_controller.py` (54) |
+| `controllers/triaje_controller.py` | Sugerencia de la estrategia, registro con reclasificación justificada, cola de triaje | `test_triaje_controller.py` (41) |
+| `controllers/cama_controller.py` | Mapa, cola de espera, camas compatibles, asignar, ocupar, cancelar, alta y limpieza | `test_cama_controller.py` (57) |
+| `controllers/reporte_controller.py` | Estado actual de la guardia e indicadores de un período | `test_reporte_controller.py` (17) |
+| `controllers/colas.py` | `EntradaCola` y `armar_cola` (cola por prioridad, en una transacción) | `test_colas.py` (3) |
+
+Todo el flujo, incluidas dos pruebas de concurrencia entre PCs, verificado en MySQL 8.0.46 con `scripts/verificar_controladores.py` (56 comprobaciones).
 
 ---
 
@@ -108,19 +124,22 @@ Ninguno bloqueante. Las decisiones menores están en "Pendientes conocidos".
 ## Pendientes conocidos (sin bloqueo inmediato)
 
 - Actualizar `db_scripts/diagrama.png` (faltan `tipo_documento` y el cambio de `dni` a `id_tipo_documento` + `num_documento`, `fecha_nac`, `id_area`, `especialidad`, `turno`, `intentos_fallidos`, `bloqueado_hasta`, las columnas generadas de `asignacion_cama` y el área "Triaje").
-- Pruebas de integración permanentes contra una BD real (la verificación del 2026-10-12 fue un script temporal).
+- Pruebas de integración en pytest contra una BD real (hoy: `scripts/verificar_controladores.py`, que se ejecuta a mano).
 - Decidir si `seed.sql` mantiene los datos reales de los integrantes.
 - PyCharm: cada integrante debe seleccionar `SIGTAC/.venv` como intérprete.
-- Decidir si `Triaje.reclasificar` al mismo nivel sugerido debe rechazarse (ver CHANGELOG del 2026-10-21).
+- `Triaje.reclasificar` al mismo nivel: el controlador ya no lo llama (confirma la sugerencia); falta decidir si el modelo también debe rechazarlo.
 - El modelo no tiene transiciones a REFERIDO ni a FUGADO / ABANDONO (existen en el catálogo y ya cuentan como episodio cerrado).
+- Sin controlador todavía: poner una cama fuera de servicio y volverla a servicio, reactivar un paciente dado de baja, editar los datos de un paciente, y la administración de usuarios y bitácora (permiso `ADMINISTRACION`).
+- Un paciente con un episodio abierto se controla en el controlador (con bloqueo de fila), no con una restricción de la BD.
 - Opcional: quitar a `sigtac_app` el permiso `UPDATE` sobre `bitacora_auditoria`, para que la bitácora no se pueda modificar ni por error del código (lo ejecuta el usuario con su cuenta de administrador).
 
 ---
 
 ## Próximo trabajo previsto
 
-1. Validar con el equipo la matriz de permisos (`models/permisos.py`; ver CHANGELOG del 2026-10-21).
-2. Fase 4, en este orden: `paciente_controller`, `triaje_controller`, `cama_controller` (con la cola de espera, que necesita un listado en `EpisodioDAO`) y `reporte_controller` (con `dao/reporte_dao.py`).
+1. Revisar la rama `feat/fase4-controladores` y fusionarla con `main`.
+2. Validar con el equipo la matriz de permisos (`models/permisos.py`; ver CHANGELOG del 2026-10-21).
+3. Fase 5: `utils/pdf_generator.py` (exportar los indicadores de `ReporteController`) o Fase 6: vistas con CustomTkinter, que ya pueden usar los controladores.
 
 Respecto al plan original, `auditoria_dao.py` se hizo antes que `triaje_dao.py` y `asignacion_dao.py` porque es de una sola tabla y no depende de transacciones (ver `CHANGELOG.md` del 2026-10-12).
 

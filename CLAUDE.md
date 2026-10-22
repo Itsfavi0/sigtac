@@ -28,6 +28,9 @@ mysql -u <admin> -p < db_scripts/crear_usuario_app.sql
 python -m pytest                               # todas
 python -m pytest tests/test_cama.py -v         # un archivo
 python -m pytest -k "bloqueo" -x               # filtrar por nombre, parar al primer fallo
+
+# Verificación contra MySQL real (cuenta de administrador; crea y borra sigtac_scratch_tmp, no toca sigtac_db)
+python scripts/verificar_controladores.py
 ```
 
 - Usa `python -m pip` y `python -m pytest` (con el `.venv` activado): garantiza que se use el intérprete del entorno.
@@ -38,16 +41,18 @@ python -m pytest -k "bloqueo" -x               # filtrar por nombre, parar al pr
 ## Estructura
 
 ```text
-controllers/  Casos de uso: auth_controller.py (Sesion, exigir_permiso, AuthController)
-dao/          Acceso a datos: db_connection.py (Singleton ConexionBD), base_dao.py, transaccion.py y un *_dao.py por entidad
+controllers/  Casos de uso: auth (Sesion, exigir_permiso), paciente, triaje, cama, reporte y colas.py (EntradaCola)
+dao/          Acceso a datos: db_connection.py (Singleton ConexionBD), base_dao.py, transaccion.py, filtros_episodio.py,
+              reporte_dao.py y un *_dao.py por entidad
 models/       Dominio: persona, documento, cama, triaje, asignacion, estrategias, permisos, estados y auditoria (Enum), excepciones
 utils/        security.py (bcrypt) y logging_config.py
 db_scripts/   schema.sql, seed.sql, crear_usuario_app.sql y diagrama.png
-tests/        pytest: un test_*.py por módulo
+tests/        pytest: un test_*.py por módulo; conftest.py con los dobles de los controladores
+scripts/      verificar_controladores.py (flujo completo contra MySQL real en una base temporal)
 docs/         PROJECT_CONTEXT, DEVELOPMENT_PLAN, PROJECT_STATUS y CHANGELOG
 ```
 
-Pendientes por fase (ver `docs/DEVELOPMENT_PLAN.md`): el resto de `controllers/` (Fase 4) y `views/` (Fase 6).
+Pendientes por fase (ver `docs/DEVELOPMENT_PLAN.md`): `utils/pdf_generator.py` (Fase 5) y `views/` (Fase 6).
 
 ## Arquitectura (capas)
 
@@ -62,6 +67,9 @@ views → controllers → models (dominio) → dao → MySQL
   Cada controlador recibe la `Sesion` al crearse (nunca una variable global) y empieza cada operación con
   `exigir_permiso(self._sesion, Permiso.X)` (`controllers/auth_controller.py`). Los errores (`SigtacError`,
   `ValueError`) no se capturan en el controlador: suben a la vista, que muestra el mensaje.
+  Patrón de cada operación que escribe: `exigir_permiso` → validar con el modelo (sin tocar la BD) →
+  `with transaccion():` leer, aplicar la regla del modelo, guardar y auditar. Los datos se leen dentro de la
+  transacción, nunca se reutilizan objetos de una operación anterior.
 - **Models**: reglas de negocio y estados. Nunca SQL ni importar de `dao/`, `views/` o `controllers/`.
 - **DAO**: único lugar con SQL. Reciben y devuelven datos o modelos; no contienen reglas de negocio.
 - Las dependencias van solo hacia abajo. No duplicar una regla en dos capas: una regla, un dueño.
@@ -100,6 +108,8 @@ views → controllers → models (dominio) → dao → MySQL
   al `with` más externo (no capturarlas a mitad). Durante una transacción `ConexionBD` no se reconecta.
 - Concurrencia entre PCs: `UPDATE` condicional (`WHERE id = %s AND estado = <esperado>`) y comprobar `rowcount`;
   0 filas = otro usuario llegó primero: lanzar una excepción (no devolver `False`) para que se deshaga la transacción.
+  Si la operación no cambia un estado (abrir episodio, segundo triaje), bloquear la fila con `*DAO.bloquear(id)`
+  (`BaseDAO._bloquear`: `SELECT ... FOR UPDATE` sin JOIN, solo dentro de `transaccion()` y como primera lectura).
 - Cambios de estado: el modelo decide la transición (`cama.reservar()`, `episodio.asignar_cama()`...) y el DAO solo la
   guarda con `cambiar_estado(objeto, estado_anterior)`. Las fechas de registro (ingreso, alta, triaje, auditoría) las pone MySQL.
 - Las reglas críticas viven también en la BD (RN-05 y RN-10 con `UNIQUE`/`CHECK`). Cambios de esquema:
@@ -128,6 +138,8 @@ RN-10: reclasificar exige justificación escrita (≥ 10 caracteres) · RN-11: b
 
 - Toda regla de negocio o cambio de comportamiento lleva su test; los valores límite se prueban explícitamente.
 - Los tests de DAO y conexión usan `MagicMock`/`monkeypatch`: no deben requerir MySQL ni `.env`.
+- Los tests de controladores usan `capa_datos` y `sesion_de` (`tests/conftest.py`): reemplazan los DAO y
+  `transaccion()` y permiten comprobar el orden de las llamadas (`inicio` → escrituras → auditoría → `commit`/`rollback`).
 - Probar comportamiento, no tiempos (los tiempos son inestables); para el señuelo se verifica que se invoque.
 - Una brecha conocida se documenta con `@pytest.mark.xfail(strict=True, reason=...)` hasta corregirla.
 - Cambios de SQL (`schema.sql`, consultas) se verifican contra una **base temporal** con otro nombre

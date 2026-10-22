@@ -136,7 +136,7 @@ La arquitectura separa responsabilidades en capas:
 - Las vistas no deben contener SQL.
 - Los modelos no deben contener SQL.
 - Los DAO encapsulan las consultas a la base de datos.
-- Los controladores orquestan interacción entre vista, modelos y DAO.
+- Los controladores orquestan interacción entre vista, modelos y DAO. Cada operación sigue el mismo patrón: `exigir_permiso` → validar los datos con el modelo (sin tocar la BD) → `with transaccion():` leer, aplicar la regla del modelo, guardar y auditar.
 - Las reglas de negocio deben permanecer en la capa de dominio/control correspondiente.
 - No duplicar lógica entre capas.
 
@@ -294,6 +294,11 @@ Cada operación de cama es una transacción del controlador que combina varios D
 Una asignación liberada (alta) y una anulada (reserva cancelada) se distinguen en el historial. Un paciente NN que resulta estar ya registrado se fusiona con él (`Paciente.fusionar_en` + `PacienteDAO.fusionar`): sus episodios pasan al paciente real y el NN se anula. Un episodio cerrado (alta, referido, fuga o anulado) no admite triajes nuevos.
 
 La compatibilidad cama–triaje la comprueba el controlador con `cama.es_compatible(nivel)` antes de asignar. Las asignaciones no se borran: se liberan y quedan como historial.
+
+### Colas de espera y bloqueos
+
+- La cola de espera de cama (y la de triaje) la arma `controllers/colas.py`: `EpisodioDAO.listar_por_estado` carga los episodios con su historial en consultas fijas y `ordenar_por_prioridad` (modelo) los ordena por nivel de triaje y luego por llegada.
+- Cuando una operación no cambia un estado que sirva de `UPDATE` condicional (abrir un episodio, un segundo triaje), el controlador bloquea la fila al empezar la transacción (`PacienteDAO.bloquear`, `EpisodioDAO.bloquear`: `SELECT ... FOR UPDATE`); otra PC espera hasta el COMMIT.
 
 ### `auditoria_dao.py`
 
