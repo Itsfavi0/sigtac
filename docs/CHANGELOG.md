@@ -5,6 +5,47 @@
 
 ---
 
+## [2026-10-22] — Fase 4: `cama_controller.py` (ciclo de la cama)
+
+### Cambio
+- Nuevo `controllers/cama_controller.py` con `CamaController(sesion)`:
+  - `VER_CAMAS`: `mapa_camas()`, `cola_de_espera()` (episodios EN ESPERA DE CAMA por prioridad).
+  - `GESTION_CAMAS`: `camas_compatibles(id_episodio)`, `asignar(id_episodio, id_cama)`, `ocupar(id_cama)`, `cancelar_asignacion(id_episodio)`, `dar_alta(id_episodio)`.
+  - `LIMPIEZA`: `solicitudes_limpieza()`, `confirmar_limpieza(id_solicitud)`.
+- Pruebas: `tests/test_cama_controller.py` (57).
+
+### Archivos afectados
+- `controllers/cama_controller.py` (nuevo), `tests/test_cama_controller.py` (nuevo), `docs/`
+
+### Motivo
+Es el núcleo del sistema (asignación de camas): une los modelos `Cama` y `EpisodioEmergencia` con los DAO de cama, episodio, asignación, limpieza y auditoría en transacciones atómicas.
+
+### Impacto
+- Pruebas: 1038 pasan.
+- Flujos y lo que guarda cada uno (todo en una transacción, con auditoría):
+
+  | Operación | Episodio | Cama | Además |
+  |---|---|---|---|
+  | `asignar` | EN ESPERA DE CAMA → EN ATENCIÓN | DISPONIBLE → RESERVADA | `AsignacionDAO.crear` |
+  | `ocupar` | — | RESERVADA → OCUPADA | exige asignación vigente |
+  | `cancelar_asignacion` | EN ATENCIÓN → EN ESPERA DE CAMA | RESERVADA → DISPONIBLE | `AsignacionDAO.anular` |
+  | `dar_alta` | EN ATENCIÓN → ALTA MÉDICA | OCUPADA → EN LIMPIEZA | `AsignacionDAO.liberar` + `SolicitudLimpiezaDAO.crear` |
+  | `confirmar_limpieza` | — | EN LIMPIEZA → DISPONIBLE | `SolicitudLimpiezaDAO.atender` |
+
+### Decisiones
+- **Compatibilidad en el controlador, con la regla del modelo:** `asignar` rechaza una cama que no sea `es_compatible` con el nivel actual; el controlador solo la aplica, la regla sigue siendo de cada subclase de `Cama`.
+- **Primero RN-01, después la compatibilidad:** `episodio.asignar_cama()` va antes del chequeo de compatibilidad para que, sin triaje, el error diga "RN-01" y no "cama incompatible".
+- **Concurrencia por `UPDATE` condicional:** si otra PC tomó la cama (o cambió el episodio) entre la lectura y la escritura, `cambiar_estado` lanza la excepción y se deshace todo, también el cambio del episodio que ya se había guardado. No hace falta bloquear filas porque estas operaciones siempre cambian el estado.
+- **`ocupar` exige una asignación vigente:** el modelo permite ocupar desde DISPONIBLE, pero sin asignación no se sabría qué paciente está en la cama.
+- **No se da de alta una cama solo reservada:** primero se ocupa (el paciente llegó) o se cancela; así una reserva que no se usó no pasa por limpieza.
+- **Auditoría por operación:** asignación (`INSERT`/`ANULAR` en `asignacion_cama`), ocupación (`UPDATE` en `cama`), alta (`UPDATE` en `episodio_emergencia`, con la solicitud de limpieza) y limpieza (`UPDATE` en `solicitud_limpieza`). El historial de estados de la cama ya lo guarda `CamaDAO`, pero no dice quién: la bitácora sí.
+
+### Pendientes
+- Fuera de servicio / volver a servicio (el modelo lo tiene; falta decidir quién puede y qué pasa con un paciente en una cama que falla).
+- Transiciones a REFERIDO y FUGADO (siguen pendientes en el modelo).
+
+---
+
 ## [2026-10-22] — Fase 4: `triaje_controller.py` y colas de espera
 
 ### Cambio
