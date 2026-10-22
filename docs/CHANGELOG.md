@@ -5,6 +5,39 @@
 
 ---
 
+## [2026-10-22] — Fase 4: `triaje_controller.py` y colas de espera
+
+### Cambio
+- Nuevo `controllers/triaje_controller.py` con `TriajeController(sesion, estrategia=None)` (permiso `TRIAJE`; la estrategia por defecto es `ReglaManchester`):
+  - `listar_sintomas()`, `cola_de_triaje()` (episodios EN ESPERA DE TRIAJE por orden de llegada).
+  - `sugerir(signos, ids_sintomas) -> Sugerencia(nivel, protocolo)`: lo que propone la estrategia, sin guardar.
+  - `registrar(id_episodio, signos, ids_sintomas, nivel_final=None, justificacion=None) -> id_triaje`: signos vitales + triaje + síntomas, cambio de estado del primer triaje y auditoría, en una transacción.
+- Nuevo `controllers/colas.py`: `EntradaCola(posicion, episodio, paciente)` y `armar_cola(estado)`, que comparten el triaje y la gestión de camas.
+- Pruebas: `tests/test_triaje_controller.py` (41) y `tests/test_colas.py` (3).
+
+### Archivos afectados
+- `controllers/triaje_controller.py`, `controllers/colas.py` (nuevos), `tests/test_triaje_controller.py`, `tests/test_colas.py` (nuevos), `docs/`
+
+### Motivo
+Siguiente paso del flujo: el episodio abierto en admisión necesita su triaje (RN-01) para entrar en la cola de cama.
+
+### Impacto
+- Pruebas: 981 pasan.
+- La vista recibe la sugerencia y el protocolo para mostrarlos, y luego llama a `registrar` con lo que el profesional decidió.
+
+### Decisiones
+- **El nivel sugerido se recalcula al registrar:** no se recibe de la vista. Así el "sugerido" de la BD es siempre lo que dijo el algoritmo y no puede alterarse para esquivar la justificación de RN-10.
+- **Reclasificar solo si el nivel cambia:** si `nivel_final` es igual al sugerido (o `None`) se confirma la sugerencia y no se guarda justificación. Resuelve en el controlador el pendiente "reclasificar al mismo nivel": el controlador nunca llama a `reclasificar` con el mismo nivel (el modelo aún lo admite).
+- **Bloqueo del episodio:** un segundo triaje no cambia el estado, así que no hay `UPDATE` condicional que detecte a otra PC; `EpisodioDAO.bloquear` impide que lo den de alta a mitad del registro.
+- **Errores de formulario antes de la BD:** signo faltante → `SignosVitalesIncompletosError` (el mismo que usan las estrategias); signo desconocido, texto en vez de número o síntoma repetido o inexistente → `ValueError`.
+- **La auditoría guarda niveles y protocolo, no la justificación:** es texto clínico (ya queda en `triaje.justificacion`).
+- **Colas en un módulo aparte:** la cola de triaje y la de cama son la misma operación con distinto estado; `armar_cola` lee episodios y pacientes en una sola transacción (misma foto de la BD) y ordena con `ordenar_por_prioridad` del modelo. El permiso lo comprueba cada controlador.
+
+### Pendientes
+- Mostrar en la cola si se superó el tiempo máximo de espera del nivel (`nivel_triaje.tiempo_max_min`).
+
+---
+
 ## [2026-10-22] — Fase 4: `paciente_controller.py` (admisión y pacientes NN)
 
 ### Cambio
