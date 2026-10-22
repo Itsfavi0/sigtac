@@ -23,7 +23,12 @@ A emergencia llegan pacientes inconscientes o sin papeles que hay que atender (y
 
 ### Impacto
 - Pruebas: 497 pasan.
-- **No verificado aún en MySQL** (igual que el cambio anterior de `tipo_documento`).
+- Verificado en MySQL 8.0.46 con una base temporal (`sigtac_scratch_tmp`, ya eliminada), junto con el cambio de `tipo_documento`. Se cargaron `schema.sql` y `seed.sql` y se usaron los DAO reales. 33 comprobaciones pasaron:
+  - Esquema: 22 tablas; los códigos de `tipo_documento` coinciden con `TipoDocumento`; `codigo` distingue mayúsculas (`'dni'` no encuentra `'DNI'`); el seed tiene 5 pacientes, 1 de ellos NN.
+  - Restricciones: tipo + número repetido → 1062; el mismo número con otro tipo se acepta; tipo sin número o número sin tipo → 3819 (`CH_paciente_documento`); varios NN a la vez se aceptan; tipo inexistente → 1452; empleado sin documento → 1048.
+  - `PacienteDAO`: busca por DNI y por CE; el mismo número con otro tipo no encuentra a nadie; `buscar_por_id` devuelve un NN (confirma el `LEFT JOIN`); `crear` guarda el pasaporte normalizado y un duplicado lanza `RegistroDuplicadoError`; un NN se guarda con tipo y número `NULL` y conserva su edad estimada; `listar_no_identificados` lo incluye; `actualizar` no le pone documento.
+  - `identificar`: con el documento de otro paciente → `RegistroDuplicadoError` y el NN queda igual; con un documento nuevo → `True`, se encuentra por documento con el mismo id y sale de la lista de NN; un segundo `identificar` con un objeto desactualizado → `False` y se conserva el primer documento.
+  - `UsuarioDAO.autenticar`: con DNI encuentra al empleado (suma un intento fallido con clave incorrecta); con el mismo número y tipo CE no lo encuentra.
 - El futuro controlador de pacientes debe ofrecer "registrar NN" y, más adelante, "identificar".
 
 ### Decisiones
@@ -36,7 +41,7 @@ A emergencia llegan pacientes inconscientes o sin papeles que hay que atender (y
 
 ### Pendientes
 - Si el documento del NN ya pertenece a otro paciente, `identificar` lanza `RegistroDuplicadoError`. Unir los dos registros queda para la Fase 4.
-- Verificar en una base temporal y recrear `sigtac_db`; actualizar `diagrama.png`.
+- Recrear `sigtac_db` con los scripts nuevos; actualizar `diagrama.png`.
 
 ---
 
@@ -60,7 +65,7 @@ El sistema solo aceptaba DNI peruano (8 dígitos): un paciente o un empleado ext
 
 ### Impacto
 - Pruebas: 466 pasan.
-- **No verificado aún en MySQL.** `sigtac_db` necesita volver a crearse con `schema.sql` y `seed.sql` (borra los datos de desarrollo).
+- Verificado en MySQL 8.0.46 junto con el cambio de pacientes NN (ver la entrada siguiente). `sigtac_db` necesita volver a crearse con `schema.sql` y `seed.sql` (borra los datos de desarrollo).
 - Quien llame a `autenticar` o a `buscar_por_documento` (futuros `auth_controller` y vistas) debe enviar el tipo de documento: el formulario de login necesita un selector de tipo.
 
 ### Decisiones
@@ -72,7 +77,7 @@ El sistema solo aceptaba DNI peruano (8 dígitos): un paciente o un empleado ext
 - El documento sigue sin poder actualizarse (`PacienteDAO.actualizar`), igual que antes el DNI.
 
 ### Pendientes
-- Verificar `schema.sql`/`seed.sql` en una base temporal y recrear `sigtac_db`.
+- Recrear `sigtac_db` con los scripts nuevos.
 - Actualizar `db_scripts/diagrama.png`.
 - Pacientes sin identificar (NN): requieren otra decisión (sin documento, nombre ni fecha de nacimiento conocidos).
 
