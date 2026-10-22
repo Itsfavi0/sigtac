@@ -276,12 +276,9 @@ Debe:
 
 **No trasladar la lógica de compatibilidad al SQL comparando directamente `tipo_cama.nivel_min`.** El diseño del proyecto considera que ese único umbral no representa correctamente los rangos de compatibilidad de todos los subtipos.
 
-### `triaje_dao.py`
+### `episodio_dao.py` y `triaje_dao.py`
 
-Debe:
-- Insertar la cabecera del episodio cuando corresponda al flujo.
-- Guardar signos vitales.
-- Gestionar la relación `triaje_sintoma`.
+`EpisodioDAO` guarda la cabecera del episodio (`episodio_emergencia`) y sus cambios de estado; `TriajeDAO` guarda los signos vitales, el triaje y la relación `triaje_sintoma` en una transacción. Un triaje guardado no se edita: una reevaluación es un triaje nuevo (RN-09). El cambio de estado del episodio (RN-01) lo decide el modelo y lo guarda `EpisodioDAO.cambiar_estado`, dentro de la misma transacción del controlador.
 
 ### `auditoria_dao.py`
 

@@ -48,6 +48,34 @@ def test_reclasificar_rechaza_nivel_invalido():
         nuevo_triaje(3).reclasificar(9, "Justificación suficientemente larga.")
 
 
+def test_sintomas_del_triaje():
+    triaje = nuevo_triaje()
+    tos, fiebre = Sintoma(10, "Tos Leve", 0.5), Sintoma(6, "Fiebre Alta (> 39°C)", 4.0)
+    triaje.agregar_sintoma(tos)
+    triaje.agregar_sintoma(fiebre)
+    assert triaje.sintomas == (tos, fiebre)
+
+
+def test_un_sintoma_no_se_registra_dos_veces():
+    triaje = nuevo_triaje()
+    triaje.agregar_sintoma(Sintoma(10, "Tos Leve", 0.5))
+    with pytest.raises(ValueError, match="ya está registrado"):
+        triaje.agregar_sintoma(Sintoma(10, "Tos Leve", 0.5))
+    assert len(triaje.sintomas) == 1
+
+
+@pytest.mark.parametrize("sintoma", [None, 10, "Tos"])
+def test_agregar_sintoma_exige_un_sintoma(sintoma):
+    with pytest.raises(ValueError):
+        nuevo_triaje().agregar_sintoma(sintoma)
+
+
+def test_los_sintomas_son_de_solo_lectura():
+    triaje = nuevo_triaje()
+    with pytest.raises(AttributeError):
+        triaje.sintomas.append(Sintoma(1, "x", 1.0))
+
+
 def test_anular_es_baja_logica():  # RN-11
     triaje = nuevo_triaje()
     assert triaje.activo
@@ -163,6 +191,42 @@ def test_triaje_actual_ignora_triajes_anulados():
     ep.agregar_triaje(valido)
     ep.agregar_triaje(anulado)
     assert ep.obtener_triaje_actual() is valido
+
+
+def test_con_la_misma_hora_gana_el_ultimo_triaje_agregado():
+    # La BD guarda la hora con segundos: dos triajes del mismo segundo no deben resolverse al azar.
+    ep = nuevo_episodio()
+    primero = nuevo_triaje(3, AHORA, id_triaje=1)
+    segundo = nuevo_triaje(2, AHORA, id_triaje=2)
+    ep.agregar_triaje(primero)
+    ep.agregar_triaje(segundo)
+    assert ep.obtener_triaje_actual() is segundo
+
+
+def test_historial_de_triajes_y_signos_en_orden_y_de_solo_lectura():  # RN-09
+    ep = nuevo_episodio()
+    t1, t2 = nuevo_triaje(3, id_triaje=1), nuevo_triaje(2, id_triaje=2)
+    t2.anular()
+    sv = SignosVitales(120, 80, 75, 16, 36.8, 98, id_si=1)
+    ep.agregar_triaje(t1)
+    ep.agregar_triaje(t2)
+    ep.agregar_signos_vitales(sv)
+    assert ep.triajes == (t1, t2)  # incluye el anulado
+    assert ep.signos_vitales == (sv,)
+    with pytest.raises(AttributeError):
+        ep.triajes.append(t1)  # es una tupla: el historial no se modifica desde fuera
+
+
+def test_episodio_se_reconstruye_con_los_datos_de_la_bd():
+    ingreso, alta = datetime(2026, 10, 21, 8, 0), datetime(2026, 10, 21, 14, 30)
+    ep = EpisodioEmergencia(7, 2, "Fiebre", estado="ALTA MÉDICA", fecha_ingreso=ingreso, fecha_alta=alta, activo=False)
+    assert (ep.fecha_ingreso, ep.fecha_alta, ep.activo) == (ingreso, alta, False)
+    assert ep.estado is EpisodioEmergencia.ESTADO_ALTA
+
+
+def test_episodio_nuevo_toma_la_hora_actual_y_esta_activo():
+    ep = nuevo_episodio()
+    assert ep.fecha_ingreso is not None and ep.fecha_alta is None and ep.activo is True
 
 
 def test_estado_inexistente_se_rechaza():

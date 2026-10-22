@@ -175,7 +175,7 @@
 
 ### Orden de implementación de los DAO restantes
 
-`paciente_dao.py` → `cama_dao.py` → `auditoria_dao.py` → (decisión sobre transacciones) → `triaje_dao.py` → `asignacion_dao.py`.
+`paciente_dao.py` → `cama_dao.py` → `auditoria_dao.py` → (decisión sobre transacciones) → `triaje_dao.py` + `episodio_dao.py` → `asignacion_dao.py`.
 Motivo del orden: ver `CHANGELOG.md` (2026-10-12).
 
 ### `paciente_dao.py`
@@ -202,11 +202,14 @@ Motivo del orden: ver `CHANGELOG.md` (2026-10-12).
 - [x] Evaluar compatibilidad con `cama.es_compatible(nivel)` en Python: lo hace el controlador sobre `listar_disponibles()`.
 - [x] Cambiar estado + registrar en `historial_estado_cama` (`cambiar_estado`: `transaccion()` y `UPDATE` condicional).
 
-### `triaje_dao.py`
+### `triaje_dao.py` y `episodio_dao.py`
 
-- [ ] Persistir información del episodio.
-- [ ] Persistir signos vitales.
-- [ ] Persistir síntomas mediante `triaje_sintoma`.
+**Estado:** completados, probados (`tests/test_triaje_dao.py`, `tests/test_episodio_dao.py`) y verificados en MySQL 8.0.46 con una base temporal. El episodio tiene su propio DAO (un DAO por entidad); ver `CHANGELOG.md` del 2026-10-21.
+
+- [x] Persistir información del episodio (`EpisodioDAO.crear`, `buscar_por_id`, `cambiar_estado`).
+- [x] Persistir signos vitales (`TriajeDAO.registrar`).
+- [x] Persistir síntomas mediante `triaje_sintoma` (`TriajeDAO.registrar`).
+- [x] Leer el historial de triajes (RN-09) y el catálogo de síntomas.
 
 ### `asignacion_dao.py`
 

@@ -22,6 +22,13 @@ class BaseDAO:
     """
 
     @staticmethod
+    def _validar_id(valor, nombre: str) -> int:
+        """Un id recibido como parámetro debe ser un entero positivo (bool no cuenta). Lanza ValueError."""
+        if isinstance(valor, bool) or not isinstance(valor, int) or valor <= 0:
+            raise ValueError(f"{nombre} debe ser un entero positivo.")
+        return valor
+
+    @staticmethod
     def _consultar_uno(sql: str, params: tuple = ()) -> dict | None:
         """Ejecuta un SELECT y devuelve la primera fila como diccionario, o None si no hay filas."""
         return BaseDAO._ejecutar_con_cursor(sql, params, lambda cursor: cursor.fetchone())

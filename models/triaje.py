@@ -104,7 +104,17 @@ class Triaje:
     def es_reclasificacion(self) -> bool:
         return self._nivel_final != self._nivel_sugerido
 
+    @property
+    def sintomas(self) -> tuple:
+        """Síntomas registrados en este triaje (de solo lectura: se agregan con agregar_sintoma)."""
+        return tuple(self._sintomas)
+
     def agregar_sintoma(self, sintoma: Sintoma):
+        """Agrega un síntoma. Cada síntoma se registra una sola vez por triaje (PK de triaje_sintoma)."""
+        if not isinstance(sintoma, Sintoma):
+            raise ValueError("sintoma debe ser un Sintoma.")
+        if any(s.id_sintoma == sintoma.id_sintoma for s in self._sintomas):
+            raise ValueError("El síntoma ya está registrado en este triaje.")
         self._sintomas.append(sintoma)
 
     def reclasificar(self, nuevo_nivel: int, justificacion: str):
@@ -141,14 +151,16 @@ class EpisodioEmergencia:
     ESTADO_EN_ATENCION = EstadoEpisodio.EN_ATENCION
     ESTADO_ALTA = EstadoEpisodio.ALTA
 
-    def __init__(self, id_episodio: int, id_paciente: int, motivo_consulta: str, estado: str = ESTADO_EN_ESPERA_TRIAJE):
+    def __init__(self, id_episodio: int, id_paciente: int, motivo_consulta: str, estado: str = ESTADO_EN_ESPERA_TRIAJE,
+                 fecha_ingreso: datetime | None = None, fecha_alta: datetime | None = None, activo: bool = True):
+        # fecha_ingreso, fecha_alta y activo solo se pasan al reconstruir el episodio desde la BD.
         self._id_episodio = id_episodio
         self._id_paciente = id_paciente
         self._motivo_consulta = motivo_consulta
         self._estado = EstadoEpisodio(estado)  # ValueError si el estado no existe
-        self._fecha_ingreso = datetime.now()
-        self._fecha_alta = None
-        self._activo = True  # Espejo de episodio_emergencia.estado_registro (RN-11)
+        self._fecha_ingreso = fecha_ingreso or datetime.now()
+        self._fecha_alta = fecha_alta
+        self._activo = activo  # Espejo de episodio_emergencia.estado_registro (RN-11)
 
         # RN-09: Un episodio puede tener múltiples triajes (historial de reclasificaciones)
         self._historial_triajes = []
@@ -175,6 +187,16 @@ class EpisodioEmergencia:
     @property
     def activo(self): return self._activo
 
+    @property
+    def triajes(self) -> tuple:
+        """Historial completo de triajes en el orden en que se agregaron, anulados incluidos (RN-09)."""
+        return tuple(self._historial_triajes)
+
+    @property
+    def signos_vitales(self) -> tuple:
+        """Mediciones de signos vitales en el orden en que se agregaron."""
+        return tuple(self._signos_vitales)
+
     def agregar_triaje(self, triaje: Triaje):
         """Agrega un nuevo triaje a la lista, manteniendo el historial completo.
 
@@ -187,9 +209,13 @@ class EpisodioEmergencia:
             self._estado = self.ESTADO_EN_ESPERA
 
     def obtener_triaje_actual(self) -> Triaje | None:
-        """Devuelve el triaje activo más reciente (los anulados no cuentan)."""
+        """
+        Devuelve el triaje activo más reciente (los anulados no cuentan). Si dos tienen la misma
+        fecha y hora (la BD guarda segundos), gana el último agregado.
+        """
         activos = [t for t in self._historial_triajes if t.activo]
-        return max(activos, key=lambda t: t.fecha_hora) if activos else None
+        # max() devuelve el primero de los empates: recorriendo al revés, ese es el último agregado.
+        return max(reversed(activos), key=lambda t: t.fecha_hora) if activos else None
 
     def agregar_signos_vitales(self, signos: SignosVitales):
         self._signos_vitales.append(signos)

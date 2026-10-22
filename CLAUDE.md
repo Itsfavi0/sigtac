@@ -79,8 +79,8 @@ views → controllers → models (dominio) → dao → MySQL
 - Todo SQL con parámetros: `cursor.execute(sql, (valor,))`. Prohibido concatenar o usar f-strings en SQL.
   Si un nombre de tabla/columna/`ORDER BY` es dinámico, validarlo contra una lista blanca.
 - No hay borrado físico (RN-11): se usa `estado_registro = FALSE`.
-- Cada DAO nuevo hereda de `BaseDAO` (`dao/base_dao.py`) y usa `_consultar_uno`, `_consultar_varios`, `_insertar`
-  y `_ejecutar`: ahí se cierran los cursores y los errores de MySQL se traducen a `PersistenciaError`
+- Cada DAO nuevo hereda de `BaseDAO` (`dao/base_dao.py`) y usa `_consultar_uno`, `_consultar_varios`, `_insertar`,
+  `_ejecutar` y `_validar_id` (ids recibidos como parámetro): ahí se cierran los cursores y los errores de MySQL se traducen a `PersistenciaError`
   (o `RegistroDuplicadoError`, o `ConexionBDError`). `None`/lista vacía = no encontrado; un fallo lanza excepción.
   Excepción: `UsuarioDAO.autenticar` devuelve `None` ante todo fallo, para no revelar la causa.
 - Cada DAO tiene un método `_a_<entidad>(fila)` que es el único punto que convierte una fila en un objeto; las
@@ -93,7 +93,9 @@ views → controllers → models (dominio) → dao → MySQL
   auditoría de una operación sensible va dentro de su transacción. Dentro del bloque, las excepciones deben llegar
   al `with` más externo (no capturarlas a mitad). Durante una transacción `ConexionBD` no se reconecta.
 - Concurrencia entre PCs: `UPDATE` condicional (`WHERE id = %s AND estado = <esperado>`) y comprobar `rowcount`;
-  0 filas = otro usuario llegó primero.
+  0 filas = otro usuario llegó primero: lanzar una excepción (no devolver `False`) para que se deshaga la transacción.
+- Cambios de estado: el modelo decide la transición (`cama.reservar()`, `episodio.asignar_cama()`...) y el DAO solo la
+  guarda con `cambiar_estado(objeto, estado_anterior)`. Las fechas de registro (ingreso, alta, triaje, auditoría) las pone MySQL.
 - Las reglas críticas viven también en la BD (RN-05 y RN-10 con `UNIQUE`/`CHECK`). Cambios de esquema:
   actualizar `schema.sql`, `seed.sql`, los modelos, las pruebas y `diagrama.png`.
 - Un `CHECK` que compare texto (`IN ('A', 'B')`) necesita la columna con `COLLATE utf8mb4_bin`: la collation

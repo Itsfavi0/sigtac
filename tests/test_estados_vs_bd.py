@@ -48,6 +48,13 @@ def test_la_fabrica_de_camas_cubre_los_tipos_de_la_bd():
     assert set(CamaDAO.CLASES_POR_TIPO) == tipos_en_seed
 
 
+def test_los_niveles_de_triaje_del_seed_son_los_del_modelo():
+    # TriajeDAO busca el nivel por su número (nivel_triaje.numero); Triaje acepta del 1 al 5.
+    bloque = re.search(r"INSERT INTO nivel_triaje \(.*?\) VALUES(.*?);", SEED, re.S).group(1)
+    numeros = {int(n) for n in re.findall(r"\(\d+, (\d+), '[^']+', \d+\)", bloque)}
+    assert numeros == set(range(1, 6))
+
+
 def test_las_tablas_auditables_son_todas_las_del_esquema_salvo_la_bitacora():
     tablas = set(re.findall(r"CREATE TABLE (\w+)", SCHEMA))
     assert "paciente" in tablas  # la expresión regular encontró tablas

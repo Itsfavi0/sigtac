@@ -33,12 +33,6 @@ class AuditoriaDAO(BaseDAO):
         return tabla
 
     @staticmethod
-    def _validar_id(valor, nombre: str) -> int:
-        if isinstance(valor, bool) or not isinstance(valor, int) or valor <= 0:
-            raise ValueError(f"{nombre} debe ser un entero positivo.")
-        return valor
-
-    @staticmethod
     def _a_registro(fila: dict) -> dict:
         """Convierte una fila de la bitácora en un diccionario, con los detalles ya decodificados."""
         detalles = fila["detalles_json"]

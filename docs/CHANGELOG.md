@@ -5,6 +5,58 @@
 
 ---
 
+## [2026-10-21] — `TriajeDAO` y `EpisodioDAO`
+
+### Cambio
+- Nuevo `dao/triaje_dao.py` (`TriajeDAO`): `listar_sintomas`, `registrar(id_episodio, signos, triaje)` (signos vitales + triaje + `triaje_sintoma` en una transacción), `listar_por_episodio` y `listar_signos_por_episodio`.
+- Nuevo `dao/episodio_dao.py` (`EpisodioDAO`): `crear`, `buscar_por_id` (con su historial de signos y triajes) y `cambiar_estado` (`UPDATE` condicional).
+- `models/triaje.py`:
+  - `Triaje.sintomas` (tupla de solo lectura); `agregar_sintoma` rechaza lo que no es `Sintoma` y un síntoma repetido.
+  - `EpisodioEmergencia`: propiedades `triajes` y `signos_vitales` (tuplas de solo lectura) y parámetros opcionales `fecha_ingreso`, `fecha_alta` y `activo` para reconstruirlo desde la BD.
+  - `obtener_triaje_actual`: con la misma fecha y hora gana el último triaje agregado.
+- `dao/base_dao.py`: nuevo `BaseDAO._validar_id`; `AuditoriaDAO` usaba una copia idéntica y ahora usa este.
+- Pruebas: `tests/test_triaje_dao.py` (31, nuevo), `tests/test_episodio_dao.py` (26, nuevo), 10 nuevas en `tests/test_triaje.py` y 1 en `tests/test_estados_vs_bd.py` (los niveles 1–5 del seed coinciden con el modelo).
+- `CLAUDE.md`: reglas de cambios de estado (el modelo decide, el DAO guarda), fechas puestas por MySQL y `_validar_id`.
+
+### Archivos afectados
+- `dao/triaje_dao.py` (nuevo), `dao/episodio_dao.py` (nuevo), `dao/base_dao.py`, `dao/auditoria_dao.py`, `models/triaje.py`
+- `tests/test_triaje_dao.py` (nuevo), `tests/test_episodio_dao.py` (nuevo), `tests/test_triaje.py`, `tests/test_estados_vs_bd.py`
+- `CLAUDE.md`, `docs/`
+
+### Motivo
+Siguiente paso de la Fase 3: el triaje es el centro del sistema y `triaje_controller` (Fase 4) lo necesita. Con `transaccion()` ya decidida, las varias escrituras de un triaje se pueden guardar de forma atómica.
+
+### Impacto
+- Pruebas: 648 pasan.
+- Verificado en MySQL 8.0.46 con una base temporal (`sigtac_scratch_tmp`, ya eliminada), recorriendo el flujo que hará `triaje_controller` (Manchester sugiere, la enfermera confirma, todo en una transacción con auditoría) y con una segunda conexión como "otra PC". 22 comprobaciones pasaron:
+  - Catálogo: 10 síntomas ordenados, con peso como `float`. El episodio 2 del seed se reconstruye con su triaje reclasificado (sugerido 3, final 2, con justificación y síntoma); el episodio 1 conserva su estado EN ATENCIÓN; uno inexistente devuelve `None`.
+  - Llegada y primer triaje (paciente extranjera): el episodio nace EN ESPERA DE TRIAJE con fecha de MySQL; se guardan signos, triaje (nivel final, sugerido, justificación, enfermera), 2 síntomas y la auditoría; el episodio pasa a EN ESPERA DE CAMA (RN-01).
+  - Reevaluación (RN-09): un triaje nuevo, el anterior intacto; el triaje actual es la reevaluación y el estado no cambia.
+  - Dos enfermeros triando el mismo episodio: el segundo recibe `ReglaNegocioError` y su triaje, signos y auditoría se deshacen.
+  - Un síntoma inexistente (FK, 1452) deshace todo el triaje y el cambio de estado.
+  - Asignar cama y dar de alta guardan los estados; la fecha de alta la pone MySQL (≥ ingreso). Un episodio con datos desactualizados lanza `ReglaNegocioError`.
+- **No ejercitado contra MySQL:** guardar un triaje *nuevo* con nivel final distinto del sugerido. En la verificación, Manchester sugirió 1 y la "reclasificación" también fue a 1. Lo cubren las pruebas unitarias (parámetros del `INSERT`), la lectura del triaje reclasificado del seed y la verificación del `CHECK CH_triaje_rn10` del 2026-10-12.
+
+### Decisiones
+- **Dos DAO, uno por entidad:** el plan solo nombraba `triaje_dao.py`, pero el episodio es otra entidad (`CLAUDE.md`: un `*_dao.py` por entidad). `EpisodioDAO.buscar_por_id` usa `TriajeDAO` para cargar el historial, así el modelo puede aplicar RN-01 sobre datos reales.
+- **`TriajeDAO` solo inserta y lee (RN-09):** una reevaluación es un triaje nuevo; un test comprueba que no hay métodos para modificar ni borrar.
+- **`registrar` no cambia el estado del episodio:** la transición la decide el modelo (`agregar_triaje`) y la guarda `EpisodioDAO.cambiar_estado`, en la misma transacción del controlador. Si dos enfermeros trían a la vez, el `UPDATE` condicional del segundo encuentra 0 filas y deshace todo su triaje.
+- **`EpisodioDAO.cambiar_estado` no abre transacción propia:** es una sola sentencia; dentro de la del controlador, su excepción deshace los pasos anteriores.
+- **0 filas → `ReglaNegocioError`** (no `False`), por la misma razón que en `CamaDAO.cambiar_estado`.
+- **Las fechas las pone MySQL** (triaje, signos, ingreso y alta): un solo reloj para todas las PCs, y `CH_episodio_fechas` se cumple aunque el reloj de una PC esté desfasado. La fecha de alta se pone al pasar a ALTA MÉDICA (`IF(%s, NOW(), fecha_alta)`).
+- **Niveles por número:** `id_nivel` e `id_nivel_sugerido` se obtienen con subconsultas sobre `nivel_triaje.numero`, no por id. Un `id_nivel_sugerido` `NULL` se lee como "sin sugerencia" (sugerido = final).
+- **Reconstrucción con los métodos del modelo:** `_a_triaje` usa `reclasificar()` y `anular()`, así las reglas (RN-10, RN-11) se aplican también a lo que llega de la BD.
+- **Desempate de `obtener_triaje_actual`:** la BD guarda segundos; dos triajes en el mismo segundo devolvían el más antiguo. Ahora gana el último agregado, que en un historial leído por `fecha_hora, id_triaje` es el más reciente.
+- **Síntoma repetido:** lo rechaza el modelo (`agregar_sintoma`) antes de llegar al `INSERT`, que fallaría por la clave primaria de `triaje_sintoma`.
+- **Sin datos clínicos en los logs:** ni la justificación ni el motivo de consulta; solo ids, niveles y estados.
+
+### Pendientes
+- Decidir si se puede registrar un triaje en un episodio ya dado de alta, referido o fugado (hoy el modelo no lo impide).
+- `Triaje.reclasificar` acepta "reclasificar" al mismo nivel sugerido y guarda la justificación aunque `es_reclasificacion` sea `False`. No viola RN-10, pero conviene decidir si debe rechazarse.
+- Cola de espera (episodios EN ESPERA DE CAMA ordenados por nivel y tiempo): con `asignacion_dao.py` / `cama_controller`.
+
+---
+
 ## [2026-10-21] — `CamaDAO.cambiar_estado` con historial
 
 ### Cambio
