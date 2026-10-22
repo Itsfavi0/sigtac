@@ -207,8 +207,11 @@ Motivo del orden: ver `CHANGELOG.md` (2026-10-12).
 
 ### `auditoria_dao.py`
 
-- [ ] `registrar(usuario, tabla, accion)`.
-- [ ] Mantener auditoría explícita desde los controladores.
+**Estado:** completado y probado (`tests/test_auditoria_dao.py`).
+
+- [x] `registrar(id_usuario, tabla, accion, id_registro, detalles=None)`: solo inserción; `AccionAuditoria` y lista blanca de tablas.
+- [x] `listar_por_registro(tabla, id_registro)`.
+- [ ] Mantener auditoría explícita desde los controladores (Fase 4).
 
 ---
 

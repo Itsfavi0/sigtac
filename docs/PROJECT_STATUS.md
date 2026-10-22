@@ -16,16 +16,16 @@
 
 - Base de datos (22 tablas) implementada con las restricciones de RN-05 y RN-10 y el bloqueo temporal de cuentas.
 - **Fase 2 (models) cerrada:** todas las clases del plan existen y tienen pruebas automáticas.
-- **Fase 3 (DAO) iniciada:** `db_connection.py`, `base_dao.py`, `usuario_dao.py`, `paciente_dao.py` y `cama_dao.py` (lectura) están terminados y probados.
+- **Fase 3 (DAO) en curso:** `db_connection.py`, `base_dao.py`, `usuario_dao.py`, `paciente_dao.py`, `cama_dao.py` (lectura) y `auditoria_dao.py` están terminados y probados.
+- `sigtac_db` recreada con el esquema actual (2026-10-21).
 - `models/persona.py` alineado con las tablas `paciente` y `empleado`, con validaciones de entrada (2026-10-12).
 - Pacientes y empleados se identifican con `DocumentoIdentidad` (DNI, carné de extranjería, pasaporte o CPP) (2026-10-21).
 - Un paciente puede ingresar sin identificar (NN) e identificarse después (2026-10-21).
-- Pruebas: **497 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
+- Pruebas: **531 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
 
 ### Tarea actual
 
-Ninguna en curso. Siguiente tarea: **`dao/auditoria_dao.py`**.
-Antes hay que volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db`: tiene el esquema anterior al 2026-10-12 (y le faltan `tipo_documento` y los pacientes NN). Los scripts ya se verificaron en una base temporal.
+Ninguna en curso. Siguiente tarea: **decidir el manejo de transacciones** (problema 3), que bloquea `cama_dao.cambiar_estado`, `triaje_dao.py` y `asignacion_dao.py`.
 
 ---
 
@@ -36,7 +36,7 @@ Antes hay que volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db`: tie
 | Fase 0 — Entorno y estructura | Completada (`.venv` recreado dentro del proyecto el 2026-10-11) |
 | Fase 1 — Base de datos | Completada. Verificada en MySQL 8.0.46 (2026-10-12 y 2026-10-21) y antes en MariaDB 11.8 |
 | Fase 2 — Models | Completada (2026-10-12) |
-| Fase 3 — DAO | En curso: `db_connection.py`, `base_dao.py`, `usuario_dao.py`, `paciente_dao.py` y `cama_dao.py` (lectura) terminados |
+| Fase 3 — DAO | En curso: `db_connection.py`, `base_dao.py`, `usuario_dao.py`, `paciente_dao.py`, `cama_dao.py` (lectura) y `auditoria_dao.py` terminados |
 | Fase 4 — Controllers | Pendiente (la carpeta `controllers/` aún no existe) |
 | Fase 5 — Utils | Parcial: `security.py` y `logging_config.py` hechos; falta `pdf_generator.py` |
 | Fase 6 — Views | Pendiente (la carpeta `views/` aún no existe) |
@@ -55,7 +55,8 @@ Antes hay que volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db`: tie
 | `models/cama.py` | `Cama` y 4 subtipos, máquina de estados, `es_compatible` | `test_cama.py` (32) |
 | `models/estrategias.py` | `EstrategiaTriaje`, `ReglaManchester`, `ReglaMINSA` | `test_estrategias.py` (32) |
 | `models/triaje.py` | `EpisodioEmergencia`, `Triaje`, `SignosVitales`, `Sintoma` | `test_triaje.py` (38) |
-| `models/estados.py` | `EstadoCama`, `EstadoEpisodio` | `test_estados_vs_bd.py` (7: también comprueba sexo, turno, tipos de cama, tipos de documento y el paciente NN del seed) |
+| `models/estados.py` | `EstadoCama`, `EstadoEpisodio` | `test_estados_vs_bd.py` (9: también comprueba sexo, turno, tipos de cama, tipos de documento, el paciente NN del seed, las tablas auditables y las acciones de auditoría) |
+| `models/auditoria.py` | `AccionAuditoria` (INSERT, UPDATE, ANULAR, IDENTIFICAR) | `test_auditoria_dao.py` y `test_estados_vs_bd.py` |
 | `models/excepciones.py` | `SigtacError` y 7 excepciones derivadas | Se usan en las pruebas anteriores |
 
 ### Fase 3 — DAO
@@ -65,21 +66,22 @@ Antes hay que volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db`: tie
 - `dao/paciente_dao.py`: buscar por id/documento, crear (también sin identificar), listar e identificar pacientes NN, actualizar (sin tocar el documento) y baja lógica (`test_paciente_dao.py`, 38 pruebas). Verificado en MySQL 8.0.46 con una base temporal (2026-10-12: 15 comprobaciones; 2026-10-21, con documentos y NN: 33).
 - `dao/cama_dao.py`: búsqueda por id/código y listados; fábrica de subclases por `nombre_tipo_cama` (`test_cama_dao.py`, 25 pruebas). Verificado en MySQL 8.0.46 con una base temporal (11 comprobaciones). Falta cambiar estado (requiere transacción).
 - `dao/usuario_dao.py`: hereda de `BaseDAO`; login con tipo + número de documento, JOIN a `empleado`, `tipo_documento` y `rol`, bcrypt, usuario inactivo, señuelo y bloqueo de 5 intentos durante 15 min (`test_usuario_dao.py`, 39 pruebas).
+- `dao/auditoria_dao.py`: `registrar` (bitácora de solo inserción; acción con `AccionAuditoria`, tabla con lista blanca, detalles como JSON) y `listar_por_registro` (`test_auditoria_dao.py`, 32 pruebas). El listado se comprobó en solo lectura contra `sigtac_db`; `registrar` aún no se probó contra MySQL real.
 - `seed.sql` tiene hashes bcrypt válidos. El login con un usuario del seed se verificó a mano contra una base temporal (ver CHANGELOG del 2026-10-11).
 
 ---
 
 ## Problemas abiertos
 
-1. **`sigtac_db` desactualizada:** no se ha vuelto a ejecutar `schema.sql`/`seed.sql` sobre ella tras los cambios del 2026-10-12 y 2026-10-21. Hacerlo borra los datos de desarrollo. Los scripts nuevos ya se verificaron en una base temporal (2026-10-21, 33 comprobaciones).
-2. **Paciente NN que ya estaba registrado:** si al identificar a un NN su documento ya pertenece a otro paciente, `PacienteDAO.identificar` lanza `RegistroDuplicadoError`. Unir los dos registros (mover los episodios) no está implementado; se decidirá con el controlador.
-3. **Permisos duplicados:** la tabla `rol` y `tiene_permiso()` en cada subclase. Se decidirá en la Fase 4. Las pruebas actuales fijan el comportamiento de `tiene_permiso()`.
-4. **Transacciones:** `ConexionBD` usa `autocommit=True` y una sola conexión. `triaje_dao.py` y `asignacion_dao.py` necesitan transacciones explícitas; hay que decidir cómo implementarlas antes de escribirlos.
+1. **Paciente NN que ya estaba registrado:** si al identificar a un NN su documento ya pertenece a otro paciente, `PacienteDAO.identificar` lanza `RegistroDuplicadoError`. Unir los dos registros (mover los episodios) no está implementado; se decidirá con el controlador.
+2. **Permisos duplicados:** la tabla `rol` y `tiene_permiso()` en cada subclase. Se decidirá en la Fase 4. Las pruebas actuales fijan el comportamiento de `tiene_permiso()`.
+3. **Transacciones:** `ConexionBD` usa `autocommit=True` y una sola conexión. `triaje_dao.py` y `asignacion_dao.py` necesitan transacciones explícitas; hay que decidir cómo implementarlas antes de escribirlos. También hay que decidir si una operación sensible se deshace cuando falla su registro de auditoría.
 
 ### Resueltos el 2026-10-21
 
 - Pacientes y empleados extranjeros: `DocumentoIdentidad` (DNI, CE, pasaporte, CPP) y tabla `tipo_documento`.
 - Pacientes sin identificar (NN): `Paciente.no_identificado`, `Paciente.identificar` y `PacienteDAO.identificar`.
+- `sigtac_db` recreada con `schema.sql` y `seed.sql` actuales.
 
 ### Resueltos el 2026-10-12
 
@@ -99,20 +101,18 @@ Antes hay que volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db`: tie
 - Revisar la coherencia de `usuario_dao.py` con `auth_controller.py` cuando exista.
 - Decidir si `seed.sql` mantiene los datos reales de los integrantes.
 - PyCharm: cada integrante debe seleccionar `SIGTAC/.venv` como intérprete.
+- Opcional: quitar a `sigtac_app` el permiso `UPDATE` sobre `bitacora_auditoria`, para que la bitácora no se pueda modificar ni por error del código (lo ejecuta el usuario con su cuenta de administrador).
 
 ---
 
 ## Próximo trabajo previsto
 
-1. Volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db` (problema 1).
-2. `auditoria_dao.py`.
-3. Decidir el manejo de transacciones (problema 4).
-4. `cama_dao.cambiar_estado` con historial.
-5. `triaje_dao.py`.
-6. `asignacion_dao.py`.
+1. Decidir el manejo de transacciones (problema 3).
+2. `cama_dao.cambiar_estado` con historial.
+3. `triaje_dao.py`.
+4. `asignacion_dao.py`.
 
-El orden respecto al plan original cambia en un punto: `auditoria_dao.py` pasa antes que `triaje_dao.py` y `asignacion_dao.py`,
-porque es de una sola tabla y no depende de transacciones. El motivo queda registrado en `CHANGELOG.md`.
+Respecto al plan original, `auditoria_dao.py` se hizo antes que `triaje_dao.py` y `asignacion_dao.py` porque es de una sola tabla y no depende de transacciones (ver `CHANGELOG.md` del 2026-10-12).
 
 ---
 

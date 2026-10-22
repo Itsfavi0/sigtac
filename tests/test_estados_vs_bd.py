@@ -4,7 +4,9 @@ from pathlib import Path
 
 import pytest
 
+from dao.auditoria_dao import AuditoriaDAO
 from dao.cama_dao import CamaDAO
+from models.auditoria import AccionAuditoria
 from models.documento import TipoDocumento
 from models.estados import EstadoCama, EstadoEpisodio
 from models.persona import Paciente, PersonalLimpieza
@@ -44,6 +46,19 @@ def test_la_fabrica_de_camas_cubre_los_tipos_de_la_bd():
     tipos_en_seed = set(re.findall(r"\(\d+, '([^']+)', \d+\)", bloque))
     assert tipos_en_seed  # la expresión regular encontró filas
     assert set(CamaDAO.CLASES_POR_TIPO) == tipos_en_seed
+
+
+def test_las_tablas_auditables_son_todas_las_del_esquema_salvo_la_bitacora():
+    tablas = set(re.findall(r"CREATE TABLE (\w+)", SCHEMA))
+    assert "paciente" in tablas  # la expresión regular encontró tablas
+    assert AuditoriaDAO.TABLAS_AUDITABLES == tablas - {"bitacora_auditoria"}
+
+
+def test_las_acciones_del_seed_existen_en_el_enum():
+    bloque = re.search(r"INSERT INTO bitacora_auditoria \(.*?\) VALUES(.*?);", SEED, re.S).group(1)
+    acciones = set(re.findall(r"\(\d+, \d+, '[^']+', '([^']+)'", bloque))
+    assert acciones  # la expresión regular encontró filas
+    assert acciones <= {a.value for a in AccionAuditoria}
 
 
 def test_el_seed_tiene_un_paciente_sin_identificar_con_el_nombre_del_modelo():

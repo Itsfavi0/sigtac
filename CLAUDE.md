@@ -39,7 +39,7 @@ python -m pytest -k "bloqueo" -x               # filtrar por nombre, parar al pr
 
 ```text
 dao/          Acceso a datos: db_connection.py (Singleton ConexionBD), base_dao.py y un *_dao.py por entidad
-models/       Dominio: persona, cama, triaje, estrategias, estados (Enum), excepciones
+models/       Dominio: persona, documento, cama, triaje, estrategias, estados y auditoria (Enum), excepciones
 utils/        security.py (bcrypt) y logging_config.py
 db_scripts/   schema.sql, seed.sql, crear_usuario_app.sql y diagrama.png
 tests/        pytest: un test_*.py por módulo

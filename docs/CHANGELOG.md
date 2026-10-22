@@ -5,6 +5,39 @@
 
 ---
 
+## [2026-10-21] — `AuditoriaDAO` y `sigtac_db` recreada
+
+### Cambio
+- Nuevo `dao/auditoria_dao.py` (`AuditoriaDAO`, hereda de `BaseDAO`): `registrar(id_usuario, tabla, accion, id_registro, detalles=None)` y `listar_por_registro(tabla, id_registro)`.
+- Nuevo `models/auditoria.py`: `AccionAuditoria` (`INSERT`, `UPDATE`, `ANULAR`, `IDENTIFICAR`).
+- Nuevo `tests/test_auditoria_dao.py` (32 pruebas) y 2 pruebas en `tests/test_estados_vs_bd.py`: la lista de tablas auditables coincide con `schema.sql` y las acciones del seed existen en el Enum.
+- El usuario recreó `sigtac_db` con `schema.sql` y `seed.sql` actuales.
+
+### Archivos afectados
+- `dao/auditoria_dao.py` (nuevo), `models/auditoria.py` (nuevo), `tests/test_auditoria_dao.py` (nuevo), `tests/test_estados_vs_bd.py`, `CLAUDE.md`, `docs/`
+
+### Motivo
+Siguiente DAO del plan. Es de una sola tabla y no necesita transacciones, y los controladores de la Fase 4 lo usarán después de cada operación sensible.
+
+### Impacto
+- Pruebas: 531 pasan.
+- `listar_por_registro` se comprobó en solo lectura contra `sigtac_db` (usuario `sigtac_app`): devuelve las 2 filas del seed con `AccionAuditoria`, `fecha_hora` como `datetime` y `detalles` en `None`, y una lista vacía para un registro sin auditoría. `registrar` no se probó contra MySQL real para no dejar filas de prueba en `sigtac_db`: la bitácora no admite borrado.
+
+### Decisiones
+- **Solo inserción:** el DAO no tiene métodos para modificar ni borrar; un test lo comprueba. Una auditoría editable no sirve como evidencia.
+- **`accion` con Enum:** evita que la misma acción quede escrita de varias formas y no se pueda agrupar en reportes. `AccionAuditoria` está en `models/` porque la usarán los controladores.
+- **Lista blanca de tablas (`TABLAS_AUDITABLES`):** el nombre de la tabla viaja como parámetro, así que no es un riesgo de inyección; la lista evita registros que apunten a tablas inexistentes. Incluye todas las tablas del esquema salvo la propia bitácora.
+- **`detalles` se convierte a JSON en el DAO** (`ensure_ascii=False`, para que las tildes queden legibles). Debe contener solo ids y valores no sensibles, nunca documentos, nombres ni claves. El log solo registra id, tabla y acción, nunca los detalles.
+- **La fecha la pone MySQL** (`DEFAULT CURRENT_TIMESTAMP`): todos los registros usan el mismo reloj, el del servidor.
+- **Un fallo al auditar lanza `PersistenciaError`**, como el resto de los DAO. Si la operación auditada debe deshacerse en ese caso se decidirá junto con las transacciones.
+- `id_usuario` es obligatorio en la tabla, así que los intentos de login de usuarios inexistentes no se auditan (quedan cubiertos por el bloqueo de intentos y los logs).
+
+### Pendientes
+- Llamar a `AuditoriaDAO.registrar` desde los controladores (Fase 4).
+- Opcional: quitar a `sigtac_app` el permiso `UPDATE` sobre `bitacora_auditoria`.
+
+---
+
 ## [2026-10-21] — Pacientes sin identificar (NN)
 
 ### Cambio
