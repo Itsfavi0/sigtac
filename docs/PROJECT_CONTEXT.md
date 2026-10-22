@@ -317,7 +317,8 @@ Para el alcance del curso se prefiere esta solución explícita frente a AOP/dec
 - `.env` no debe versionarse.
 - Las consultas DAO deben ser parametrizadas.
 - El acceso depende del **rol** del usuario (`usuario.id_rol`), no del cargo ni de la subclase de `Empleado`. La matriz rol → permisos está en `models/permisos.py` (`Rol`, `Permiso`, `PERMISOS_POR_ROL`, `tiene_permiso`); un rol desconocido no tiene permisos.
-- Los controladores comprueban el permiso con `tiene_permiso(nombre_rol, permiso)` y lanzan `UsuarioSinPermisoError` si falta: el modelo solo responde, no lanza esa excepción.
+- Los controladores comprueban el permiso con `exigir_permiso(sesion, permiso)` (`controllers/auth_controller.py`), que usa `tiene_permiso(nombre_rol, permiso)` y lanza `UsuarioSinPermisoError` si falta: el modelo solo responde, no lanza esa excepción.
+- La `Sesion` (usuario conectado) se crea en `AuthController.iniciar_sesion` y se pasa a cada controlador; al cerrar sesión se invalida y esos controladores dejan de operar.
 
 ---
 

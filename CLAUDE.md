@@ -38,6 +38,7 @@ python -m pytest -k "bloqueo" -x               # filtrar por nombre, parar al pr
 ## Estructura
 
 ```text
+controllers/  Casos de uso: auth_controller.py (Sesion, exigir_permiso, AuthController)
 dao/          Acceso a datos: db_connection.py (Singleton ConexionBD), base_dao.py, transaccion.py y un *_dao.py por entidad
 models/       Dominio: persona, documento, cama, triaje, asignacion, estrategias, permisos, estados y auditoria (Enum), excepciones
 utils/        security.py (bcrypt) y logging_config.py
@@ -46,7 +47,7 @@ tests/        pytest: un test_*.py por módulo
 docs/         PROJECT_CONTEXT, DEVELOPMENT_PLAN, PROJECT_STATUS y CHANGELOG
 ```
 
-Pendientes por fase (ver `docs/DEVELOPMENT_PLAN.md`): `controllers/` (Fase 4) y `views/` (Fase 6) no existen aún.
+Pendientes por fase (ver `docs/DEVELOPMENT_PLAN.md`): el resto de `controllers/` (Fase 4) y `views/` (Fase 6).
 
 ## Arquitectura (capas)
 
@@ -58,6 +59,9 @@ views → controllers → models (dominio) → dao → MySQL
 - **Controllers**: orquestan vista, modelos y DAO; aquí se comprueban los permisos por rol: `tiene_permiso(nombre_rol, permiso)`
   de `models/permisos.py` y, si falta, `UsuarioSinPermisoError`. Los permisos dependen del rol, nunca del cargo ni de la
   subclase de `Empleado`; la matriz rol → permisos vive solo en `models/permisos.py`.
+  Cada controlador recibe la `Sesion` al crearse (nunca una variable global) y empieza cada operación con
+  `exigir_permiso(self._sesion, Permiso.X)` (`controllers/auth_controller.py`). Los errores (`SigtacError`,
+  `ValueError`) no se capturan en el controlador: suben a la vista, que muestra el mensaje.
 - **Models**: reglas de negocio y estados. Nunca SQL ni importar de `dao/`, `views/` o `controllers/`.
 - **DAO**: único lugar con SQL. Reciben y devuelven datos o modelos; no contienen reglas de negocio.
 - Las dependencias van solo hacia abajo. No duplicar una regla en dos capas: una regla, un dueño.

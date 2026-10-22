@@ -17,8 +17,18 @@ class CamaNoDisponibleError(SigtacError):
     """
     pass
 
+class AutenticacionError(SigtacError):
+    """
+    Se lanza cuando el inicio de sesión falla. El mensaje es siempre el mismo (no dice si el documento
+    no existe, la clave es incorrecta o la cuenta está bloqueada) para no dar pistas a un atacante.
+    """
+    pass
+
 class UsuarioSinPermisoError(SigtacError):
-    """Se lanza cuando un empleado intenta realizar una acción fuera de los permisos de su rol."""
+    """
+    Se lanza cuando un empleado intenta realizar una acción fuera de los permisos de su rol, o cuando no
+    hay una sesión activa.
+    """
     pass
 
 class NivelTriajeInvalidoError(SigtacError):

@@ -236,10 +236,18 @@ Motivo del orden: ver `CHANGELOG.md` (2026-10-12).
 
 ### `auth_controller.py`
 
-- [ ] Recibir usuario/contraseña.
-- [ ] Delegar autenticación a `usuario_dao`.
-- [ ] Mantener sesión activa.
-- [ ] Determinar permisos por rol: la matriz ya existe (`models/permisos.py`, `tiene_permiso(rol, permiso)`); el controlador lanza `UsuarioSinPermisoError` si falta el permiso.
+**Estado:** completado y probado (`tests/test_auth_controller.py`, 2026-10-21).
+
+- [x] Recibir tipo y número de documento y contraseña (`iniciar_sesion`).
+- [x] Delegar autenticación a `usuario_dao` (login fallido → `AutenticacionError` con mensaje genérico).
+- [x] Mantener sesión activa (`Sesion`, inyectada en los demás controladores; `cerrar_sesion` la invalida).
+- [x] Determinar permisos por rol: `exigir_permiso(sesion, permiso)` usa `tiene_permiso` de `models/permisos.py` y lanza `UsuarioSinPermisoError` si falta el permiso.
+
+### `paciente_controller.py`
+
+- [ ] Buscar o registrar al paciente (con documento o NN).
+- [ ] Abrir el episodio de emergencia.
+- [ ] Identificar y fusionar pacientes NN (con auditoría).
 
 ### `triaje_controller.py`
 
@@ -254,7 +262,7 @@ Motivo del orden: ver `CHANGELOG.md` (2026-10-12).
 ### `cama_controller.py`
 
 - [ ] Orquestar asignación.
-- [ ] Obtener cola de espera.
+- [ ] Obtener cola de espera (requiere un listado por estado en `EpisodioDAO`; orden: nivel de triaje y luego llegada).
 - [ ] Evaluar reglas de asignación.
 - [ ] Obtener camas compatibles.
 - [ ] Reservar mediante transacción atómica.
@@ -263,7 +271,7 @@ Motivo del orden: ver `CHANGELOG.md` (2026-10-12).
 ### `reporte_controller.py`
 
 - [ ] Consultar datos.
-- [ ] Preparar AVG/COUNT y otros cálculos.
+- [ ] Preparar AVG/COUNT y otros cálculos (el SQL va en un `dao/reporte_dao.py`; el controlador solo da formato).
 - [ ] Preparar KPIs.
 - [ ] Entregar datos a las vistas.
 

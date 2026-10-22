@@ -5,6 +5,44 @@
 
 ---
 
+## [2026-10-21] — Fase 4: `auth_controller.py` (sesión y permisos)
+
+### Cambio
+- Nueva carpeta `controllers/` con `auth_controller.py`:
+  - `Sesion`: el usuario que inició sesión (`id_usuario`, `id_empleado`, `nombre_rol`, `nombres`, `apellidos`, `cargo`). Datos de solo lectura, `puede(permiso)` para las vistas y `cerrar()` para invalidarla.
+  - `exigir_permiso(sesion, permiso)`: punto único donde los controladores comprueban un permiso; lanza `UsuarioSinPermisoError` si no hay sesión, si está cerrada o si el rol no tiene el permiso. Devuelve la sesión (para usar su `id_usuario` en la auditoría).
+  - `AuthController`: `iniciar_sesion(tipo_documento, num_documento, password)`, `cerrar_sesion()`, `exigir_sesion()`, `sesion` y `autenticado`.
+- `models/excepciones.py`: nueva `AutenticacionError` (login fallido, siempre con el mismo mensaje).
+- Pruebas: nuevo `tests/test_auth_controller.py` (73), con `UsuarioDAO.autenticar` simulado.
+
+### Archivos afectados
+- `controllers/__init__.py` y `controllers/auth_controller.py` (nuevos), `models/excepciones.py`
+- `tests/test_auth_controller.py` (nuevo)
+- `CLAUDE.md`, `docs/`
+
+### Motivo
+Primer paso de la Fase 4: sin sesión no se pueden aplicar los permisos ni saber quién hizo cada operación (auditoría). Los demás controladores dependen de este.
+
+### Impacto
+- Pruebas: 848 pasan. Sin cambios en la BD ni en los DAO (no requiere verificación en base temporal).
+- Los próximos controladores se crean con la sesión (`TriajeController(sesion)`) y empiezan cada operación con `exigir_permiso(self._sesion, Permiso.X)`.
+
+### Decisiones
+- **Sesión inyectada, no global:** cada controlador recibe la `Sesion` al crearse. Una variable global obligaría a las pruebas a modificar estado compartido; así, una prueba crea una sesión de cualquier rol en una línea.
+- **Cerrar sesión invalida el objeto:** como los controladores guardan la sesión que recibieron, `cerrar_sesion()` marca esa misma `Sesion` como cerrada; cualquier controlador que aún la tenga deja de poder operar (`exigir_permiso` falla).
+- **Un nuevo login cierra antes la sesión anterior:** si el intento falla, no queda nadie conectado (evita que una persona opere con la sesión de otra).
+- **Login fallido = excepción con mensaje genérico:** `AutenticacionError` (subclase de `SigtacError`, como el resto de errores que la vista muestra). El mensaje no dice si falló el documento, la clave o el bloqueo, igual que `UsuarioDAO.autenticar`, que devuelve `None` sin revelar la causa.
+- **La sesión guarda lo mínimo:** ni clave, ni hash, ni número de documento; el `repr` muestra solo `id_usuario` y rol (puede terminar en un log).
+- **Rol desconocido:** el usuario inicia sesión pero no tiene ningún permiso (denegar por defecto, como `tiene_permiso`).
+- **Permiso mal escrito:** `exigir_permiso` lo valida antes que la sesión y lanza `ValueError` (error de programación), haya sesión o no.
+- **Login y logout no van a la bitácora:** `bitacora_auditoria` registra cambios sobre tablas (`tabla` + `id_registro`); el inicio y el fallo de sesión ya quedan en el log de `UsuarioDAO.autenticar` (sin documentos ni nombres).
+
+### Pendientes
+- `paciente_controller.py`, `triaje_controller.py`, `cama_controller.py` y `reporte_controller.py` (en ese orden).
+- Antes de `cama_controller`: un método de `EpisodioDAO` para listar la cola de espera. Antes de `reporte_controller`: `dao/reporte_dao.py` con las consultas AVG/COUNT.
+
+---
+
 ## [2026-10-21] — Permisos por rol (`models/permisos.py`)
 
 ### Cambio

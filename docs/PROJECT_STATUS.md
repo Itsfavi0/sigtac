@@ -21,11 +21,11 @@
 - `models/persona.py` alineado con las tablas `paciente` y `empleado`, con validaciones de entrada (2026-10-12).
 - Pacientes y empleados se identifican con `DocumentoIdentidad` (DNI, carné de extranjería, pasaporte o CPP) (2026-10-21).
 - Un paciente puede ingresar sin identificar (NN) e identificarse después (2026-10-21).
-- Pruebas: **775 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
+- Pruebas: **848 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
 
 ### Tarea actual
 
-Ninguna en curso. Siguiente tarea: **Fase 4, controladores**, empezando por `auth_controller.py` (login, sesión y comprobación de permisos con `models/permisos.py`).
+**Fase 4, controladores.** Hecho: `auth_controller.py` (sesión y permisos). Siguiente: `paciente_controller.py` (admisión, episodio, pacientes NN).
 
 ---
 
@@ -37,7 +37,7 @@ Ninguna en curso. Siguiente tarea: **Fase 4, controladores**, empezando por `aut
 | Fase 1 — Base de datos | Completada. Verificada en MySQL 8.0.46 (2026-10-12 y 2026-10-21) y antes en MariaDB 11.8 |
 | Fase 2 — Models | Completada (2026-10-12) |
 | Fase 3 — DAO | Completada (2026-10-21) |
-| Fase 4 — Controllers | Pendiente (la carpeta `controllers/` aún no existe) |
+| Fase 4 — Controllers | En curso: `auth_controller.py` hecho (2026-10-21) |
 | Fase 5 — Utils | Parcial: `security.py` y `logging_config.py` hechos; falta `pdf_generator.py` |
 | Fase 6 — Views | Pendiente (la carpeta `views/` aún no existe) |
 | Fase 7 — Integración y pruebas | Pendiente |
@@ -109,7 +109,6 @@ Ninguno bloqueante. Las decisiones menores están en "Pendientes conocidos".
 
 - Actualizar `db_scripts/diagrama.png` (faltan `tipo_documento` y el cambio de `dni` a `id_tipo_documento` + `num_documento`, `fecha_nac`, `id_area`, `especialidad`, `turno`, `intentos_fallidos`, `bloqueado_hasta`, las columnas generadas de `asignacion_cama` y el área "Triaje").
 - Pruebas de integración permanentes contra una BD real (la verificación del 2026-10-12 fue un script temporal).
-- Revisar la coherencia de `usuario_dao.py` con `auth_controller.py` cuando exista.
 - Decidir si `seed.sql` mantiene los datos reales de los integrantes.
 - PyCharm: cada integrante debe seleccionar `SIGTAC/.venv` como intérprete.
 - Decidir si `Triaje.reclasificar` al mismo nivel sugerido debe rechazarse (ver CHANGELOG del 2026-10-21).
@@ -121,7 +120,7 @@ Ninguno bloqueante. Las decisiones menores están en "Pendientes conocidos".
 ## Próximo trabajo previsto
 
 1. Validar con el equipo la matriz de permisos (`models/permisos.py`; ver CHANGELOG del 2026-10-21).
-2. Fase 4: controladores (`auth_controller`, `triaje_controller`, `cama_controller`), incluida la cola de espera.
+2. Fase 4, en este orden: `paciente_controller`, `triaje_controller`, `cama_controller` (con la cola de espera, que necesita un listado en `EpisodioDAO`) y `reporte_controller` (con `dao/reporte_dao.py`).
 
 Respecto al plan original, `auditoria_dao.py` se hizo antes que `triaje_dao.py` y `asignacion_dao.py` porque es de una sola tabla y no depende de transacciones (ver `CHANGELOG.md` del 2026-10-12).
 
