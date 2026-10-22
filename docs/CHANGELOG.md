@@ -5,6 +5,45 @@
 
 ---
 
+## [2026-10-22] — Fase 4: `paciente_controller.py` (admisión y pacientes NN)
+
+### Cambio
+- Nuevo `controllers/paciente_controller.py` con `PacienteController(sesion)`, todo con el permiso `PACIENTES`:
+  - Consultas: `listar_seguros()`, `buscar_por_documento(tipo, numero)`, `listar_no_identificados()`.
+  - `registrar(...)`: paciente con documento; rechaza un documento ya registrado (activo o dado de baja).
+  - `registrar_no_identificado(sexo, edad_estimada, id_seguro)`: paciente NN.
+  - `abrir_episodio(id_paciente, motivo_consulta)`: el episodio empieza EN ESPERA DE TRIAJE; un paciente no puede tener dos episodios abiertos.
+  - `identificar(id_paciente, ...)`: si el documento ya es de otro paciente, pide fusionar en lugar de duplicar a la persona.
+  - `fusionar(id_nn, id_destino)`: no fusiona si los dos tienen un episodio abierto.
+  - Cada escritura va con su auditoría (`INSERT`, `IDENTIFICAR`, `FUSIONAR`) dentro de la misma transacción.
+- `tests/conftest.py` (nuevo): `CapaDatosFalsa` (reemplaza los DAO y `transaccion()` de un controlador y anota el orden de las llamadas) y la fábrica `sesion_de(rol)`.
+- Pruebas: `tests/test_paciente_controller.py` (54).
+
+### Archivos afectados
+- `controllers/paciente_controller.py` (nuevo), `tests/conftest.py` (nuevo), `tests/test_paciente_controller.py` (nuevo), `docs/`
+
+### Motivo
+Sin admisión no hay episodio, y sin episodio no hay triaje ni cama. Los pacientes NN ya estaban resueltos en modelos y DAO; faltaba quien orquestara las reglas con permisos, transacción y auditoría.
+
+### Impacto
+- Pruebas: 937 pasan.
+- Patrón de todos los controladores: `exigir_permiso` → validar datos con el modelo (sin tocar la BD) → `with transaccion():` leer, aplicar la regla del modelo, guardar y auditar.
+
+### Decisiones
+- **Leer dentro de la transacción:** los datos se cargan en la misma transacción que los guarda; así ninguna operación trabaja con un objeto que quedó viejo tras un fallo o tras el cambio de otra PC.
+- **Validar antes de abrir la transacción:** un dato inválido (`ValueError`) no llega a la BD.
+- **Un episodio abierto por paciente:** la persona sigue en emergencia; abrir otro duplicaría su cola y su cama. La fila del paciente se bloquea (`PacienteDAO.bloquear`) para que dos PCs no lo admitan a la vez. No hay restricción en la BD (no es fácil expresarla con `UNIQUE`); queda en el controlador.
+- **Documento existente:** se avisa con `ReglaNegocioError` antes de insertar (mensaje claro para la vista); el `UNIQUE` sigue respaldando la regla si dos PCs registran a la vez (`RegistroDuplicadoError`, se deshace todo).
+- **Identificar con un documento ajeno:** se rechaza y se indica fusionar; identificar duplicaría a la persona (y el `UNIQUE` lo impediría con un error menos claro).
+- **Auditoría sin datos personales:** solo ids (`{"id_destino": 1, "episodios_movidos": 1}`).
+- **Pruebas con un registro de llamadas:** `CapaDatosFalsa` permite comprobar el orden exacto (`inicio` → escrituras → auditoría → `commit`) y que ante un error haya `rollback` sin auditoría.
+
+### Pendientes
+- Reactivar un paciente dado de baja (hoy solo se informa; no hay método).
+- Editar los datos de un paciente identificado (`PacienteDAO.actualizar` existe; falta decidir quién puede y si se audita con `UPDATE`).
+
+---
+
 ## [2026-10-22] — Base para los controladores: colas, historial en bloque y bloqueo de filas
 
 ### Cambio
