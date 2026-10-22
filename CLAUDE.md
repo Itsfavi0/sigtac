@@ -38,7 +38,7 @@ python -m pytest -k "bloqueo" -x               # filtrar por nombre, parar al pr
 ## Estructura
 
 ```text
-dao/          Acceso a datos: db_connection.py (Singleton ConexionBD), base_dao.py y un *_dao.py por entidad
+dao/          Acceso a datos: db_connection.py (Singleton ConexionBD), base_dao.py, transaccion.py y un *_dao.py por entidad
 models/       Dominio: persona, documento, cama, triaje, estrategias, estados y auditoria (Enum), excepciones
 utils/        security.py (bcrypt) y logging_config.py
 db_scripts/   schema.sql, seed.sql, crear_usuario_app.sql y diagrama.png
@@ -86,8 +86,14 @@ views → controllers → models (dominio) → dao → MySQL
 - Cada DAO tiene un método `_a_<entidad>(fila)` que es el único punto que convierte una fila en un objeto; las
   validaciones las hace el constructor del modelo, no el DAO. `estado_registro` llega como 0/1: convertir con `bool()`.
 - `ConexionBD` usa `autocommit=True` y `FOUND_ROWS`: el `rowcount` de un `UPDATE` cuenta las filas *encontradas*
-  (0 = no existe), aunque los valores no cambien. Las operaciones multi-paso de escritura (asignar cama, dar de alta,
-  cambiar estado de cama + historial) necesitan transacciones explícitas: no escribirlas antes de esa decisión.
+  (0 = no existe), aunque los valores no cambien.
+- Toda operación de varias escrituras (asignar cama, dar de alta, cambiar estado de cama + historial) va dentro de
+  `with transaccion():` (`dao/transaccion.py`): COMMIT si el bloque termina bien, ROLLBACK ante cualquier excepción.
+  Un bloque anidado se une al externo, así que un método DAO de varios pasos también usa `transaccion()`. La
+  auditoría de una operación sensible va dentro de su transacción. Dentro del bloque, las excepciones deben llegar
+  al `with` más externo (no capturarlas a mitad). Durante una transacción `ConexionBD` no se reconecta.
+- Concurrencia entre PCs: `UPDATE` condicional (`WHERE id = %s AND estado = <esperado>`) y comprobar `rowcount`;
+  0 filas = otro usuario llegó primero.
 - Las reglas críticas viven también en la BD (RN-05 y RN-10 con `UNIQUE`/`CHECK`). Cambios de esquema:
   actualizar `schema.sql`, `seed.sql`, los modelos, las pruebas y `diagrama.png`.
 - Un `CHECK` que compare texto (`IN ('A', 'B')`) necesita la columna con `COLLATE utf8mb4_bin`: la collation

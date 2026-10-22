@@ -141,6 +141,15 @@
 - [x] Credenciales desde `.env`.
 - [x] Manejo correcto de cursor/conexión.
 - [x] Cierre/commit/rollback según corresponda.
+- [x] Estado de transacción; no se reconecta a mitad de una transacción.
+
+### `transaccion.py`
+
+**Estado:** completado, probado (`tests/test_transaccion.py`) y verificado en MySQL 8.0.46 con una base temporal.
+
+- [x] `with transaccion():` (Unit of Work): COMMIT si todo sale bien, ROLLBACK ante cualquier excepción.
+- [x] Un bloque anidado se une a la transacción abierta.
+- [x] La auditoría va dentro de la transacción de la operación auditada.
 
 ### `usuario_dao.py`
 
@@ -191,7 +200,7 @@ Motivo del orden: ver `CHANGELOG.md` (2026-10-12).
 - [x] Utilizar fábrica simple (`CLASES_POR_TIPO`, por `nombre_tipo_cama`).
 - [x] Filtrar SQL por disponibilidad.
 - [x] Evaluar compatibilidad con `cama.es_compatible(nivel)` en Python: lo hace el controlador sobre `listar_disponibles()`.
-- [ ] Cambiar estado + registrar en `historial_estado_cama` (después de decidir las transacciones).
+- [ ] Cambiar estado + registrar en `historial_estado_cama` (con `transaccion()` y `UPDATE` condicional).
 
 ### `triaje_dao.py`
 

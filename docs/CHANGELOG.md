@@ -5,6 +5,48 @@
 
 ---
 
+## [2026-10-21] — Transacciones explícitas (`dao/transaccion.py`)
+
+### Cambio
+- Nuevo `dao/transaccion.py`: gestor de contexto `with transaccion():` que agrupa varias escrituras en una unidad (patrón *Unit of Work*). Hace COMMIT si el bloque termina bien y ROLLBACK ante cualquier excepción, que luego se vuelve a lanzar. Un bloque anidado se une a la transacción abierta.
+- `dao/db_connection.py`: `ConexionBD` conoce el estado de transacción (`en_transaccion`, `iniciar_transaccion`, `terminar_transaccion`). Durante una transacción, `obtener_conexion` **no se reconecta**: lanza `ConexionBDError`.
+- Nuevo `tests/test_transaccion.py` (16 pruebas) y 11 pruebas nuevas en `tests/test_db_connection.py`.
+- `CLAUDE.md`: reglas de uso de `transaccion()` y de concurrencia con `UPDATE` condicional.
+
+### Archivos afectados
+- `dao/transaccion.py` (nuevo), `dao/db_connection.py`, `tests/test_transaccion.py` (nuevo), `tests/test_db_connection.py`, `CLAUDE.md`, `docs/`
+
+### Motivo
+Era el problema abierto que bloqueaba `cama_dao.cambiar_estado`, `triaje_dao.py` y `asignacion_dao.py`. Con `autocommit=True`, si falla un paso intermedio de una operación (p. ej. el tercer paso de asignar una cama), los anteriores ya quedaron guardados y la BD queda inconsistente.
+
+### Impacto
+- Pruebas: 558 pasan.
+- Verificado en MySQL 8.0.46 con una base temporal (`sigtac_scratch_tmp`, ya eliminada), usando `ConexionBD`, `BaseDAO` y `AuditoriaDAO` reales. 21 comprobaciones pasaron:
+  - Antes del COMMIT otra conexión no ve los cambios; después ve el `UPDATE` y el `INSERT`.
+  - Un error de MySQL en el tercer paso (1062 por `UNIQUE cama_vigente`, RN-05) y una excepción de negocio deshacen los pasos anteriores.
+  - Un bloque anidado no confirma por su cuenta; un error en él deshace también lo del externo.
+  - `AuditoriaDAO.registrar` contra MySQL real (JSON con tildes intacto). Si la operación falla, su auditoría se deshace; si la auditoría falla (FK, 1452), la operación se deshace.
+  - Con la conexión cortada a mitad (`KILL`), el paso siguiente lanza `ConexionBDError` sin reconectar, MySQL deshace el paso anterior y la transacción queda cerrada; fuera de una transacción sí se reconecta.
+  - Una sentencia suelta fuera de transacciones se guarda al instante (autocommit sigue activo).
+- **Bug encontrado por la verificación real** (las pruebas con `MagicMock` no podían verlo): con la extensión C del conector, `rollback()` sobre una conexión cortada lanza `_mysql_connector.MySQLInterfaceError`, que **no hereda** de `mysql.connector.Error`; escapaba de `_deshacer` y tapaba el `ConexionBDError` original. `commit()` tiene el mismo comportamiento. Corregido: `terminar_transaccion` comprueba `is_connected()` antes; si la conexión se perdió, no llama a `rollback()` (MySQL ya deshizo lo pendiente) y confirmar lanza `ConexionBDError`. Tres pruebas reproducen el caso.
+
+### Decisiones
+- **Gestor de contexto en lugar de `autocommit=False` global:** con `autocommit=False` un `commit()` olvidado pierde datos y, en REPEATABLE READ, una conexión de larga vida lee una foto vieja (el mapa de camas no vería los cambios de otras PCs). `START TRANSACTION` suspende el autocommit solo mientras dura el bloque.
+- **No procedimientos almacenados:** sacarían reglas de negocio de Python y serían difíciles de probar con pytest.
+- **El controlador marca la unidad, el DAO hace COMMIT/ROLLBACK:** el controlador no escribe SQL; solo dice qué pasos van juntos.
+- **Bloques anidados se unen al externo:** un método DAO de varios pasos (`cambiar_estado` + historial) usa `transaccion()` y sirve solo o dentro de la transacción de un controlador. Consecuencia: dentro de una transacción, las excepciones deben llegar al `with` más externo; si se capturan a mitad, lo demás se confirmaría.
+- **`try/finally` con una bandera `exito`** en lugar de `except Exception`: deshace ante cualquier error sin capturarlo.
+- **Sin reconexión durante una transacción:** los pasos siguientes irían a una conexión nueva, fuera de la transacción, con autocommit, y quedarían guardados aunque la operación estuviera a medias.
+- **La auditoría va dentro de la transacción** (pendiente de `AuditoriaDAO`): nunca queda un cambio sensible sin auditar ni una auditoría de algo que no ocurrió.
+- **Concurrencia entre PCs con `UPDATE` condicional** (`WHERE ... AND estado = <esperado>` y comprobar `rowcount`), como en `PacienteDAO.identificar`, respaldado por los `UNIQUE` de la BD. Más simple que `SELECT ... FOR UPDATE` y sin bloqueos en espera.
+- La conexión es compartida: una sola transacción a la vez (la app de escritorio es de un hilo).
+
+### Pendientes
+- Limitación conocida: si la conexión se corta justo entre `is_connected()` y `commit()`/`rollback()`, el error de la extensión C escaparía igual. Es muy improbable.
+- Usar `transaccion()` en `cama_dao.cambiar_estado`, `triaje_dao.py` y `asignacion_dao.py`.
+
+---
+
 ## [2026-10-21] — `AuditoriaDAO` y `sigtac_db` recreada
 
 ### Cambio
