@@ -16,16 +16,16 @@
 
 - Base de datos (22 tablas) implementada con las restricciones de RN-05 y RN-10 y el bloqueo temporal de cuentas.
 - **Fase 2 (models) cerrada:** todas las clases del plan existen y tienen pruebas automáticas.
-- **Fase 3 (DAO) en curso:** `db_connection.py`, `base_dao.py`, `usuario_dao.py`, `paciente_dao.py`, `cama_dao.py`, `auditoria_dao.py`, `transaccion.py`, `triaje_dao.py` y `episodio_dao.py` están terminados y probados.
+- **Fase 3 (DAO) cerrada (2026-10-21):** todos los DAO del plan, más `episodio_dao.py`, `solicitud_limpieza_dao.py` y `transaccion.py`, están terminados, probados y verificados en MySQL 8.0.46 con bases temporales.
 - `sigtac_db` recreada con el esquema actual (2026-10-21).
 - `models/persona.py` alineado con las tablas `paciente` y `empleado`, con validaciones de entrada (2026-10-12).
 - Pacientes y empleados se identifican con `DocumentoIdentidad` (DNI, carné de extranjería, pasaporte o CPP) (2026-10-21).
 - Un paciente puede ingresar sin identificar (NN) e identificarse después (2026-10-21).
-- Pruebas: **648 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
+- Pruebas: **684 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
 
 ### Tarea actual
 
-Ninguna en curso. Siguiente tarea: **`asignacion_dao.py`** (asignar y liberar camas: `asignacion_cama`, `CamaDAO.cambiar_estado` y `EpisodioDAO.cambiar_estado` en una transacción).
+Ninguna en curso. Siguiente tarea: **Fase 4, controladores**. Antes conviene decidir los permisos (problema 2: tabla `rol` o `tiene_permiso()`), porque los controladores son los que los aplican.
 
 ---
 
@@ -36,7 +36,7 @@ Ninguna en curso. Siguiente tarea: **`asignacion_dao.py`** (asignar y liberar ca
 | Fase 0 — Entorno y estructura | Completada (`.venv` recreado dentro del proyecto el 2026-10-11) |
 | Fase 1 — Base de datos | Completada. Verificada en MySQL 8.0.46 (2026-10-12 y 2026-10-21) y antes en MariaDB 11.8 |
 | Fase 2 — Models | Completada (2026-10-12) |
-| Fase 3 — DAO | En curso: `db_connection.py`, `base_dao.py`, `usuario_dao.py`, `paciente_dao.py`, `cama_dao.py`, `auditoria_dao.py`, `transaccion.py`, `triaje_dao.py` y `episodio_dao.py` terminados; falta `asignacion_dao.py` |
+| Fase 3 — DAO | Completada (2026-10-21) |
 | Fase 4 — Controllers | Pendiente (la carpeta `controllers/` aún no existe) |
 | Fase 5 — Utils | Parcial: `security.py` y `logging_config.py` hechos; falta `pdf_generator.py` |
 | Fase 6 — Views | Pendiente (la carpeta `views/` aún no existe) |
@@ -57,6 +57,7 @@ Ninguna en curso. Siguiente tarea: **`asignacion_dao.py`** (asignar y liberar ca
 | `models/triaje.py` | `EpisodioEmergencia` (con historial de triajes y signos de solo lectura), `Triaje` (con `sintomas`), `SignosVitales`, `Sintoma` | `test_triaje.py` (48) |
 | `models/estados.py` | `EstadoCama`, `EstadoEpisodio` | `test_estados_vs_bd.py` (10: también comprueba sexo, turno, tipos de cama, tipos de documento, niveles de triaje, el paciente NN del seed, las tablas auditables y las acciones de auditoría) |
 | `models/auditoria.py` | `AccionAuditoria` (INSERT, UPDATE, ANULAR, IDENTIFICAR) | `test_auditoria_dao.py` y `test_estados_vs_bd.py` |
+| `models/asignacion.py` | `AsignacionCama` y `SolicitudLimpieza` (registros inmutables) | `test_asignacion.py` (10) |
 | `models/excepciones.py` | `SigtacError` y 7 excepciones derivadas | Se usan en las pruebas anteriores |
 
 ### Fase 3 — DAO
@@ -70,6 +71,7 @@ Ninguna en curso. Siguiente tarea: **`asignacion_dao.py`** (asignar y liberar ca
 - `dao/auditoria_dao.py`: `registrar` (bitácora de solo inserción; acción con `AccionAuditoria`, tabla con lista blanca, detalles como JSON) y `listar_por_registro` (`test_auditoria_dao.py`, 32 pruebas). Verificado en MySQL 8.0.46 con una base temporal junto con las transacciones (JSON con tildes, auditoría deshecha si falla la operación y viceversa).
 - `dao/triaje_dao.py`: catálogo de síntomas; `registrar` (signos vitales + triaje + síntomas en una transacción; solo inserción, RN-09) y lectura del historial de triajes y signos por episodio (`test_triaje_dao.py`, 31 pruebas).
 - `dao/episodio_dao.py`: crear, `buscar_por_id` (con su historial de signos y triajes) y `cambiar_estado` (`UPDATE` condicional; la fecha de alta la pone MySQL) (`test_episodio_dao.py`, 26 pruebas). Ambos verificados en MySQL 8.0.46 con una base temporal (ver CHANGELOG del 2026-10-21).
+- `dao/asignacion_dao.py`: crear, buscar la asignación vigente por episodio o por cama y `liberar` (`UPDATE` condicional). `dao/solicitud_limpieza_dao.py`: crear, `listar_pendientes` y `atender` (`UPDATE` condicional) (`test_asignacion_dao.py`, 26 pruebas). Verificados con el ciclo completo de una cama en una base temporal (ver CHANGELOG del 2026-10-21).
 - `seed.sql` tiene hashes bcrypt válidos. El login con un usuario del seed se verificó a mano contra una base temporal (ver CHANGELOG del 2026-10-11).
 
 ---
@@ -104,6 +106,7 @@ Ninguna en curso. Siguiente tarea: **`asignacion_dao.py`** (asignar y liberar ca
 - Revisar la coherencia de `usuario_dao.py` con `auth_controller.py` cuando exista.
 - Decidir si `seed.sql` mantiene los datos reales de los integrantes.
 - PyCharm: cada integrante debe seleccionar `SIGTAC/.venv` como intérprete.
+- Cancelar una reserva (cama RESERVADA cuyo paciente nunca llegó): el modelo no tiene esa transición.
 - Decidir si se puede registrar un triaje en un episodio dado de alta, referido o fugado (hoy el modelo no lo impide) y si `Triaje.reclasificar` al mismo nivel sugerido debe rechazarse (ver CHANGELOG del 2026-10-21).
 - Opcional: quitar a `sigtac_app` el permiso `UPDATE` sobre `bitacora_auditoria`, para que la bitácora no se pueda modificar ni por error del código (lo ejecuta el usuario con su cuenta de administrador).
 
@@ -111,8 +114,8 @@ Ninguna en curso. Siguiente tarea: **`asignacion_dao.py`** (asignar y liberar ca
 
 ## Próximo trabajo previsto
 
-1. `asignacion_dao.py`.
-2. Fase 4: controladores (`auth_controller`, `triaje_controller`, `cama_controller`).
+1. Decidir los permisos por rol (problema 2).
+2. Fase 4: controladores (`auth_controller`, `triaje_controller`, `cama_controller`), incluida la cola de espera.
 
 Respecto al plan original, `auditoria_dao.py` se hizo antes que `triaje_dao.py` y `asignacion_dao.py` porque es de una sola tabla y no depende de transacciones (ver `CHANGELOG.md` del 2026-10-12).
 

@@ -5,6 +5,47 @@
 
 ---
 
+## [2026-10-21] — `AsignacionDAO` y `SolicitudLimpiezaDAO` (cierre de la Fase 3)
+
+### Cambio
+- Nuevo `models/asignacion.py`: `AsignacionCama` y `SolicitudLimpieza`, registros inmutables (`dataclass(frozen=True)`) con `vigente` / `pendiente`. Validan las mismas fechas que `CH_asignacion_fechas` y `CH_limpieza_fechas`, y que una solicitud atendida indique el empleado.
+- Nuevo `dao/asignacion_dao.py` (`AsignacionDAO`): `crear`, `buscar_vigente_por_episodio`, `buscar_vigente_por_cama` y `liberar` (`UPDATE` condicional).
+- Nuevo `dao/solicitud_limpieza_dao.py` (`SolicitudLimpiezaDAO`): `crear`, `listar_pendientes` (con el código de la cama) y `atender` (`UPDATE` condicional).
+- Pruebas: `tests/test_asignacion.py` (10) y `tests/test_asignacion_dao.py` (26), nuevos.
+
+### Archivos afectados
+- `models/asignacion.py` (nuevo), `dao/asignacion_dao.py` (nuevo), `dao/solicitud_limpieza_dao.py` (nuevo)
+- `tests/test_asignacion.py` (nuevo), `tests/test_asignacion_dao.py` (nuevo), `docs/`
+
+### Motivo
+Último DAO de la Fase 3. Con él se cierra el ciclo de una cama (RN-05, RN-07, RN-08) y `cama_controller` (Fase 4) tiene todo lo que necesita para asignar, dar de alta y confirmar la limpieza.
+
+### Impacto
+- Pruebas: 684 pasan. **Fase 3 completada.**
+- Verificado en MySQL 8.0.46 con una base temporal (`sigtac_scratch_tmp`, ya eliminada), con funciones que imitan los futuros controladores (cada operación en una transacción con auditoría) y una segunda conexión como "otra PC". 24 comprobaciones pasaron:
+  - Seed: TRA-01 tiene la asignación vigente del episodio 1; una cama libre no tiene; la solicitud pendiente es la de UCI-02.
+  - Asignar (episodio 2, nivel 2): las camas compatibles son OBS-01, OBS-02 y UCI-01 (TRA-02 no); el episodio pasa a EN ATENCIÓN, UCI-01 a RESERVADA, la asignación queda vigente para ambos y auditada.
+  - Conflictos: otra PC que asigna la misma cama con datos viejos recibe `CamaNoDisponibleError` y el cambio de estado de su episodio se deshace; asignar otra cama al mismo episodio con datos viejos lanza `ReglaNegocioError` y la otra cama sigue DISPONIBLE; una segunda asignación vigente de TRA-01 la rechaza el `UNIQUE` de la BD (`RegistroDuplicadoError`, RN-05).
+  - Ocupar y dar de alta (RN-07): UCI-01 OCUPADA → EN LIMPIEZA (no DISPONIBLE), episodio en ALTA MÉDICA, asignación liberada con fecha de MySQL y una solicitud de limpieza pendiente. Repetir el alta con datos viejos falla y no crea otra solicitud.
+  - Limpieza (RN-08): UCI-01 vuelve a DISPONIBLE, la solicitud queda atendida por el empleado 4 y sale de pendientes; atenderla otra vez lanza `ReglaNegocioError`. Historial de UCI-01: RESERVADA > OCUPADA > EN LIMPIEZA > DISPONIBLE.
+  - Una cama liberada se puede volver a asignar: el `UNIQUE` solo cuenta las asignaciones vigentes.
+
+### Decisiones
+- **Dos DAO, uno por entidad:** la solicitud de limpieza es otra tabla con su propio ciclo (pendiente → atendida).
+- **Cada método es una sola sentencia y no abre transacción propia:** el controlador los combina con `CamaDAO.cambiar_estado` y `EpisodioDAO.cambiar_estado` en `transaccion()`. Ver la tabla de flujos en `PROJECT_CONTEXT.md`.
+- **`liberar` y `atender` son `UPDATE` condicionales** (`fecha_liberacion IS NULL`, `fecha_atencion IS NULL`); 0 filas → `ReglaNegocioError` para que se deshaga la transacción. Las fechas las pone MySQL.
+- **El `UNIQUE` de `cama_vigente`/`episodio_vigente` es el respaldo de RN-05:** el conflicto normal lo detecta antes el `UPDATE` condicional de la cama; el `UNIQUE` lo detiene incluso si un controlador olvidara cambiar el estado. `crear` deja pasar el `RegistroDuplicadoError` sin traducirlo, porque no se sabe si el duplicado es de la cama o del episodio.
+- **Una sola solicitud pendiente por cama** sin restricción en la BD: el `UPDATE` condicional de la cama deja pasar una sola transición a EN LIMPIEZA por ciclo, y la solicitud se crea en esa misma transacción.
+- **Las asignaciones no se borran:** se liberan y quedan como historial; un test comprueba que el DAO no tiene métodos para borrar.
+- **La compatibilidad cama–triaje no está en estos DAO:** la comprueba el controlador con `cama.es_compatible(nivel)`.
+
+### Pendientes
+- Cola de espera (episodios EN ESPERA DE CAMA por nivel y tiempo de espera): en `cama_controller`, Fase 4.
+- Cancelar una reserva (cama RESERVADA cuyo paciente nunca llegó): el modelo no tiene esa transición; `cama.dar_alta()` exige OCUPADA. Decidirlo con el controlador.
+- Permisos por rol (problema 2 de `PROJECT_STATUS.md`) antes de los controladores.
+
+---
+
 ## [2026-10-21] — `TriajeDAO` y `EpisodioDAO`
 
 ### Cambio

@@ -175,7 +175,7 @@
 
 ### Orden de implementación de los DAO restantes
 
-`paciente_dao.py` → `cama_dao.py` → `auditoria_dao.py` → (decisión sobre transacciones) → `triaje_dao.py` + `episodio_dao.py` → `asignacion_dao.py`.
+`paciente_dao.py` → `cama_dao.py` → `auditoria_dao.py` → (decisión sobre transacciones) → `triaje_dao.py` + `episodio_dao.py` → `asignacion_dao.py` + `solicitud_limpieza_dao.py`. **Fase 3 completada (2026-10-21).**
 Motivo del orden: ver `CHANGELOG.md` (2026-10-12).
 
 ### `paciente_dao.py`
@@ -211,11 +211,14 @@ Motivo del orden: ver `CHANGELOG.md` (2026-10-12).
 - [x] Persistir síntomas mediante `triaje_sintoma` (`TriajeDAO.registrar`).
 - [x] Leer el historial de triajes (RN-09) y el catálogo de síntomas.
 
-### `asignacion_dao.py`
+### `asignacion_dao.py` y `solicitud_limpieza_dao.py`
 
-- [ ] Consultas necesarias para asignación.
-- [ ] Reserva/liberación según flujo definido.
-- [ ] Preparar operaciones transaccionales requeridas.
+**Estado:** completados, probados (`tests/test_asignacion_dao.py`) y verificados en MySQL 8.0.46 con el ciclo completo de una cama. La solicitud de limpieza tiene su propio DAO (un DAO por entidad).
+
+- [x] Consultas necesarias para asignación (asignación vigente por episodio o por cama).
+- [x] Reserva/liberación según flujo definido (`crear`, `liberar`; RN-05, RN-07).
+- [x] Solicitudes de limpieza: crear al dar de alta, listar pendientes y atender (RN-07, RN-08).
+- [x] Operaciones transaccionales: cada método es una sentencia y se combina en `transaccion()` desde el controlador.
 
 ### `auditoria_dao.py`
 

@@ -280,6 +280,18 @@ Debe:
 
 `EpisodioDAO` guarda la cabecera del episodio (`episodio_emergencia`) y sus cambios de estado; `TriajeDAO` guarda los signos vitales, el triaje y la relación `triaje_sintoma` en una transacción. Un triaje guardado no se edita: una reevaluación es un triaje nuevo (RN-09). El cambio de estado del episodio (RN-01) lo decide el modelo y lo guarda `EpisodioDAO.cambiar_estado`, dentro de la misma transacción del controlador.
 
+### `asignacion_dao.py` y `solicitud_limpieza_dao.py`
+
+Cada operación de cama es una transacción del controlador que combina varios DAO:
+
+| Flujo | Modelo | DAO |
+|---|---|---|
+| Asignar cama (RN-01, RN-05) | `episodio.asignar_cama()`, `cama.reservar()` | estados + `AsignacionDAO.crear` |
+| Dar de alta (RN-07) | `episodio.dar_alta()`, `cama.dar_alta()` | estados + `AsignacionDAO.liberar` + `SolicitudLimpiezaDAO.crear` |
+| Confirmar limpieza (RN-08) | `cama.liberar_limpieza()` | estado + `SolicitudLimpiezaDAO.atender` |
+
+La compatibilidad cama–triaje la comprueba el controlador con `cama.es_compatible(nivel)` antes de asignar. Las asignaciones no se borran: se liberan y quedan como historial.
+
 ### `auditoria_dao.py`
 
 Debe exponer una operación conceptual:
