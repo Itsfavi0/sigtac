@@ -56,9 +56,11 @@ def test_persona_es_abstracta():
         Persona(dni("70123456"), "Rosa", "Mendoza", date(1959, 5, 14))
 
 
-def test_empleado_es_abstracto():
-    with pytest.raises(TypeError):
-        Empleado(1, dni("11111111"), "Admin", "Sistema", date(1990, 1, 1), "Ingeniero de Sistemas")
+def test_empleado_sin_profesion_especifica_se_puede_crear():
+    # P. ej. el administrador (Ingeniero de Sistemas): no tiene área, especialidad ni turno.
+    admin = Empleado(1, dni("11111111"), "Admin", "Sistema", date(1990, 1, 1), "Ingeniero de Sistemas", "CIP-12345")
+    assert admin.obtener_resumen() == "EMPLEADO [1] - Sistema, Admin | Cargo: Ingeniero de Sistemas | Registro: CIP-12345"
+    assert isinstance(admin, Persona)
 
 
 # ---- Validaciones comunes de Persona (se prueban en todas las subclases)
@@ -504,22 +506,7 @@ def test_resumen_es_polimorfico():
     assert all(resumen.startswith("EMPLEADO") for resumen in resumenes[1:])
 
 
-# ---- Permisos por subclase
-# Estas pruebas fijan el comportamiento actual de tiene_permiso(). Los permisos también
-# existen en la tabla `rol`; cuál de las dos fuentes se conserva se decidirá en la Fase 4.
-@pytest.mark.parametrize("fabrica, permitidos", [
-    (nuevo_enfermero, {"triaje", "camas"}),
-    (nuevo_medico, {"triaje", "camas", "historias_clinicas"}),
-    (nuevo_limpieza, {"limpieza"}),
-])
-def test_permisos_por_tipo_de_empleado(fabrica, permitidos):
-    empleado = fabrica()
-    modulos = {"triaje", "camas", "historias_clinicas", "limpieza", "reportes", "usuarios"}
-    for modulo in modulos:
-        assert empleado.tiene_permiso(modulo) is (modulo in permitidos), modulo
-
-
+# ---- Los permisos no dependen de la profesión (ver tests/test_permisos.py)
 @pytest.mark.parametrize("fabrica", FABRICAS_EMPLEADO)
-def test_permiso_inexistente_se_rechaza(fabrica):
-    assert fabrica().tiene_permiso("") is False
-    assert fabrica().tiene_permiso("TRIAJE") is False  # distingue mayúsculas
+def test_los_empleados_no_deciden_permisos(fabrica):
+    assert not hasattr(fabrica(), "tiene_permiso")

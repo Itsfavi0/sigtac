@@ -5,6 +5,52 @@
 
 ---
 
+## [2026-10-21] — Permisos por rol (`models/permisos.py`)
+
+### Cambio
+- Nuevo `models/permisos.py`: `Rol` (`StrEnum` con los 5 roles de la tabla `rol`), `Permiso` (`StrEnum` con los módulos del sistema), la matriz `PERMISOS_POR_ROL` (`frozenset` por rol) y `tiene_permiso(rol, permiso)`.
+- `models/persona.py`: se quita `tiene_permiso()` de `Empleado` (era abstracto) y de `Enfermero`, `Medico` y `PersonalLimpieza`. `Empleado` deja de ser abstracta y puede representar al personal sin profesión específica (p. ej. el administrador).
+- Pruebas: nuevo `tests/test_permisos.py` (52); en `tests/test_persona.py` se reemplazan las pruebas de `tiene_permiso()` por subclase y la de `Empleado` abstracto; `tests/test_estados_vs_bd.py` compara `Rol` con la tabla `rol` de `seed.sql`.
+- `CLAUDE.md`: regla de permisos en los controladores.
+
+### Archivos afectados
+- `models/permisos.py` (nuevo), `models/persona.py`
+- `tests/test_permisos.py` (nuevo), `tests/test_persona.py`, `tests/test_estados_vs_bd.py`
+- `CLAUDE.md`, `docs/`
+
+### Motivo
+Era el último problema abierto antes de la Fase 4: los permisos existían en dos lugares (tabla `rol` y `tiene_permiso()` en cada subclase) y no coincidían. Los controladores necesitan una sola fuente para aplicar los permisos.
+
+### Impacto
+- Pruebas: 775 pasan. Sin cambios en la BD (no requiere verificación en base temporal); los nombres de `Rol` se comparan con `seed.sql`.
+- Matriz aplicada (pendiente de validar con el equipo):
+
+  | Permiso | Admin | Jefe de Guardia | Médico | Enfermero de Triaje | Limpieza |
+  |---|:-:|:-:|:-:|:-:|:-:|
+  | `PACIENTES` (registrar, identificar, fusionar NN) | | ✅ | ✅ | ✅ | |
+  | `TRIAJE` (registrar, reclasificar) | | ✅ | ✅ | ✅ | |
+  | `GESTION_CAMAS` (asignar, cancelar reserva, alta) | | ✅ | ✅ | | |
+  | `VER_CAMAS` (mapa de camas) | ✅ | ✅ | ✅ | ✅ | ✅ |
+  | `LIMPIEZA` (confirmar, RN-08) | | | | | ✅ |
+  | `REPORTES` | ✅ | ✅ | | | |
+  | `ADMINISTRACION` (usuarios y auditoría) | ✅ | | | | |
+
+- Cambios respecto a `tiene_permiso()` anterior: el enfermero ya no gestiona camas (asignar es decisión médica) y desaparece `historias_clinicas`, que no es un módulo del alcance.
+
+### Decisiones
+- **El permiso depende del rol, no de la profesión:** el proyecto separó `rol` de `cargo` porque "el cargo laboral y los permisos del software son conceptos distintos"; `tiene_permiso()` en las subclases volvía a atar el permiso a la profesión. Además, el administrador y el jefe de guardia no tenían subclase, y un mismo médico puede tener roles distintos.
+- **Matriz en Python, no tabla `rol_permiso`:** los permisos casi no cambian; en Python es un archivo, sin SQL ni pantalla de edición, y se prueba sin MySQL. Si más adelante se pide editarlos en vivo, se migra a una tabla sin tocar los controladores (siguen llamando a `tiene_permiso`).
+- **Denegar por defecto:** un rol desconocido no tiene ningún permiso (distingue mayúsculas y tildes, como el nombre en la BD). Un permiso desconocido sí es un error de programación (`ValueError`).
+- **El modelo responde, el controlador lanza:** `tiene_permiso` devuelve `True`/`False`; `UsuarioSinPermisoError` la lanza el controlador, como indica `DEVELOPMENT_PLAN.md`.
+- **`Empleado` instanciable:** sin `tiene_permiso` abstracto ya no hay razón para impedirlo, y así el personal administrativo tiene una clase. Las subclases conservan lo propio de la profesión (área, especialidad, turno).
+- **Matriz duplicada a propósito en la prueba:** `test_permisos.py` escribe la matriz esperada aparte; un cambio accidental en `PERMISOS_POR_ROL` hace fallar la prueba.
+
+### Pendientes
+- Validar la matriz con el equipo (o con el documento Word del proyecto, que manda si define permisos).
+- Aplicar los permisos en los controladores de la Fase 4.
+
+---
+
 ## [2026-10-21] — Fusión de pacientes NN, cancelación de reservas y episodios cerrados
 
 ### Cambio

@@ -9,6 +9,7 @@ from dao.cama_dao import CamaDAO
 from models.auditoria import AccionAuditoria
 from models.documento import TipoDocumento
 from models.estados import EstadoCama, EstadoEpisodio
+from models.permisos import Rol
 from models.persona import Paciente, PersonalLimpieza
 
 DB_SCRIPTS = Path(__file__).resolve().parent.parent / "db_scripts"
@@ -21,7 +22,9 @@ def nombres_en_seed(tabla):
     return set(re.findall(r"\(\d+, '([^']+)'\)", bloque))
 
 
-@pytest.mark.parametrize("tabla, enum", [("estado_cama", EstadoCama), ("estado_episodio", EstadoEpisodio)])
+@pytest.mark.parametrize("tabla, enum", [
+    ("estado_cama", EstadoCama), ("estado_episodio", EstadoEpisodio), ("rol", Rol),
+])
 def test_los_enum_coinciden_con_los_catalogos_de_la_bd(tabla, enum):
     assert {e.value for e in enum} == nombres_en_seed(tabla)
 

@@ -39,7 +39,7 @@ python -m pytest -k "bloqueo" -x               # filtrar por nombre, parar al pr
 
 ```text
 dao/          Acceso a datos: db_connection.py (Singleton ConexionBD), base_dao.py, transaccion.py y un *_dao.py por entidad
-models/       Dominio: persona, documento, cama, triaje, estrategias, estados y auditoria (Enum), excepciones
+models/       Dominio: persona, documento, cama, triaje, asignacion, estrategias, permisos, estados y auditoria (Enum), excepciones
 utils/        security.py (bcrypt) y logging_config.py
 db_scripts/   schema.sql, seed.sql, crear_usuario_app.sql y diagrama.png
 tests/        pytest: un test_*.py por módulo
@@ -55,7 +55,9 @@ views → controllers → models (dominio) → dao → MySQL
 ```
 
 - **Views**: solo interfaz. Nunca SQL ni reglas de negocio.
-- **Controllers**: orquestan vista, modelos y DAO; aquí van los permisos por rol (`UsuarioSinPermisoError`).
+- **Controllers**: orquestan vista, modelos y DAO; aquí se comprueban los permisos por rol: `tiene_permiso(nombre_rol, permiso)`
+  de `models/permisos.py` y, si falta, `UsuarioSinPermisoError`. Los permisos dependen del rol, nunca del cargo ni de la
+  subclase de `Empleado`; la matriz rol → permisos vive solo en `models/permisos.py`.
 - **Models**: reglas de negocio y estados. Nunca SQL ni importar de `dao/`, `views/` o `controllers/`.
 - **DAO**: único lugar con SQL. Reciben y devuelven datos o modelos; no contienen reglas de negocio.
 - Las dependencias van solo hacia abajo. No duplicar una regla en dos capas: una regla, un dueño.

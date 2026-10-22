@@ -239,7 +239,7 @@ Motivo del orden: ver `CHANGELOG.md` (2026-10-12).
 - [ ] Recibir usuario/contraseña.
 - [ ] Delegar autenticación a `usuario_dao`.
 - [ ] Mantener sesión activa.
-- [ ] Determinar permisos por rol.
+- [ ] Determinar permisos por rol: la matriz ya existe (`models/permisos.py`, `tiene_permiso(rol, permiso)`); el controlador lanza `UsuarioSinPermisoError` si falta el permiso.
 
 ### `triaje_controller.py`
 

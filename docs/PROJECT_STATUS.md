@@ -21,11 +21,11 @@
 - `models/persona.py` alineado con las tablas `paciente` y `empleado`, con validaciones de entrada (2026-10-12).
 - Pacientes y empleados se identifican con `DocumentoIdentidad` (DNI, carné de extranjería, pasaporte o CPP) (2026-10-21).
 - Un paciente puede ingresar sin identificar (NN) e identificarse después (2026-10-21).
-- Pruebas: **725 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
+- Pruebas: **775 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
 
 ### Tarea actual
 
-Ninguna en curso. Siguiente tarea: **Fase 4, controladores**. Antes conviene decidir los permisos (problema 1: tabla `rol` o `tiene_permiso()`), porque los controladores son los que los aplican.
+Ninguna en curso. Siguiente tarea: **Fase 4, controladores**, empezando por `auth_controller.py` (login, sesión y comprobación de permisos con `models/permisos.py`).
 
 ---
 
@@ -50,14 +50,15 @@ Ninguna en curso. Siguiente tarea: **Fase 4, controladores**. Antes conviene dec
 
 | Archivo | Contenido | Pruebas |
 |---|---|---|
-| `models/persona.py` | `Persona`, `Paciente` (incluye `no_identificado`, `identificar` y `fusionar_en`), `Empleado`, `Enfermero`, `Medico`, `PersonalLimpieza` | `test_persona.py` (200) |
+| `models/persona.py` | `Persona`, `Paciente` (incluye `no_identificado`, `identificar` y `fusionar_en`), `Empleado` (instanciable: personal sin profesión específica), `Enfermero`, `Medico`, `PersonalLimpieza` | `test_persona.py` (197) |
 | `models/documento.py` | `TipoDocumento`, `DocumentoIdentidad` (objeto valor: tipo + número) | `test_documento.py` (53) |
 | `models/cama.py` | `Cama` y 4 subtipos, máquina de estados (incluye `cancelar_reserva`), `es_compatible` | `test_cama.py` (37) |
 | `models/estrategias.py` | `EstrategiaTriaje`, `ReglaManchester`, `ReglaMINSA` | `test_estrategias.py` (32) |
 | `models/triaje.py` | `EpisodioEmergencia` (historial de solo lectura, `cerrado`, `cancelar_asignacion`), `Triaje` (con `sintomas`), `SignosVitales`, `Sintoma` | `test_triaje.py` (62) |
-| `models/estados.py` | `EstadoCama`, `EstadoEpisodio` | `test_estados_vs_bd.py` (10: también comprueba sexo, turno, tipos de cama, tipos de documento, niveles de triaje, el paciente NN del seed, las tablas auditables y las acciones de auditoría) |
+| `models/estados.py` | `EstadoCama`, `EstadoEpisodio` | `test_estados_vs_bd.py` (11: también comprueba roles, sexo, turno, tipos de cama, tipos de documento, niveles de triaje, el paciente NN del seed, las tablas auditables y las acciones de auditoría) |
 | `models/auditoria.py` | `AccionAuditoria` (INSERT, UPDATE, ANULAR, IDENTIFICAR, FUSIONAR) | `test_auditoria_dao.py` y `test_estados_vs_bd.py` |
 | `models/asignacion.py` | `AsignacionCama` y `SolicitudLimpieza` (registros inmutables) | `test_asignacion.py` (10) |
+| `models/permisos.py` | `Rol`, `Permiso`, matriz `PERMISOS_POR_ROL` y `tiene_permiso(rol, permiso)` | `test_permisos.py` (52) |
 | `models/excepciones.py` | `SigtacError` y 7 excepciones derivadas | Se usan en las pruebas anteriores |
 
 ### Fase 3 — DAO
@@ -78,9 +79,11 @@ Ninguna en curso. Siguiente tarea: **Fase 4, controladores**. Antes conviene dec
 
 ## Problemas abiertos
 
-1. **Permisos duplicados:** la tabla `rol` y `tiene_permiso()` en cada subclase. Se decidirá en la Fase 4. Las pruebas actuales fijan el comportamiento de `tiene_permiso()`.
+Ninguno bloqueante. Las decisiones menores están en "Pendientes conocidos".
 
 ### Resueltos el 2026-10-21
+
+- Permisos duplicados: los permisos dependen del rol del usuario, con la matriz de `models/permisos.py`; se quitó `tiene_permiso()` de las subclases de `Empleado`.
 
 - Paciente NN que ya estaba registrado: `Paciente.fusionar_en` + `PacienteDAO.fusionar` (sus episodios pasan al paciente real y el NN se anula).
 - Cancelar una reserva: `Cama.cancelar_reserva`, `EpisodioEmergencia.cancelar_asignacion` y `AsignacionDAO.anular`.
@@ -117,7 +120,7 @@ Ninguna en curso. Siguiente tarea: **Fase 4, controladores**. Antes conviene dec
 
 ## Próximo trabajo previsto
 
-1. Decidir los permisos por rol (problema 1).
+1. Validar con el equipo la matriz de permisos (`models/permisos.py`; ver CHANGELOG del 2026-10-21).
 2. Fase 4: controladores (`auth_controller`, `triaje_controller`, `cama_controller`), incluida la cola de espera.
 
 Respecto al plan original, `auditoria_dao.py` se hizo antes que `triaje_dao.py` y `asignacion_dao.py` porque es de una sola tabla y no depende de transacciones (ver `CHANGELOG.md` del 2026-10-12).

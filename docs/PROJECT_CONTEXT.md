@@ -316,9 +316,8 @@ Para el alcance del curso se prefiere esta solución explícita frente a AOP/dec
 - Las credenciales de BD se gestionan mediante `.env`.
 - `.env` no debe versionarse.
 - Las consultas DAO deben ser parametrizadas.
-- El acceso por rol se resolverá en la capa de controladores.
-
-`UsuarioSinPermisoError` está planificada para la Fase 4, donde se resolverá el control de permisos por rol.
+- El acceso depende del **rol** del usuario (`usuario.id_rol`), no del cargo ni de la subclase de `Empleado`. La matriz rol → permisos está en `models/permisos.py` (`Rol`, `Permiso`, `PERMISOS_POR_ROL`, `tiene_permiso`); un rol desconocido no tiene permisos.
+- Los controladores comprueban el permiso con `tiene_permiso(nombre_rol, permiso)` y lanzan `UsuarioSinPermisoError` si falta: el modelo solo responde, no lanza esa excepción.
 
 ---
 

@@ -200,7 +200,13 @@ class Paciente(Persona):
         self._activo = False
 
 class Empleado(Persona):
-    """Clase abstracta que extiende a Persona para el personal del Hospital"""
+    """
+    Personal del hospital. Se usa tal cual para el personal sin atributos propios de una profesión
+    (p. ej. administrativo); las subclases añaden área, especialidad o turno.
+
+    Los permisos en el sistema no dependen de esta clase ni de sus subclases (la profesión), sino del
+    rol del usuario: ver models/permisos.py.
+    """
     def __init__(self, id_empleado : int | None, documento: DocumentoIdentidad, nombres: str, apellidos: str, fecha_nac : date,
                  cargo : str, colegiatura: str | None = None, activo: bool = True):
         super().__init__(documento, nombres, apellidos, fecha_nac)
@@ -234,11 +240,6 @@ class Empleado(Persona):
 
         return base
 
-    @abstractmethod
-    def tiene_permiso(self, modulo: str) -> bool:
-        """Determina si el empleado tiene acceso a cierta parte del sistema"""
-        pass
-
 #SUBCLASES DE EMPLEADO
 class Enfermero(Empleado):
     def __init__(self, id_empleado : int | None, documento: DocumentoIdentidad, nombres: str, apellidos: str, fecha_nac : date,
@@ -257,9 +258,6 @@ class Enfermero(Empleado):
         # Lógica futura para registrar el triaje
         pass
 
-    def tiene_permiso(self, modulo: str) -> bool:
-        return modulo in ['triaje', 'camas']
-
 class Medico(Empleado):
     def __init__(self, id_empleado: int | None, documento: DocumentoIdentidad, nombres: str, apellidos: str, fecha_nac: date,
                  cargo: str, colegiatura: str | None, especialidad: str, activo: bool = True):
@@ -275,9 +273,6 @@ class Medico(Empleado):
     def dar_alta(self, episodio):
         # Lógica futura para cerrar el episodio
         pass
-
-    def tiene_permiso(self, modulo: str) -> bool:
-        return modulo in ['triaje', 'camas', 'historias_clinicas']
 
 
 class PersonalLimpieza(Empleado):
@@ -301,6 +296,3 @@ class PersonalLimpieza(Empleado):
     def atender_solicitud(self, id_solicitud: int):
         # Lógica futura para liberar camas
         pass
-
-    def tiene_permiso(self, modulo: str) -> bool:
-        return modulo in ['limpieza']
