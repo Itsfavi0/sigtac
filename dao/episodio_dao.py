@@ -23,13 +23,14 @@ class EpisodioDAO(BaseDAO):
     """
 
     @staticmethod
-    def _a_episodio(fila: dict) -> EpisodioEmergencia:
-        """Convierte una fila en un EpisodioEmergencia (sin su historial de triajes ni signos)."""
+    def _a_episodio(fila: dict, triajes=(), signos_vitales=()) -> EpisodioEmergencia:
+        """Convierte una fila (y su historial, si se pasa) en un EpisodioEmergencia."""
         return EpisodioEmergencia(
             fila["id_episodio"], fila["id_paciente"], fila["motivo_consulta"],
             estado=EstadoEpisodio(fila["nombre_estado_episodio"]),  # ValueError si no existe en el Enum
             fecha_ingreso=fila["fecha_ingreso"], fecha_alta=fila["fecha_alta"],
             activo=bool(fila["estado_registro"]),  # MySQL devuelve BOOLEAN como 0/1
+            triajes=triajes, signos_vitales=signos_vitales,
         )
 
     @staticmethod
@@ -66,14 +67,10 @@ class EpisodioDAO(BaseDAO):
         fila = EpisodioDAO._consultar_uno(EpisodioDAO._SELECT + " WHERE ep.id_episodio = %s", (id_episodio,))
         if not fila:
             return None
-        episodio = EpisodioDAO._a_episodio(fila)
-        for signos in TriajeDAO.listar_signos_por_episodio(id_episodio):
-            episodio.agregar_signos_vitales(signos)
-        for triaje in TriajeDAO.listar_por_episodio(id_episodio):
-            # agregar_triaje solo cambia el estado si el episodio sigue EN ESPERA DE TRIAJE, lo que no
-            # ocurre en un episodio guardado con triajes: el estado leído de la BD se conserva.
-            episodio.agregar_triaje(triaje)
-        return episodio
+        # El historial se pasa al constructor (no con agregar_triaje): así se carga también el de un
+        # episodio cerrado y se conserva el estado leído de la BD.
+        return EpisodioDAO._a_episodio(fila, signos_vitales=TriajeDAO.listar_signos_por_episodio(id_episodio),
+                                       triajes=TriajeDAO.listar_por_episodio(id_episodio))
 
     @staticmethod
     def cambiar_estado(episodio: EpisodioEmergencia, estado_anterior: EstadoEpisodio | str) -> None:

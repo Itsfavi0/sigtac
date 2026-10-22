@@ -289,6 +289,9 @@ Cada operación de cama es una transacción del controlador que combina varios D
 | Asignar cama (RN-01, RN-05) | `episodio.asignar_cama()`, `cama.reservar()` | estados + `AsignacionDAO.crear` |
 | Dar de alta (RN-07) | `episodio.dar_alta()`, `cama.dar_alta()` | estados + `AsignacionDAO.liberar` + `SolicitudLimpiezaDAO.crear` |
 | Confirmar limpieza (RN-08) | `cama.liberar_limpieza()` | estado + `SolicitudLimpiezaDAO.atender` |
+| Cancelar una reserva | `episodio.cancelar_asignacion()`, `cama.cancelar_reserva()` | estados + `AsignacionDAO.anular` (sin limpieza) |
+
+Una asignación liberada (alta) y una anulada (reserva cancelada) se distinguen en el historial. Un paciente NN que resulta estar ya registrado se fusiona con él (`Paciente.fusionar_en` + `PacienteDAO.fusionar`): sus episodios pasan al paciente real y el NN se anula. Un episodio cerrado (alta, referido, fuga o anulado) no admite triajes nuevos.
 
 La compatibilidad cama–triaje la comprueba el controlador con `cama.es_compatible(nivel)` antes de asignar. Las asignaciones no se borran: se liberan y quedan como historial.
 

@@ -89,3 +89,21 @@ class AsignacionDAO(BaseDAO):
             logger.warning("Liberación rechazada: la asignación no está vigente (id_asignacion=%s).", id_asignacion)
             raise ReglaNegocioError("La asignación ya fue liberada o no existe.")
         logger.info("Asignación liberada (id_asignacion=%s).", id_asignacion)
+
+    @staticmethod
+    def anular(id_asignacion: int) -> None:
+        """
+        Anula una asignación que no llegó a usarse (reserva cancelada): baja lógica con
+        estado_registro = FALSE (RN-11), sin fecha de liberación. Así el historial distingue una
+        reserva cancelada de una cama que se usó y se liberó al dar de alta.
+        UPDATE condicional: si la asignación no está vigente, lanza ReglaNegocioError.
+        """
+        AsignacionDAO._validar_id(id_asignacion, "id_asignacion")
+        filas = AsignacionDAO._ejecutar(
+            "UPDATE asignacion_cama SET estado_registro = FALSE WHERE id_asignacion = %s" + AsignacionDAO._VIGENTE,
+            (id_asignacion,),
+        )
+        if filas == 0:
+            logger.warning("Anulación rechazada: la asignación no está vigente (id_asignacion=%s).", id_asignacion)
+            raise ReglaNegocioError("La asignación ya fue liberada, anulada o no existe.")
+        logger.info("Asignación anulada (id_asignacion=%s).", id_asignacion)

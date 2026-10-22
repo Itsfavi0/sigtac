@@ -67,6 +67,25 @@ def test_liberar_limpieza_solo_desde_limpieza(estado):
         nueva_cama(estado).liberar_limpieza()
 
 
+# ---- Cancelar una reserva
+def test_cancelar_reserva_devuelve_la_cama_a_disponible_sin_limpieza():
+    cama = nueva_cama()
+    cama.reservar()
+    cama.cancelar_reserva()
+    assert cama.estado == Cama.ESTADO_DISPONIBLE  # no se usó: no pasa por limpieza
+
+
+@pytest.mark.parametrize("estado", [
+    Cama.ESTADO_DISPONIBLE, Cama.ESTADO_OCUPADA, Cama.ESTADO_EN_LIMPIEZA, Cama.ESTADO_FUERA_SERVICIO,
+])
+def test_solo_se_cancela_una_cama_reservada(estado):
+    # Una cama ocupada ya se usó: debe salir por dar_alta() y pasar por limpieza (RN-07)
+    cama = nueva_cama(estado)
+    with pytest.raises(CamaEstadoInvalidoError):
+        cama.cancelar_reserva()
+    assert cama.estado == estado
+
+
 # ---- Fuera de servicio
 @pytest.mark.parametrize("estado", [
     Cama.ESTADO_DISPONIBLE, Cama.ESTADO_RESERVADA, Cama.ESTADO_OCUPADA,

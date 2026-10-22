@@ -128,9 +128,32 @@ def test_liberar_con_id_invalido_no_llega_a_la_bd(monkeypatch):
     bd.clase.assert_not_called()
 
 
+# ---- AsignacionDAO.anular (reserva cancelada)
+def test_anular_es_baja_logica_sin_fecha_de_liberacion(monkeypatch):  # RN-11
+    bd = BD(monkeypatch, rowcount=1)
+    AsignacionDAO.anular(1)
+    assert bd.sql.startswith("UPDATE asignacion_cama SET estado_registro = FALSE WHERE id_asignacion = %s")
+    assert bd.sql.endswith("AND fecha_liberacion IS NULL AND estado_registro = TRUE")
+    assert "fecha_liberacion = " not in bd.sql and "DELETE" not in bd.sql.upper()
+    assert bd.params == (1,)
+
+
+def test_anular_una_asignacion_no_vigente_lanza_regla_negocio_error(monkeypatch):
+    BD(monkeypatch, rowcount=0)
+    with pytest.raises(ReglaNegocioError, match="anulada"):
+        AsignacionDAO.anular(1)
+
+
+def test_anular_con_id_invalido_no_llega_a_la_bd(monkeypatch):
+    bd = BD(monkeypatch)
+    with pytest.raises(ValueError):
+        AsignacionDAO.anular(0)
+    bd.clase.assert_not_called()
+
+
 def test_asignacion_dao_no_borra():  # el historial de asignaciones se conserva
     publicos = {nombre for nombre in vars(AsignacionDAO) if not nombre.startswith("_")}
-    assert publicos == {"crear", "buscar_vigente_por_episodio", "buscar_vigente_por_cama", "liberar"}
+    assert publicos == {"crear", "buscar_vigente_por_episodio", "buscar_vigente_por_cama", "liberar", "anular"}
 
 
 # ---- SolicitudLimpiezaDAO

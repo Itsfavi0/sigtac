@@ -120,6 +120,24 @@ def test_buscar_episodio_anulado_y_con_alta(monkeypatch):
     assert (ep.estado, ep.fecha_alta, ep.activo) == (EstadoEpisodio.ALTA, alta, False)
 
 
+def test_un_episodio_dado_de_alta_se_carga_con_su_historial(monkeypatch):
+    # Antes el historial se cargaba con agregar_triaje, que ahora rechaza episodios cerrados.
+    triajes = [{"id_triaje": 1, "nivel_final": 3, "nivel_sugerido": 3, "id_empleado": 3, "fecha_hora": INGRESO,
+                "justificacion": None, "estado_registro": 1}]
+    BD(monkeypatch, row=fila(nombre_estado_episodio="ALTA MÉDICA", fecha_alta=datetime(2026, 10, 21, 14, 0)),
+       filas_por_consulta=[[], triajes, []])
+    ep = EpisodioDAO.buscar_por_id(2)
+    assert ep.cerrado and [t.id_triaje for t in ep.triajes] == [1]
+
+
+def test_un_episodio_en_espera_de_triaje_con_historial_conserva_su_estado(monkeypatch):
+    # El constructor no aplica la transición de agregar_triaje: el estado es el de la BD.
+    triajes = [{"id_triaje": 1, "nivel_final": 3, "nivel_sugerido": 3, "id_empleado": 3, "fecha_hora": INGRESO,
+                "justificacion": None, "estado_registro": 0}]
+    BD(monkeypatch, row=fila(nombre_estado_episodio="EN ESPERA DE TRIAJE"), filas_por_consulta=[[], triajes, []])
+    assert EpisodioDAO.buscar_por_id(2).estado is EstadoEpisodio.EN_ESPERA_TRIAJE
+
+
 def test_buscar_inexistente_devuelve_none_sin_mas_consultas(monkeypatch):
     bd = BD(monkeypatch, row=None)
     assert EpisodioDAO.buscar_por_id(99) is None
@@ -127,7 +145,7 @@ def test_buscar_inexistente_devuelve_none_sin_mas_consultas(monkeypatch):
 
 
 def test_estado_desconocido_en_la_bd_se_rechaza(monkeypatch):
-    BD(monkeypatch, row=fila(nombre_estado_episodio="PERDIDO"))
+    BD(monkeypatch, row=fila(nombre_estado_episodio="PERDIDO"), filas_por_consulta=[[], []])
     with pytest.raises(ValueError):
         EpisodioDAO.buscar_por_id(2)
 

@@ -1,7 +1,9 @@
 import logging
 
 from dao.base_dao import BaseDAO
+from dao.transaccion import transaccion
 from models.documento import DocumentoIdentidad
+from models.excepciones import ReglaNegocioError
 from models.persona import Paciente
 
 logger = logging.getLogger(__name__)
@@ -115,20 +117,21 @@ class PacienteDAO(BaseDAO):
         """
         Guarda la identidad real (documento, nombres, apellidos y fecha de nacimiento) de un paciente
         que ingresó sin identificar; antes se llama a paciente.identificar().
-        Devuelve False si el paciente no existe o ya estaba identificado en la BD. Lanza
+        Devuelve False si el paciente no existe, ya estaba identificado o está anulado en la BD. Lanza
         RegistroDuplicadoError si el documento ya pertenece a otro paciente.
         """
         if paciente.id_paciente is None:
             raise ValueError("El paciente no tiene id: para registrarlo use crear().")
         if not paciente.identificado:
             raise ValueError("El paciente no tiene documento: llame antes a paciente.identificar().")
-        # La condición num_documento IS NULL impide sobrescribir el documento de un paciente ya identificado.
+        # num_documento IS NULL impide sobrescribir el documento de un paciente ya identificado, y
+        # estado_registro = TRUE impide identificar un NN anulado (p. ej. ya fusionado con otro paciente).
         filas = PacienteDAO._ejecutar(
             """
             UPDATE paciente
             SET id_tipo_documento = (SELECT id_tipo_documento FROM tipo_documento WHERE codigo = %s),
                 num_documento = %s, nombres = %s, apellidos = %s, fecha_nac = %s
-            WHERE id_paciente = %s AND num_documento IS NULL
+            WHERE id_paciente = %s AND num_documento IS NULL AND estado_registro = TRUE
             """,
             (paciente.documento.tipo.value, paciente.documento.numero, paciente.nombres,
              paciente.apellidos, paciente.fecha_nac, paciente.id_paciente),
@@ -136,6 +139,43 @@ class PacienteDAO(BaseDAO):
         if filas:
             logger.info("Paciente identificado (id_paciente=%s).", paciente.id_paciente)
         return filas > 0
+
+    @staticmethod
+    def fusionar(nn: Paciente, destino: Paciente) -> int:
+        """
+        Guarda la fusión de un paciente sin identificar con el paciente registrado que resultó ser
+        (antes se llama a nn.fusionar_en(destino), que valida la regla y anula el NN en memoria).
+        En una transacción: comprueba que el destino siga activo e identificado, anula el NN (solo si
+        sigue sin identificar y activo) y pasa sus episodios al destino. Devuelve cuántos episodios
+        se movieron. Si el NN o el destino ya no están como se esperaba, lanza ReglaNegocioError.
+        """
+        if not isinstance(nn, Paciente) or not isinstance(destino, Paciente):
+            raise ValueError("nn y destino deben ser Paciente.")
+        id_nn = PacienteDAO._validar_id(nn.id_paciente, "id_paciente del NN")
+        id_destino = PacienteDAO._validar_id(destino.id_paciente, "id_paciente del destino")
+        if nn.activo or nn.identificado:
+            raise ValueError("Llame antes a nn.fusionar_en(destino).")
+
+        with transaccion():
+            if not PacienteDAO._consultar_uno(
+                "SELECT 1 FROM paciente WHERE id_paciente = %s AND estado_registro = TRUE AND num_documento IS NOT NULL",
+                (id_destino,),
+            ):
+                raise ReglaNegocioError("El paciente destino no existe, está anulado o no está identificado.")
+            filas = PacienteDAO._ejecutar(
+                """
+                UPDATE paciente SET estado_registro = FALSE
+                WHERE id_paciente = %s AND num_documento IS NULL AND estado_registro = TRUE
+                """,
+                (id_nn,),
+            )
+            if filas == 0:
+                raise ReglaNegocioError("El paciente sin identificar ya fue identificado, fusionado o no existe.")
+            movidos = PacienteDAO._ejecutar(
+                "UPDATE episodio_emergencia SET id_paciente = %s WHERE id_paciente = %s", (id_destino, id_nn)
+            )
+        logger.info("Paciente NN fusionado (id_nn=%s, id_destino=%s, episodios=%s).", id_nn, id_destino, movidos)
+        return movidos
 
     @staticmethod
     def anular(id_paciente: int) -> bool:

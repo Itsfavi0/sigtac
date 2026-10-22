@@ -229,6 +229,78 @@ def test_episodio_nuevo_toma_la_hora_actual_y_esta_activo():
     assert ep.fecha_ingreso is not None and ep.fecha_alta is None and ep.activo is True
 
 
+# ---- Episodio cerrado: no admite triajes ni signos nuevos
+SIGNOS = SignosVitales(120, 80, 75, 16, 36.8, 98, id_si=None)
+
+
+@pytest.mark.parametrize("estado", ["ALTA MÉDICA", "REFERIDO", "FUGADO / ABANDONO"])
+def test_episodio_cerrado_no_admite_triaje_ni_signos(estado):
+    ep = EpisodioEmergencia(1, 1, "Dolor torácico", estado=estado)
+    assert ep.cerrado
+    with pytest.raises(ReglaNegocioError, match="triaje"):
+        ep.agregar_triaje(nuevo_triaje())
+    with pytest.raises(ReglaNegocioError, match="signos"):
+        ep.agregar_signos_vitales(SIGNOS)
+    assert ep.triajes == () and ep.signos_vitales == ()
+
+
+def test_episodio_anulado_no_admite_triaje_ni_signos():  # RN-11
+    ep = nuevo_episodio()
+    ep.anular()
+    assert ep.cerrado
+    with pytest.raises(ReglaNegocioError, match="anulado"):
+        ep.agregar_triaje(nuevo_triaje())
+    with pytest.raises(ReglaNegocioError, match="anulado"):
+        ep.agregar_signos_vitales(SIGNOS)
+
+
+@pytest.mark.parametrize("estado", ["EN ESPERA DE TRIAJE", "EN ESPERA DE CAMA", "EN ATENCIÓN (CON CAMA)"])
+def test_episodio_abierto_admite_triaje_y_signos(estado):  # RN-09: reevaluar a quien sigue en emergencia
+    ep = EpisodioEmergencia(1, 1, "Dolor torácico", estado=estado)
+    assert not ep.cerrado
+    ep.agregar_signos_vitales(SIGNOS)
+    ep.agregar_triaje(nuevo_triaje())
+    assert len(ep.triajes) == 1 and len(ep.signos_vitales) == 1
+
+
+def test_episodio_cerrado_se_reconstruye_con_su_historial():
+    t, sv = nuevo_triaje(), SIGNOS
+    ep = EpisodioEmergencia(1, 1, "x", estado="ALTA MÉDICA", triajes=[t], signos_vitales=[sv])
+    assert ep.triajes == (t,) and ep.signos_vitales == (sv,)
+    assert ep.estado is EpisodioEmergencia.ESTADO_ALTA
+
+
+def test_reconstruir_con_historial_no_cambia_el_estado():
+    # agregar_triaje pasaría a EN ESPERA DE CAMA; el constructor respeta el estado guardado
+    ep = EpisodioEmergencia(1, 1, "x", triajes=[nuevo_triaje()])
+    assert ep.estado is EpisodioEmergencia.ESTADO_EN_ESPERA_TRIAJE
+
+
+def test_el_historial_del_constructor_es_una_copia():
+    origen = [nuevo_triaje()]
+    ep = EpisodioEmergencia(1, 1, "x", triajes=origen)
+    origen.append(nuevo_triaje(id_triaje=2))
+    assert len(ep.triajes) == 1
+
+
+# ---- Cancelar la asignación de cama
+def test_cancelar_asignacion_vuelve_a_espera_de_cama():
+    ep = episodio_con_triaje()
+    ep.asignar_cama()
+    ep.cancelar_asignacion()
+    assert ep.estado == EpisodioEmergencia.ESTADO_EN_ESPERA
+    ep.asignar_cama()  # puede recibir otra cama
+    assert ep.estado == EpisodioEmergencia.ESTADO_EN_ATENCION
+
+
+@pytest.mark.parametrize("estado", ["EN ESPERA DE TRIAJE", "EN ESPERA DE CAMA", "ALTA MÉDICA"])
+def test_solo_se_cancela_la_asignacion_de_un_episodio_en_atencion(estado):
+    ep = EpisodioEmergencia(1, 1, "x", estado=estado)
+    with pytest.raises(ReglaNegocioError):
+        ep.cancelar_asignacion()
+    assert ep.estado == estado
+
+
 def test_estado_inexistente_se_rechaza():
     with pytest.raises(ValueError):
         EpisodioEmergencia(1, 1, "motivo", estado="INVENTADO")

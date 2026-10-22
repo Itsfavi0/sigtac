@@ -21,11 +21,11 @@
 - `models/persona.py` alineado con las tablas `paciente` y `empleado`, con validaciones de entrada (2026-10-12).
 - Pacientes y empleados se identifican con `DocumentoIdentidad` (DNI, carné de extranjería, pasaporte o CPP) (2026-10-21).
 - Un paciente puede ingresar sin identificar (NN) e identificarse después (2026-10-21).
-- Pruebas: **684 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
+- Pruebas: **725 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
 
 ### Tarea actual
 
-Ninguna en curso. Siguiente tarea: **Fase 4, controladores**. Antes conviene decidir los permisos (problema 2: tabla `rol` o `tiene_permiso()`), porque los controladores son los que los aplican.
+Ninguna en curso. Siguiente tarea: **Fase 4, controladores**. Antes conviene decidir los permisos (problema 1: tabla `rol` o `tiene_permiso()`), porque los controladores son los que los aplican.
 
 ---
 
@@ -50,13 +50,13 @@ Ninguna en curso. Siguiente tarea: **Fase 4, controladores**. Antes conviene dec
 
 | Archivo | Contenido | Pruebas |
 |---|---|---|
-| `models/persona.py` | `Persona`, `Paciente` (incluye `no_identificado` e `identificar`), `Empleado`, `Enfermero`, `Medico`, `PersonalLimpieza` | `test_persona.py` (192) |
+| `models/persona.py` | `Persona`, `Paciente` (incluye `no_identificado`, `identificar` y `fusionar_en`), `Empleado`, `Enfermero`, `Medico`, `PersonalLimpieza` | `test_persona.py` (200) |
 | `models/documento.py` | `TipoDocumento`, `DocumentoIdentidad` (objeto valor: tipo + número) | `test_documento.py` (53) |
-| `models/cama.py` | `Cama` y 4 subtipos, máquina de estados, `es_compatible` | `test_cama.py` (32) |
+| `models/cama.py` | `Cama` y 4 subtipos, máquina de estados (incluye `cancelar_reserva`), `es_compatible` | `test_cama.py` (37) |
 | `models/estrategias.py` | `EstrategiaTriaje`, `ReglaManchester`, `ReglaMINSA` | `test_estrategias.py` (32) |
-| `models/triaje.py` | `EpisodioEmergencia` (con historial de triajes y signos de solo lectura), `Triaje` (con `sintomas`), `SignosVitales`, `Sintoma` | `test_triaje.py` (48) |
+| `models/triaje.py` | `EpisodioEmergencia` (historial de solo lectura, `cerrado`, `cancelar_asignacion`), `Triaje` (con `sintomas`), `SignosVitales`, `Sintoma` | `test_triaje.py` (62) |
 | `models/estados.py` | `EstadoCama`, `EstadoEpisodio` | `test_estados_vs_bd.py` (10: también comprueba sexo, turno, tipos de cama, tipos de documento, niveles de triaje, el paciente NN del seed, las tablas auditables y las acciones de auditoría) |
-| `models/auditoria.py` | `AccionAuditoria` (INSERT, UPDATE, ANULAR, IDENTIFICAR) | `test_auditoria_dao.py` y `test_estados_vs_bd.py` |
+| `models/auditoria.py` | `AccionAuditoria` (INSERT, UPDATE, ANULAR, IDENTIFICAR, FUSIONAR) | `test_auditoria_dao.py` y `test_estados_vs_bd.py` |
 | `models/asignacion.py` | `AsignacionCama` y `SolicitudLimpieza` (registros inmutables) | `test_asignacion.py` (10) |
 | `models/excepciones.py` | `SigtacError` y 7 excepciones derivadas | Se usan en las pruebas anteriores |
 
@@ -65,23 +65,26 @@ Ninguna en curso. Siguiente tarea: **Fase 4, controladores**. Antes conviene dec
 - `dao/db_connection.py`: Singleton, credenciales obligatorias desde `.env`, `autocommit=True`, `FOUND_ROWS`, reconexión (salvo durante una transacción) y estado de transacción (`test_db_connection.py`, 23 pruebas).
 - `dao/transaccion.py`: `with transaccion():` con COMMIT/ROLLBACK, bloques anidados que se unen al externo (`test_transaccion.py`, 16 pruebas). Verificado en MySQL 8.0.46 con una base temporal (21 comprobaciones, incluida una conexión cortada a mitad).
 - `dao/base_dao.py`: clase base de los DAO (cursor, cierre y traducción de errores a `PersistenciaError`/`RegistroDuplicadoError`) (`test_base_dao.py`, 23 pruebas).
-- `dao/paciente_dao.py`: buscar por id/documento, crear (también sin identificar), listar e identificar pacientes NN, actualizar (sin tocar el documento) y baja lógica (`test_paciente_dao.py`, 38 pruebas). Verificado en MySQL 8.0.46 con una base temporal (2026-10-12: 15 comprobaciones; 2026-10-21, con documentos y NN: 33).
+- `dao/paciente_dao.py`: buscar por id/documento, crear (también sin identificar), listar, identificar y fusionar pacientes NN, actualizar (sin tocar el documento) y baja lógica (`test_paciente_dao.py`, 47 pruebas). Verificado en MySQL 8.0.46 con una base temporal (2026-10-12: 15 comprobaciones; 2026-10-21, con documentos y NN: 33).
 - `dao/cama_dao.py`: búsqueda por id/código y listados; fábrica de subclases por `nombre_tipo_cama`; `cambiar_estado` (UPDATE condicional + historial en una transacción) (`test_cama_dao.py`, 47 pruebas). Verificado en MySQL 8.0.46 con una base temporal (lectura: 11 comprobaciones; `cambiar_estado`: ver CHANGELOG del 2026-10-21).
 - `dao/usuario_dao.py`: hereda de `BaseDAO`; login con tipo + número de documento, JOIN a `empleado`, `tipo_documento` y `rol`, bcrypt, usuario inactivo, señuelo y bloqueo de 5 intentos durante 15 min (`test_usuario_dao.py`, 39 pruebas).
 - `dao/auditoria_dao.py`: `registrar` (bitácora de solo inserción; acción con `AccionAuditoria`, tabla con lista blanca, detalles como JSON) y `listar_por_registro` (`test_auditoria_dao.py`, 32 pruebas). Verificado en MySQL 8.0.46 con una base temporal junto con las transacciones (JSON con tildes, auditoría deshecha si falla la operación y viceversa).
 - `dao/triaje_dao.py`: catálogo de síntomas; `registrar` (signos vitales + triaje + síntomas en una transacción; solo inserción, RN-09) y lectura del historial de triajes y signos por episodio (`test_triaje_dao.py`, 31 pruebas).
 - `dao/episodio_dao.py`: crear, `buscar_por_id` (con su historial de signos y triajes) y `cambiar_estado` (`UPDATE` condicional; la fecha de alta la pone MySQL) (`test_episodio_dao.py`, 26 pruebas). Ambos verificados en MySQL 8.0.46 con una base temporal (ver CHANGELOG del 2026-10-21).
-- `dao/asignacion_dao.py`: crear, buscar la asignación vigente por episodio o por cama y `liberar` (`UPDATE` condicional). `dao/solicitud_limpieza_dao.py`: crear, `listar_pendientes` y `atender` (`UPDATE` condicional) (`test_asignacion_dao.py`, 26 pruebas). Verificados con el ciclo completo de una cama en una base temporal (ver CHANGELOG del 2026-10-21).
+- `dao/asignacion_dao.py`: crear, buscar la asignación vigente por episodio o por cama, `liberar` (alta) y `anular` (reserva cancelada), ambos `UPDATE` condicionales. `dao/solicitud_limpieza_dao.py`: crear, `listar_pendientes` y `atender` (`UPDATE` condicional) (`test_asignacion_dao.py`, 29 pruebas). Verificados con el ciclo completo de una cama en una base temporal (ver CHANGELOG del 2026-10-21).
 - `seed.sql` tiene hashes bcrypt válidos. El login con un usuario del seed se verificó a mano contra una base temporal (ver CHANGELOG del 2026-10-11).
 
 ---
 
 ## Problemas abiertos
 
-1. **Paciente NN que ya estaba registrado:** si al identificar a un NN su documento ya pertenece a otro paciente, `PacienteDAO.identificar` lanza `RegistroDuplicadoError`. Unir los dos registros (mover los episodios) no está implementado; se decidirá con el controlador.
-2. **Permisos duplicados:** la tabla `rol` y `tiene_permiso()` en cada subclase. Se decidirá en la Fase 4. Las pruebas actuales fijan el comportamiento de `tiene_permiso()`.
+1. **Permisos duplicados:** la tabla `rol` y `tiene_permiso()` en cada subclase. Se decidirá en la Fase 4. Las pruebas actuales fijan el comportamiento de `tiene_permiso()`.
 
 ### Resueltos el 2026-10-21
+
+- Paciente NN que ya estaba registrado: `Paciente.fusionar_en` + `PacienteDAO.fusionar` (sus episodios pasan al paciente real y el NN se anula).
+- Cancelar una reserva: `Cama.cancelar_reserva`, `EpisodioEmergencia.cancelar_asignacion` y `AsignacionDAO.anular`.
+- Un episodio cerrado (alta, referido, fuga o anulado) no admite triajes ni signos nuevos.
 
 - Pacientes y empleados extranjeros: `DocumentoIdentidad` (DNI, CE, pasaporte, CPP) y tabla `tipo_documento`.
 - Pacientes sin identificar (NN): `Paciente.no_identificado`, `Paciente.identificar` y `PacienteDAO.identificar`.
@@ -106,15 +109,15 @@ Ninguna en curso. Siguiente tarea: **Fase 4, controladores**. Antes conviene dec
 - Revisar la coherencia de `usuario_dao.py` con `auth_controller.py` cuando exista.
 - Decidir si `seed.sql` mantiene los datos reales de los integrantes.
 - PyCharm: cada integrante debe seleccionar `SIGTAC/.venv` como intérprete.
-- Cancelar una reserva (cama RESERVADA cuyo paciente nunca llegó): el modelo no tiene esa transición.
-- Decidir si se puede registrar un triaje en un episodio dado de alta, referido o fugado (hoy el modelo no lo impide) y si `Triaje.reclasificar` al mismo nivel sugerido debe rechazarse (ver CHANGELOG del 2026-10-21).
+- Decidir si `Triaje.reclasificar` al mismo nivel sugerido debe rechazarse (ver CHANGELOG del 2026-10-21).
+- El modelo no tiene transiciones a REFERIDO ni a FUGADO / ABANDONO (existen en el catálogo y ya cuentan como episodio cerrado).
 - Opcional: quitar a `sigtac_app` el permiso `UPDATE` sobre `bitacora_auditoria`, para que la bitácora no se pueda modificar ni por error del código (lo ejecuta el usuario con su cuenta de administrador).
 
 ---
 
 ## Próximo trabajo previsto
 
-1. Decidir los permisos por rol (problema 2).
+1. Decidir los permisos por rol (problema 1).
 2. Fase 4: controladores (`auth_controller`, `triaje_controller`, `cama_controller`), incluida la cola de espera.
 
 Respecto al plan original, `auditoria_dao.py` se hizo antes que `triaje_dao.py` y `asignacion_dao.py` porque es de una sola tabla y no depende de transacciones (ver `CHANGELOG.md` del 2026-10-12).

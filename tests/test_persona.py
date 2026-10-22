@@ -304,6 +304,55 @@ def test_identificar_con_datos_invalidos_no_modifica_al_paciente(cambio, mensaje
     assert (paciente.nombres, paciente.apellidos) == ("NN", "NN")
 
 
+def test_un_paciente_nn_anulado_no_se_puede_identificar():
+    paciente = nuevo_paciente(id_paciente=5, documento=None, nombres="NN", apellidos="NN")
+    paciente.anular()
+    with pytest.raises(ReglaNegocioError, match="anulado"):
+        paciente.identificar(dni("70123456"), "Pedro", "Ramírez", date(1980, 3, 2))
+
+
+# ---- Fusión: el NN resultó ser un paciente ya registrado
+def nn(id_paciente=5):
+    return nuevo_paciente(id_paciente=id_paciente, documento=None, nombres="NN", apellidos="NN")
+
+
+def test_fusionar_anula_al_nn_y_no_toca_al_destino():  # RN-11
+    nn_paciente, destino = nn(), nuevo_paciente(id_paciente=1)
+    nn_paciente.fusionar_en(destino)
+    assert nn_paciente.activo is False and nn_paciente.identificado is False
+    assert destino.activo is True and destino.documento == dni("70123456")
+
+
+@pytest.mark.parametrize("preparar_nn, preparar_destino, mensaje", [
+    (lambda p: p.identificar(dni("11111111"), "A", "B", date(1990, 1, 1)), lambda d: None, "sin identificar"),
+    (lambda p: p.anular(), lambda d: None, "anulado o fusionado"),
+    (lambda p: None, lambda d: d.anular(), "destino está anulado"),
+])
+def test_fusionar_valida_ambos_pacientes(preparar_nn, preparar_destino, mensaje):
+    nn_paciente, destino = nn(), nuevo_paciente(id_paciente=1)
+    preparar_nn(nn_paciente)
+    preparar_destino(destino)
+    activo_antes = nn_paciente.activo
+    with pytest.raises(ReglaNegocioError, match=mensaje):
+        nn_paciente.fusionar_en(destino)
+    assert nn_paciente.activo is activo_antes  # no cambió nada
+
+
+def test_el_destino_debe_estar_identificado():
+    with pytest.raises(ReglaNegocioError, match="identificado"):
+        nn().fusionar_en(nn(id_paciente=6))
+
+
+def test_un_paciente_no_se_fusiona_consigo_mismo():
+    with pytest.raises(ValueError, match="consigo mismo"):
+        nn(5).fusionar_en(nuevo_paciente(id_paciente=5))
+
+
+def test_el_destino_debe_ser_un_paciente():
+    with pytest.raises(ValueError, match="Paciente"):
+        nn().fusionar_en("Rosa")
+
+
 # ---- calcular_edad: valores límite alrededor del cumpleaños
 @pytest.mark.parametrize("hoy, edad_esperada", [
     (date(2026, 5, 13), 66),  # un día antes del cumpleaños

@@ -5,6 +5,52 @@
 
 ---
 
+## [2026-10-21] — Fusión de pacientes NN, cancelación de reservas y episodios cerrados
+
+### Cambio
+- **Fusión de un paciente NN con uno ya registrado:**
+  - `Paciente.fusionar_en(destino)` valida la regla (NN sin identificar y activo; destino identificado y activo; distintos) y anula el NN en memoria.
+  - `PacienteDAO.fusionar(nn, destino)`, en una transacción: comprueba que el destino siga activo e identificado, anula el NN (`UPDATE` condicional) y pasa sus episodios al destino. Devuelve cuántos episodios movió.
+  - `AccionAuditoria.FUSIONAR`.
+  - `Paciente.identificar` rechaza un NN anulado, y `PacienteDAO.identificar` exige además `estado_registro = TRUE`.
+- **Cancelar una reserva:**
+  - `Cama.cancelar_reserva()` (RESERVADA → DISPONIBLE, sin limpieza).
+  - `EpisodioEmergencia.cancelar_asignacion()` (EN ATENCIÓN → EN ESPERA DE CAMA).
+  - `AsignacionDAO.anular(id_asignacion)`: baja lógica (`estado_registro = FALSE`), sin fecha de liberación.
+- **Episodios cerrados:**
+  - `EpisodioEmergencia.cerrado` (ALTA, REFERIDO, FUGADO o anulado); `agregar_triaje` y `agregar_signos_vitales` lanzan `ReglaNegocioError` en un episodio cerrado.
+  - El constructor de `EpisodioEmergencia` recibe `triajes` y `signos_vitales` para reconstruirlo desde la BD; `EpisodioDAO.buscar_por_id` los pasa ahí en lugar de usar `agregar_triaje`.
+- Pruebas: 41 nuevas o ajustadas en `test_persona.py`, `test_triaje.py`, `test_cama.py`, `test_paciente_dao.py`, `test_episodio_dao.py` y `test_asignacion_dao.py`.
+
+### Archivos afectados
+- `models/persona.py`, `models/triaje.py`, `models/cama.py`, `models/auditoria.py`
+- `dao/paciente_dao.py`, `dao/episodio_dao.py`, `dao/asignacion_dao.py`
+- `tests/test_persona.py`, `tests/test_triaje.py`, `tests/test_cama.py`, `tests/test_paciente_dao.py`, `tests/test_episodio_dao.py`, `tests/test_asignacion_dao.py`, `docs/`
+
+### Motivo
+Tres decisiones pendientes que afectan a los flujos que orquestarán los controladores de la Fase 4. Resolverlas antes evita que el controlador tenga que improvisar reglas que pertenecen al modelo.
+
+### Impacto
+- Pruebas: 725 pasan.
+- Verificado en MySQL 8.0.46 con una base temporal (`sigtac_scratch_tmp`, ya eliminada), con los DAO reales en transacciones como las de los futuros controladores. 22 comprobaciones pasaron:
+  - Fusión: un NN con un episodio triado resulta ser Rosa (DNI del seed); el episodio, con su triaje, pasa a ella; el NN queda anulado y sin documento (no se borra), sale de la lista de no identificados y la fusión queda auditada; los datos de Rosa no cambian. Fusionarlo otra vez con datos viejos falla; identificar en la BD al NN ya fusionado devuelve `False`; fusionar con un destino anulado en la BD lanza `ReglaNegocioError` y deshace la anulación del NN.
+  - Cancelar una reserva: el episodio vuelve a EN ESPERA DE CAMA y la cama a DISPONIBLE sin solicitud de limpieza; la asignación queda anulada sin fecha de liberación; el historial registra RESERVADA y DISPONIBLE; el episodio puede recibir otra cama; anular otra vez falla; una cama OCUPADA no se puede cancelar.
+  - Episodio cerrado: un episodio dado de alta se carga con su historial (con la versión anterior, `buscar_por_id` habría fallado al aplicar la nueva regla) y registrar un triaje en él lanza `ReglaNegocioError` sin guardar nada.
+
+### Decisiones
+- **Fusionar en lugar de identificar:** si el documento del NN ya pertenece a otro paciente, identificarlo duplicaría la persona. Los episodios pasan al paciente real y el NN se anula (RN-11): queda como rastro, y la auditoría `FUSIONAR` registra a quién se unió. Los datos provisionales del NN (nombres "NN", edad estimada) se descartan.
+- **El destino se comprueba dentro de la transacción** con un `SELECT` antes de anular el NN. No se usó `SELECT ... FOR UPDATE`: el margen para que otro usuario anule al destino justo en ese instante es mínimo y el resultado sería un episodio de un paciente anulado, recuperable.
+- **Reserva cancelada = asignación anulada, no liberada:** `fecha_liberacion` significa "se usó y se dio de alta"; `estado_registro = FALSE` significa "no llegó a usarse". Los reportes (p. ej. estancia media) podrán distinguirlas. La cama no pasa por limpieza porque nunca se ocupó; una cama OCUPADA debe salir por el alta (RN-07).
+- **Reconstruir ≠ registrar:** el historial de un episodio leído de la BD se pasa al constructor, sin aplicar las reglas de un triaje nuevo. Así un episodio cerrado tiene historial y se conserva el estado guardado.
+- **Episodio cerrado incluye REFERIDO y FUGADO / ABANDONO** aunque el modelo aún no tenga esas transiciones: existen en el catálogo y un episodio en esos estados tampoco debe recibir triajes.
+
+### Pendientes
+- Transiciones a REFERIDO y FUGADO / ABANDONO (el modelo no las tiene).
+- Decidir si `Triaje.reclasificar` al mismo nivel sugerido debe rechazarse.
+- Permisos por rol antes de los controladores.
+
+---
+
 ## [2026-10-21] — `AsignacionDAO` y `SolicitudLimpiezaDAO` (cierre de la Fase 3)
 
 ### Cambio
@@ -42,7 +88,7 @@
 ### Pendientes
 - Cola de espera (episodios EN ESPERA DE CAMA por nivel y tiempo de espera): en `cama_controller`, Fase 4.
 - Cancelar una reserva (cama RESERVADA cuyo paciente nunca llegó): el modelo no tiene esa transición; `cama.dar_alta()` exige OCUPADA. Decidirlo con el controlador.
-- Permisos por rol (problema 2 de `PROJECT_STATUS.md`) antes de los controladores.
+- Permisos por rol ("Permisos duplicados" en `PROJECT_STATUS.md`) antes de los controladores.
 
 ---
 

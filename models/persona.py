@@ -157,12 +157,35 @@ class Paciente(Persona):
         """
         if self.identificado:
             raise ReglaNegocioError("El paciente ya está identificado.")
+        if not self.activo:
+            raise ReglaNegocioError("El paciente está anulado (p. ej. ya se fusionó con otro registro).")
         # Se valida todo antes de modificar: si un dato es inválido, el paciente queda como estaba.
         documento = _validar_documento(documento)
         nombres = _validar_texto(nombres, "nombres")
         apellidos = _validar_texto(apellidos, "apellidos")
         fecha_nac = _validar_fecha_nac(fecha_nac)
         self._documento, self._nombres, self._apellidos, self._fecha_nac = documento, nombres, apellidos, fecha_nac
+
+    def fusionar_en(self, destino: "Paciente"):
+        """
+        El paciente sin identificar resultó ser `destino`, que ya estaba registrado (su documento ya existe).
+        En lugar de identificarlo (se duplicaría el documento), sus episodios pasan a `destino` y este
+        registro NN se anula (RN-11: no se borra). Los datos provisionales del NN se descartan: valen los
+        del paciente registrado. PacienteDAO.fusionar guarda el resultado.
+        """
+        if not isinstance(destino, Paciente):
+            raise ValueError("destino debe ser un Paciente.")
+        if self.identificado:
+            raise ReglaNegocioError("Solo un paciente sin identificar se puede fusionar con otro.")
+        if not self.activo:
+            raise ReglaNegocioError("El paciente sin identificar ya fue anulado o fusionado.")
+        if not destino.identificado:
+            raise ReglaNegocioError("El paciente destino debe estar identificado.")
+        if not destino.activo:
+            raise ReglaNegocioError("El paciente destino está anulado.")
+        if self.id_paciente is not None and self.id_paciente == destino.id_paciente:
+            raise ValueError("Un paciente no se puede fusionar consigo mismo.")
+        self.anular()
 
     def obtener_resumen(self) -> str:
         seguro = self.nombre_seguro or f"id {self.id_seguro}"

@@ -150,10 +150,15 @@ class EpisodioEmergencia:
     ESTADO_EN_ESPERA = EstadoEpisodio.EN_ESPERA
     ESTADO_EN_ATENCION = EstadoEpisodio.EN_ATENCION
     ESTADO_ALTA = EstadoEpisodio.ALTA
+    # Un episodio cerrado ya no admite triajes ni signos vitales nuevos.
+    ESTADOS_CERRADOS = (EstadoEpisodio.ALTA, EstadoEpisodio.REFERIDO, EstadoEpisodio.FUGADO)
 
     def __init__(self, id_episodio: int, id_paciente: int, motivo_consulta: str, estado: str = ESTADO_EN_ESPERA_TRIAJE,
-                 fecha_ingreso: datetime | None = None, fecha_alta: datetime | None = None, activo: bool = True):
-        # fecha_ingreso, fecha_alta y activo solo se pasan al reconstruir el episodio desde la BD.
+                 fecha_ingreso: datetime | None = None, fecha_alta: datetime | None = None, activo: bool = True,
+                 triajes=(), signos_vitales=()):
+        # fecha_ingreso, fecha_alta, activo, triajes y signos_vitales solo se pasan al reconstruir el
+        # episodio desde la BD: el historial se carga tal cual, sin aplicar las reglas de un triaje nuevo
+        # (un episodio dado de alta también tiene historial).
         self._id_episodio = id_episodio
         self._id_paciente = id_paciente
         self._motivo_consulta = motivo_consulta
@@ -163,8 +168,8 @@ class EpisodioEmergencia:
         self._activo = activo  # Espejo de episodio_emergencia.estado_registro (RN-11)
 
         # RN-09: Un episodio puede tener múltiples triajes (historial de reclasificaciones)
-        self._historial_triajes = []
-        self._signos_vitales = []
+        self._historial_triajes = list(triajes)
+        self._signos_vitales = list(signos_vitales)
 
     @property
     def id_episodio(self): return self._id_episodio
@@ -197,13 +202,25 @@ class EpisodioEmergencia:
         """Mediciones de signos vitales en el orden en que se agregaron."""
         return tuple(self._signos_vitales)
 
+    @property
+    def cerrado(self) -> bool:
+        """True si el episodio terminó (alta, referido o fuga) o fue anulado."""
+        return self._estado in self.ESTADOS_CERRADOS or not self._activo
+
+    def _exigir_abierto(self, accion: str):
+        if self.cerrado:
+            motivo = "anulado" if not self._activo else f"en estado {self._estado}"
+            raise ReglaNegocioError(f"No se puede {accion} en un episodio {motivo}.")
+
     def agregar_triaje(self, triaje: Triaje):
         """Agrega un nuevo triaje a la lista, manteniendo el historial completo.
 
         RN-01: mientras no exista ningún triaje, el episodio permanece en
         EN_ESPERA_TRIAJE y no es elegible para asignación de cama. En cuanto
         se registra el primer triaje, pasa a EN_ESPERA (de cama).
+        Un episodio cerrado (alta, referido, fuga o anulado) no admite triajes nuevos.
         """
+        self._exigir_abierto("registrar un triaje")
         self._historial_triajes.append(triaje)
         if self._estado == self.ESTADO_EN_ESPERA_TRIAJE:
             self._estado = self.ESTADO_EN_ESPERA
@@ -218,6 +235,8 @@ class EpisodioEmergencia:
         return max(reversed(activos), key=lambda t: t.fecha_hora) if activos else None
 
     def agregar_signos_vitales(self, signos: SignosVitales):
+        """Agrega una medición. Un episodio cerrado no admite mediciones nuevas."""
+        self._exigir_abierto("registrar signos vitales")
         self._signos_vitales.append(signos)
 
     def asignar_cama(self):
@@ -227,6 +246,15 @@ class EpisodioEmergencia:
         if self.obtener_triaje_actual() is None:
             raise ReglaNegocioError("No se puede asignar cama sin un triaje activo (RN-01).")
         self._estado = self.ESTADO_EN_ATENCION
+
+    def cancelar_asignacion(self):
+        """
+        La cama reservada no llegó a usarse (p. ej. se asignó por error o el paciente necesita otra):
+        el episodio vuelve a esperar cama. La cama la libera Cama.cancelar_reserva().
+        """
+        if self._estado != self.ESTADO_EN_ATENCION:
+            raise ReglaNegocioError(f"No se puede cancelar la asignación de un episodio en estado {self._estado}.")
+        self._estado = self.ESTADO_EN_ESPERA
 
     def dar_alta(self):
         """Solo se da de alta a un paciente que está siendo atendido en una cama."""

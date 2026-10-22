@@ -41,6 +41,12 @@ class Cama(ABC):
             raise CamaEstadoInvalidoError(f"No se puede ocupar la cama {self._codigo} desde el estado {self._estado}.")
         self._estado = self.ESTADO_OCUPADA
 
+    def cancelar_reserva(self):
+        """La reserva no llegó a usarse: la cama vuelve a estar disponible sin pasar por limpieza."""
+        if self._estado != self.ESTADO_RESERVADA:
+            raise CamaEstadoInvalidoError(f"La cama {self._codigo} no está reservada.")
+        self._estado = self.ESTADO_DISPONIBLE
+
     def dar_alta(self):
         """RN-07: Al dar de alta, la cama no queda disponible, pasa a limpieza obligatoria."""
         if self._estado != self.ESTADO_OCUPADA:
