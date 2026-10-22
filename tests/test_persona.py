@@ -2,9 +2,12 @@ from datetime import date, datetime
 
 import pytest
 
-from models.persona import (
-    Empleado, Enfermero, Medico, Paciente, PersonalLimpieza, Persona, es_dni_valido,
-)
+from models.documento import DocumentoIdentidad, TipoDocumento
+from models.persona import Empleado, Enfermero, Medico, Paciente, PersonalLimpieza, Persona
+
+
+def dni(numero: str) -> DocumentoIdentidad:
+    return DocumentoIdentidad(TipoDocumento.DNI, numero)
 
 
 def fijar_hoy(monkeypatch, hoy: date):
@@ -13,14 +16,14 @@ def fijar_hoy(monkeypatch, hoy: date):
 
 
 def nuevo_paciente(**cambios):
-    datos = dict(id_paciente=1, dni="70123456", nombres="Rosa", apellidos="Mendoza Flores",
+    datos = dict(id_paciente=1, documento=dni("70123456"), nombres="Rosa", apellidos="Mendoza Flores",
                  fecha_nac=date(1959, 5, 14), sexo="F", id_seguro=1)
     datos.update(cambios)
     return Paciente(**datos)
 
 
 def nuevo_enfermero(**cambios):
-    datos = dict(id_empleado=3, dni="33333333", nombres="Ana", apellidos="Torres",
+    datos = dict(id_empleado=3, documento=dni("33333333"), nombres="Ana", apellidos="Torres",
                  fecha_nac=date(1998, 7, 20), cargo="Licenciado(a) en Enfermería",
                  colegiatura="CEP-98765", area="Triaje")
     datos.update(cambios)
@@ -28,7 +31,7 @@ def nuevo_enfermero(**cambios):
 
 
 def nuevo_medico(**cambios):
-    datos = dict(id_empleado=5, dni="55555555", nombres="Luis", apellidos="Rojas",
+    datos = dict(id_empleado=5, documento=dni("55555555"), nombres="Luis", apellidos="Rojas",
                  fecha_nac=date(1985, 9, 30), cargo="Médico Internista",
                  colegiatura="CMP-67890", especialidad="Medicina Interna")
     datos.update(cambios)
@@ -36,7 +39,7 @@ def nuevo_medico(**cambios):
 
 
 def nuevo_limpieza(**cambios):
-    datos = dict(id_empleado=4, dni="44444444", nombres="Juan", apellidos="Pérez",
+    datos = dict(id_empleado=4, documento=dni("44444444"), nombres="Juan", apellidos="Pérez",
                  fecha_nac=date(1999, 11, 5), cargo="Operario de Limpieza", turno="MAÑANA")
     datos.update(cambios)
     return PersonalLimpieza(**datos)
@@ -49,43 +52,33 @@ FABRICAS_EMPLEADO = [nuevo_enfermero, nuevo_medico, nuevo_limpieza]
 # ---- Clases abstractas
 def test_persona_es_abstracta():
     with pytest.raises(TypeError):
-        Persona("70123456", "Rosa", "Mendoza", date(1959, 5, 14))
+        Persona(dni("70123456"), "Rosa", "Mendoza", date(1959, 5, 14))
 
 
 def test_empleado_es_abstracto():
     with pytest.raises(TypeError):
-        Empleado(1, "11111111", "Admin", "Sistema", date(1990, 1, 1), "Ingeniero de Sistemas")
+        Empleado(1, dni("11111111"), "Admin", "Sistema", date(1990, 1, 1), "Ingeniero de Sistemas")
 
 
 # ---- Validaciones comunes de Persona (se prueban en todas las subclases)
-@pytest.mark.parametrize("dni", [
-    "1234567",     # 7 dígitos (límite inferior)
-    "123456789",   # 9 dígitos (límite superior)
-    "1234567A",    # contiene una letra
-    " 12345678",   # espacios: el DNI debe llegar ya limpio
-    "",
-    None,
-    12345678,      # número en lugar de texto
-    "١٢٣٤٥٦٧٨",    # dígitos arábigos: \d los aceptaría, [0-9] no
+# El formato de cada tipo de documento se prueba en test_documento.py.
+@pytest.mark.parametrize("documento", ["70123456", None, ("DNI", "70123456")])
+@pytest.mark.parametrize("fabrica", FABRICAS)
+def test_documento_debe_ser_un_documento_identidad(fabrica, documento):
+    with pytest.raises(ValueError, match="documento"):
+        fabrica(documento=documento)
+
+
+@pytest.mark.parametrize("tipo, numero", [
+    (TipoDocumento.CARNE_EXTRANJERIA, "001234567"),
+    (TipoDocumento.PASAPORTE, "AB1234567"),
+    (TipoDocumento.PERMISO_PERMANENCIA, "123456789"),
 ])
 @pytest.mark.parametrize("fabrica", FABRICAS)
-def test_dni_invalido_se_rechaza(fabrica, dni):
-    with pytest.raises(ValueError, match="DNI"):
-        fabrica(dni=dni)
-
-
-def test_el_mensaje_de_error_no_incluye_el_dni():
-    # Los mensajes de error pueden acabar en un log: no deben llevar datos personales.
-    with pytest.raises(ValueError) as error:
-        nuevo_paciente(dni="1234567X")
-    assert "1234567X" not in str(error.value)
-
-
-@pytest.mark.parametrize("dni, esperado", [
-    ("12345678", True), ("00000000", True), ("1234567", False), ("12345678 ", False), (None, False),
-])
-def test_es_dni_valido(dni, esperado):
-    assert es_dni_valido(dni) is esperado
+def test_se_registran_personas_con_documento_extranjero(fabrica, tipo, numero):
+    persona = fabrica(documento=DocumentoIdentidad(tipo, numero))
+    assert persona.documento.tipo is tipo
+    assert persona.documento.numero == numero
 
 
 @pytest.mark.parametrize("campo", ["nombres", "apellidos"])
@@ -123,7 +116,7 @@ def test_fecha_de_nacimiento_de_hoy_se_acepta(monkeypatch):
 def test_paciente_expone_sus_datos():
     paciente = nuevo_paciente(nombre_seguro="EsSalud")
     assert paciente.id_paciente == 1
-    assert paciente.dni == "70123456"
+    assert paciente.documento == dni("70123456")
     assert paciente.nombres == "Rosa"
     assert paciente.apellidos == "Mendoza Flores"
     assert paciente.fecha_nac == date(1959, 5, 14)
@@ -187,7 +180,7 @@ def test_anular_paciente_es_baja_logica():  # RN-11
     paciente.anular()
     assert paciente.activo is False
     # El objeto se conserva con todos sus datos: no hay borrado físico
-    assert paciente.dni == "70123456"
+    assert paciente.documento == dni("70123456")
 
 
 def test_anular_dos_veces_no_falla():
@@ -199,8 +192,13 @@ def test_anular_dos_veces_no_falla():
 
 def test_resumen_de_paciente_con_nombre_de_seguro():
     assert nuevo_paciente(nombre_seguro="EsSalud").obtener_resumen() == (
-        "PACIENTE: [70123456 - Mendoza Flores, Rosa] | Sexo: F | Seguro: EsSalud"
+        "PACIENTE: [DNI 70123456 - Mendoza Flores, Rosa] | Sexo: F | Seguro: EsSalud"
     )
+
+
+def test_resumen_de_paciente_extranjero_muestra_el_tipo_de_documento():
+    paciente = nuevo_paciente(documento=DocumentoIdentidad(TipoDocumento.PASAPORTE, "AB1234567"))
+    assert paciente.obtener_resumen().startswith("PACIENTE: [PAS AB1234567 - ")
 
 
 def test_resumen_de_paciente_sin_nombre_de_seguro_muestra_el_id():
@@ -210,7 +208,7 @@ def test_resumen_de_paciente_sin_nombre_de_seguro_muestra_el_id():
 def test_los_atributos_son_de_solo_lectura():
     paciente = nuevo_paciente()
     with pytest.raises(AttributeError):
-        paciente.dni = "00000000"
+        paciente.documento = dni("00000000")
     with pytest.raises(AttributeError):
         paciente.activo = True
     with pytest.raises(AttributeError):

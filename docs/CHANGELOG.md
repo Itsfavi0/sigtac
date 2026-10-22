@@ -5,6 +5,44 @@
 
 ---
 
+## [2026-10-21] — Documento de identidad para personas extranjeras
+
+### Cambio
+- Nueva tabla de catálogo `tipo_documento` (DNI, CE, PAS, CPP). En `paciente` y `empleado`, la columna `dni` se reemplaza por `id_tipo_documento` (FK) + `num_documento`, con `UNIQUE (id_tipo_documento, num_documento)`. El esquema pasa a 22 tablas.
+- Nuevo `models/documento.py`: `TipoDocumento` (`StrEnum`) y `DocumentoIdentidad` (objeto valor inmutable: tipo + número, con `__eq__`/`__hash__`).
+- `Persona` y sus subclases reciben un `DocumentoIdentidad` en lugar de `dni: str` (propiedad `documento`). Se elimina `es_dni_valido`.
+- `PacienteDAO.buscar_por_dni(dni)` pasa a `buscar_por_documento(documento)`; `crear` obtiene `id_tipo_documento` con una subconsulta por código.
+- `UsuarioDAO.autenticar(tipo_documento, num_documento, password_plano)`: el login pide tipo y número; la sesión devuelve `tipo_documento` y `num_documento` en lugar de `dni`.
+- `seed.sql`: catálogo de tipos y una paciente extranjera con carné de extranjería.
+
+### Archivos afectados
+- `db_scripts/schema.sql`, `db_scripts/seed.sql`, `models/documento.py` (nuevo), `models/persona.py`, `dao/paciente_dao.py`, `dao/usuario_dao.py`, comentarios en `dao/base_dao.py`, `models/excepciones.py` y `utils/security.py`
+- `tests/test_documento.py` (nuevo, 53 pruebas), `tests/test_persona.py`, `tests/test_paciente_dao.py`, `tests/test_usuario_dao.py`, `tests/test_estados_vs_bd.py`
+- `CLAUDE.md`, `docs/`
+
+### Motivo
+El sistema solo aceptaba DNI peruano (8 dígitos): un paciente o un empleado extranjero no se podía registrar (problema abierto 2 de `PROJECT_STATUS.md`). Un hospital debe atender a cualquier persona sin importar su nacionalidad.
+
+### Impacto
+- Pruebas: 466 pasan.
+- **No verificado aún en MySQL.** `sigtac_db` necesita volver a crearse con `schema.sql` y `seed.sql` (borra los datos de desarrollo).
+- Quien llame a `autenticar` o a `buscar_por_documento` (futuros `auth_controller` y vistas) debe enviar el tipo de documento: el formulario de login necesita un selector de tipo.
+
+### Decisiones
+- **Tipo + número juntos identifican a la persona:** el mismo número puede ser un DNI de una persona y el pasaporte de otra. Por eso el `UNIQUE` es compuesto.
+- **Catálogo en lugar de `CHECK`:** añadir un tipo es un `INSERT`, no un cambio de esquema; sigue el patrón de `seguro` y `estado_cama`. Un test compara `TipoDocumento` con `seed.sql`.
+- **El formato vive en un solo lugar (`DocumentoIdentidad`):** el DNI exige exactamente 8 dígitos; los documentos extranjeros aceptan de 6 a 12 letras o dígitos, porque su formato varía según el país y la fecha de emisión. No se verificó el formato oficial exacto de CE, pasaporte ni CPP.
+- **Normalización en el objeto valor:** el número se guarda sin espacios en los extremos y en mayúsculas. Antes `Persona` rechazaba un DNI con espacios y `UsuarioDAO` lo limpiaba; ahora lo hace `DocumentoIdentidad` para todos.
+- **Objeto en lugar de dos atributos sueltos:** `Persona` recibe un `DocumentoIdentidad` ya validado, así el tipo y el número no pueden quedar desincronizados. `__repr__` oculta el número para que no termine en un log.
+- El documento sigue sin poder actualizarse (`PacienteDAO.actualizar`), igual que antes el DNI.
+
+### Pendientes
+- Verificar `schema.sql`/`seed.sql` en una base temporal y recrear `sigtac_db`.
+- Actualizar `db_scripts/diagrama.png`.
+- Pacientes sin identificar (NN): requieren otra decisión (sin documento, nombre ni fecha de nacimiento conocidos).
+
+---
+
 ## [2026-10-13] — `CamaDAO` (lectura) y reglas nuevas en `CLAUDE.md`
 
 ### Cambio

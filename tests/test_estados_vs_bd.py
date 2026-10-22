@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from dao.cama_dao import CamaDAO
+from models.documento import TipoDocumento
 from models.estados import EstadoCama, EstadoEpisodio
 from models.persona import Paciente, PersonalLimpieza
 
@@ -43,3 +44,10 @@ def test_la_fabrica_de_camas_cubre_los_tipos_de_la_bd():
     tipos_en_seed = set(re.findall(r"\(\d+, '([^']+)', \d+\)", bloque))
     assert tipos_en_seed  # la expresión regular encontró filas
     assert set(CamaDAO.CLASES_POR_TIPO) == tipos_en_seed
+
+
+def test_los_tipos_de_documento_coinciden_con_la_bd():
+    bloque = re.search(r"INSERT INTO tipo_documento \(.*?\) VALUES(.*?);", SEED, re.S).group(1)
+    codigos_en_seed = set(re.findall(r"\(\d+, '([^']+)', '[^']+'\)", bloque))
+    assert codigos_en_seed  # la expresión regular encontró filas
+    assert {t.value for t in TipoDocumento} == codigos_en_seed

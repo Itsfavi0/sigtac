@@ -2,7 +2,7 @@
 
 > Estado de trabajo actual del proyecto.
 > Este archivo debe mantenerse pequeño y actualizado después de cada sesión importante.
-> Última actualización: 2026-10-13.
+> Última actualización: 2026-10-21.
 
 ---
 
@@ -14,16 +14,17 @@
 
 ### Situación actual
 
-- Base de datos (21 tablas) implementada con las restricciones de RN-05 y RN-10 y el bloqueo temporal de cuentas.
+- Base de datos (22 tablas) implementada con las restricciones de RN-05 y RN-10 y el bloqueo temporal de cuentas.
 - **Fase 2 (models) cerrada:** todas las clases del plan existen y tienen pruebas automáticas.
 - **Fase 3 (DAO) iniciada:** `db_connection.py`, `base_dao.py`, `usuario_dao.py`, `paciente_dao.py` y `cama_dao.py` (lectura) están terminados y probados.
 - `models/persona.py` alineado con las tablas `paciente` y `empleado`, con validaciones de entrada (2026-10-12).
-- Pruebas: **419 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
+- Pacientes y empleados se identifican con `DocumentoIdentidad` (DNI, carné de extranjería, pasaporte o CPP) (2026-10-21).
+- Pruebas: **466 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
 
 ### Tarea actual
 
 Ninguna en curso. Siguiente tarea: **`dao/auditoria_dao.py`**.
-Antes hay que volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db`: tiene el esquema anterior al 2026-10-12.
+Antes hay que verificar `schema.sql`/`seed.sql` en una base temporal y volver a ejecutarlos sobre `sigtac_db`: tiene el esquema anterior al 2026-10-12 (y ahora falta además `tipo_documento`).
 
 ---
 
@@ -48,30 +49,35 @@ Antes hay que volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db`: tie
 
 | Archivo | Contenido | Pruebas |
 |---|---|---|
-| `models/persona.py` | `Persona`, `Paciente`, `Empleado`, `Enfermero`, `Medico`, `PersonalLimpieza`, `es_dni_valido` | `test_persona.py` (185) |
+| `models/persona.py` | `Persona`, `Paciente`, `Empleado`, `Enfermero`, `Medico`, `PersonalLimpieza` | `test_persona.py` (172) |
+| `models/documento.py` | `TipoDocumento`, `DocumentoIdentidad` (objeto valor: tipo + número) | `test_documento.py` (53) |
 | `models/cama.py` | `Cama` y 4 subtipos, máquina de estados, `es_compatible` | `test_cama.py` (32) |
 | `models/estrategias.py` | `EstrategiaTriaje`, `ReglaManchester`, `ReglaMINSA` | `test_estrategias.py` (32) |
 | `models/triaje.py` | `EpisodioEmergencia`, `Triaje`, `SignosVitales`, `Sintoma` | `test_triaje.py` (38) |
-| `models/estados.py` | `EstadoCama`, `EstadoEpisodio` | `test_estados_vs_bd.py` (4: también comprueba sexo y turno contra los `CHECK`) |
+| `models/estados.py` | `EstadoCama`, `EstadoEpisodio` | `test_estados_vs_bd.py` (6: también comprueba sexo, turno, tipos de cama y tipos de documento) |
 | `models/excepciones.py` | `SigtacError` y 7 excepciones derivadas | Se usan en las pruebas anteriores |
 
 ### Fase 3 — DAO
 
 - `dao/db_connection.py`: Singleton, credenciales obligatorias desde `.env`, `autocommit=True`, `FOUND_ROWS`, reconexión (`test_db_connection.py`, 12 pruebas).
 - `dao/base_dao.py`: clase base de los DAO (cursor, cierre y traducción de errores a `PersistenciaError`/`RegistroDuplicadoError`) (`test_base_dao.py`, 23 pruebas).
-- `dao/paciente_dao.py`: buscar por id/DNI, crear, actualizar (sin tocar el DNI) y baja lógica (`test_paciente_dao.py`, 28 pruebas). Verificado en MySQL 8.0.46 con una base temporal (15 comprobaciones).
+- `dao/paciente_dao.py`: buscar por id/documento, crear, actualizar (sin tocar el documento) y baja lógica (`test_paciente_dao.py`, 28 pruebas). Verificado en MySQL 8.0.46 con una base temporal (15 comprobaciones) antes del cambio a `tipo_documento`; falta repetir la verificación.
 - `dao/cama_dao.py`: búsqueda por id/código y listados; fábrica de subclases por `nombre_tipo_cama` (`test_cama_dao.py`, 25 pruebas). Verificado en MySQL 8.0.46 con una base temporal (11 comprobaciones). Falta cambiar estado (requiere transacción).
-- `dao/usuario_dao.py`: hereda de `BaseDAO`; login con JOIN a `empleado` y `rol`, bcrypt, usuario inactivo, señuelo, validación de DNI y bloqueo de 5 intentos durante 15 min (`test_usuario_dao.py`, 33 pruebas).
+- `dao/usuario_dao.py`: hereda de `BaseDAO`; login con tipo + número de documento, JOIN a `empleado`, `tipo_documento` y `rol`, bcrypt, usuario inactivo, señuelo y bloqueo de 5 intentos durante 15 min (`test_usuario_dao.py`, 39 pruebas).
 - `seed.sql` tiene hashes bcrypt válidos. El login con un usuario del seed se verificó a mano contra una base temporal (ver CHANGELOG del 2026-10-11).
 
 ---
 
 ## Problemas abiertos
 
-1. **`sigtac_db` desactualizada:** no se ha vuelto a ejecutar `schema.sql`/`seed.sql` sobre ella tras los cambios del 2026-10-12. Hacerlo borra los datos de desarrollo.
-2. **Pacientes sin DNI peruano** (extranjeros o pacientes sin identificar): `Persona` exige 8 dígitos, así que hoy no se pueden registrar. Requiere una decisión del equipo.
+1. **`sigtac_db` desactualizada:** no se ha vuelto a ejecutar `schema.sql`/`seed.sql` sobre ella tras los cambios del 2026-10-12 y 2026-10-21. Hacerlo borra los datos de desarrollo. El cambio de `tipo_documento` aún no se verificó en MySQL.
+2. **Pacientes sin identificar (NN):** los extranjeros ya se registran (2026-10-21), pero un paciente que llega sin documento ni datos todavía no. Requiere una decisión del equipo (documento, nombre y fecha de nacimiento desconocidos; identificación posterior).
 3. **Permisos duplicados:** la tabla `rol` y `tiene_permiso()` en cada subclase. Se decidirá en la Fase 4. Las pruebas actuales fijan el comportamiento de `tiene_permiso()`.
 4. **Transacciones:** `ConexionBD` usa `autocommit=True` y una sola conexión. `triaje_dao.py` y `asignacion_dao.py` necesitan transacciones explícitas; hay que decidir cómo implementarlas antes de escribirlos.
+
+### Resueltos el 2026-10-21
+
+- Pacientes y empleados extranjeros: `DocumentoIdentidad` (DNI, CE, pasaporte, CPP) y tabla `tipo_documento`.
 
 ### Resueltos el 2026-10-12
 
@@ -86,7 +92,7 @@ Antes hay que volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db`: tie
 
 ## Pendientes conocidos (sin bloqueo inmediato)
 
-- Actualizar `db_scripts/diagrama.png` (faltan `fecha_nac`, `id_area`, `especialidad`, `turno`, `intentos_fallidos`, `bloqueado_hasta`, las columnas generadas de `asignacion_cama` y el área "Triaje").
+- Actualizar `db_scripts/diagrama.png` (faltan `tipo_documento` y el cambio de `dni` a `id_tipo_documento` + `num_documento`, `fecha_nac`, `id_area`, `especialidad`, `turno`, `intentos_fallidos`, `bloqueado_hasta`, las columnas generadas de `asignacion_cama` y el área "Triaje").
 - Pruebas de integración permanentes contra una BD real (la verificación del 2026-10-12 fue un script temporal).
 - Revisar la coherencia de `usuario_dao.py` con `auth_controller.py` cuando exista.
 - Decidir si `seed.sql` mantiene los datos reales de los integrantes.
@@ -96,7 +102,7 @@ Antes hay que volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db`: tie
 
 ## Próximo trabajo previsto
 
-1. Volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db` (problema 1).
+1. Verificar `tipo_documento` en una base temporal y volver a ejecutar `schema.sql` y `seed.sql` sobre `sigtac_db` (problema 1).
 2. `auditoria_dao.py`.
 3. Decidir el manejo de transacciones (problema 4).
 4. `cama_dao.cambiar_estado` con historial.

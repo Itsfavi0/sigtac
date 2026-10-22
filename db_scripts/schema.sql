@@ -48,6 +48,7 @@ DROP TABLE IF EXISTS estado_episodio;
 DROP TABLE IF EXISTS seguro;
 DROP TABLE IF EXISTS cargo;
 DROP TABLE IF EXISTS rol;
+DROP TABLE IF EXISTS tipo_documento;
 
 -- ==============================================================================
 -- 1. NIVEL 1: TABLAS DE CATÁLOGO
@@ -75,6 +76,15 @@ CREATE TABLE seguro (
     
     CONSTRAINT PK_seguro PRIMARY KEY (id_seguro),
     CONSTRAINT UN_seguro_nombre UNIQUE (nombre_seguro)
+) ENGINE=InnoDB;
+
+CREATE TABLE tipo_documento (
+    id_tipo_documento INT AUTO_INCREMENT,
+    codigo VARCHAR(10) COLLATE utf8mb4_bin NOT NULL COMMENT 'Coincide con TipoDocumento (models/documento.py). utf8mb4_bin: distingue mayúsculas',
+    nombre_tipo_documento VARCHAR(100) NOT NULL,
+    
+    CONSTRAINT PK_tipo_documento PRIMARY KEY (id_tipo_documento),
+    CONSTRAINT UN_tipo_documento_codigo UNIQUE (codigo)
 ) ENGINE=InnoDB;
 
 CREATE TABLE estado_episodio (
@@ -138,7 +148,8 @@ CREATE TABLE sintoma (
 
 CREATE TABLE empleado (
     id_empleado INT AUTO_INCREMENT,
-    dni VARCHAR(15) NOT NULL,
+    id_tipo_documento INT NOT NULL,
+    num_documento VARCHAR(15) NOT NULL COMMENT 'El formato según el tipo lo valida DocumentoIdentidad en Python',
     nombres VARCHAR(100) NOT NULL,
     apellidos VARCHAR(100) NOT NULL,
     fecha_nac DATE NOT NULL,
@@ -150,8 +161,10 @@ CREATE TABLE empleado (
     estado_registro BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'TRUE=Activo, FALSE=Anulado',
 
     CONSTRAINT PK_empleado PRIMARY KEY (id_empleado),
-    CONSTRAINT UN_empleado_dni UNIQUE (dni),
+    -- Un documento lo identifican tipo y número juntos: el mismo número puede existir como DNI y como pasaporte.
+    CONSTRAINT UN_empleado_documento UNIQUE (id_tipo_documento, num_documento),
     CONSTRAINT CH_empleado_turno CHECK (turno IS NULL OR turno IN ('MAÑANA', 'TARDE', 'NOCHE')),
+    CONSTRAINT FK_empleado_tipo_documento FOREIGN KEY (id_tipo_documento) REFERENCES tipo_documento(id_tipo_documento) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT FK_empleado_cargo FOREIGN KEY (id_cargo) REFERENCES cargo(id_cargo) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT FK_empleado_area FOREIGN KEY (id_area) REFERENCES area(id_area) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB;
@@ -173,7 +186,8 @@ CREATE TABLE usuario (
 
 CREATE TABLE paciente (
     id_paciente INT AUTO_INCREMENT,
-    dni VARCHAR(15) NOT NULL,
+    id_tipo_documento INT NOT NULL,
+    num_documento VARCHAR(15) NOT NULL COMMENT 'El formato según el tipo lo valida DocumentoIdentidad en Python',
     nombres VARCHAR(100) NOT NULL,
     apellidos VARCHAR(100) NOT NULL,
     fecha_nac DATE NOT NULL,
@@ -182,8 +196,9 @@ CREATE TABLE paciente (
     estado_registro BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'TRUE=Activo, FALSE=Anulado',
     
     CONSTRAINT PK_paciente PRIMARY KEY (id_paciente),
-    CONSTRAINT UN_paciente_dni UNIQUE (dni),
+    CONSTRAINT UN_paciente_documento UNIQUE (id_tipo_documento, num_documento),
     CONSTRAINT CH_paciente_sexo CHECK (sexo IN ('M', 'F')),
+    CONSTRAINT FK_paciente_tipo_documento FOREIGN KEY (id_tipo_documento) REFERENCES tipo_documento(id_tipo_documento) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT FK_paciente_seguro FOREIGN KEY (id_seguro) REFERENCES seguro(id_seguro) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 

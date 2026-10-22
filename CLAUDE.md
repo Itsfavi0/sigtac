@@ -105,9 +105,9 @@ RN-10: reclasificar exige justificación escrita (≥ 10 caracteres) · RN-11: b
 
 - Nunca versionar ni mostrar `.env`; nunca poner credenciales en el código. Las variables de conexión son
   obligatorias (sin valores por defecto). Usar un usuario de BD con `SELECT, INSERT, UPDATE`, no `root`.
-- Contraseñas solo con bcrypt (`utils/security.py`); nunca registrar claves, hashes, DNI ni nombres en logs.
-- `UsuarioDAO.autenticar` devuelve siempre `None` ante cualquier fallo (sin revelar la causa), valida el DNI
-  (8 dígitos), usa `simular_verificacion` en las salidas tempranas y bloquea 5 intentos fallidos durante 15 min.
+- Contraseñas solo con bcrypt (`utils/security.py`); nunca registrar claves, hashes, números de documento ni nombres en logs.
+- `UsuarioDAO.autenticar` devuelve siempre `None` ante cualquier fallo (sin revelar la causa), valida el documento
+  con `DocumentoIdentidad`, usa `simular_verificacion` en las salidas tempranas y bloquea 5 intentos fallidos durante 15 min.
 - Las claves del seed son solo de desarrollo; nunca usarlas fuera de local.
 
 ## Pruebas

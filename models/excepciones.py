@@ -39,5 +39,5 @@ class ConexionBDError(PersistenciaError):
     pass
 
 class RegistroDuplicadoError(PersistenciaError):
-    """Se lanza cuando se intenta guardar un registro que viola una restricción de unicidad (p. ej. DNI repetido)."""
+    """Se lanza cuando se intenta guardar un registro que viola una restricción de unicidad (p. ej. documento de identidad repetido)."""
     pass

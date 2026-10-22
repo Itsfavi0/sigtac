@@ -1,15 +1,7 @@
-import re
 from abc import ABC, abstractmethod
 from datetime import date, datetime
 
-# DNI peruano: exactamente 8 dígitos. Es la única definición del formato en el proyecto;
-# UsuarioDAO la reutiliza mediante es_dni_valido().
-PATRON_DNI = re.compile(r"[0-9]{8}")
-
-
-def es_dni_valido(dni) -> bool:
-    """Indica si `dni` es un texto de exactamente 8 dígitos (sin espacios)."""
-    return isinstance(dni, str) and PATRON_DNI.fullmatch(dni) is not None
+from models.documento import DocumentoIdentidad
 
 
 def _hoy() -> date:
@@ -42,23 +34,22 @@ def _validar_activo(valor) -> bool:
 #CLASE PADRE
 class Persona(ABC):
     """Superclase abstracta que define los atributos comunes de la persona"""
-    def __init__(self, dni : str, nombres: str, apellidos: str, fecha_nac : date):
-        # Los mensajes de error no incluyen el valor recibido: son datos personales
-        # y podrían terminar en un log.
-        if not es_dni_valido(dni):
-            raise ValueError("El DNI debe tener exactamente 8 dígitos.")
+    def __init__(self, documento: DocumentoIdentidad, nombres: str, apellidos: str, fecha_nac : date):
+        # El formato del número lo valida DocumentoIdentidad al crearse; aquí solo se exige que lo sea.
+        if not isinstance(documento, DocumentoIdentidad):
+            raise ValueError("documento debe ser un DocumentoIdentidad.")
         # datetime es subclase de date: se excluye para no mezclar fechas con horas.
         if not isinstance(fecha_nac, date) or isinstance(fecha_nac, datetime):
             raise ValueError("La fecha de nacimiento debe ser una fecha (date).")
         if fecha_nac > _hoy():
             raise ValueError("La fecha de nacimiento no puede ser futura.")
-        self._dni = dni
+        self._documento = documento
         self._nombres = _validar_texto(nombres, "nombres")
         self._apellidos = _validar_texto(apellidos, "apellidos")
         self._fecha_nac = fecha_nac
 
     @property
-    def dni(self): return self._dni
+    def documento(self): return self._documento
 
     @property
     def nombres(self): return self._nombres
@@ -83,9 +74,9 @@ class Paciente(Persona):
     # Coinciden con CH_paciente_sexo en schema.sql
     SEXOS_VALIDOS = ("M", "F")
 
-    def __init__(self, id_paciente : int | None, dni : str, nombres: str, apellidos: str, fecha_nac : date,
+    def __init__(self, id_paciente : int | None, documento: DocumentoIdentidad, nombres: str, apellidos: str, fecha_nac : date,
                  sexo: str, id_seguro: int, activo: bool = True, nombre_seguro: str | None = None):
-        super().__init__(dni, nombres, apellidos, fecha_nac)
+        super().__init__(documento, nombres, apellidos, fecha_nac)
         if sexo not in self.SEXOS_VALIDOS:
             raise ValueError("El sexo debe ser 'M' o 'F'.")
         if id_seguro is None:
@@ -118,7 +109,7 @@ class Paciente(Persona):
 
     def obtener_resumen(self) -> str:
         seguro = self.nombre_seguro or f"id {self.id_seguro}"
-        return f"PACIENTE: [{self.dni} - {self.apellidos}, {self.nombres}] | Sexo: {self.sexo} | Seguro: {seguro}"
+        return f"PACIENTE: [{self.documento} - {self.apellidos}, {self.nombres}] | Sexo: {self.sexo} | Seguro: {seguro}"
 
     def agregar_episodio(self, episodio):
         self._episodios.append(episodio)
@@ -129,9 +120,9 @@ class Paciente(Persona):
 
 class Empleado(Persona):
     """Clase abstracta que extiende a Persona para el personal del Hospital"""
-    def __init__(self, id_empleado : int | None, dni : str, nombres: str, apellidos: str, fecha_nac : date,
+    def __init__(self, id_empleado : int | None, documento: DocumentoIdentidad, nombres: str, apellidos: str, fecha_nac : date,
                  cargo : str, colegiatura: str | None = None, activo: bool = True):
-        super().__init__(dni, nombres, apellidos, fecha_nac)
+        super().__init__(documento, nombres, apellidos, fecha_nac)
         self._id_empleado = _validar_id(id_empleado, "id_empleado")
         self._cargo = _validar_texto(cargo, "cargo")
         self._colegiatura = None if colegiatura is None else _validar_texto(colegiatura, "colegiatura")
@@ -169,9 +160,9 @@ class Empleado(Persona):
 
 #SUBCLASES DE EMPLEADO
 class Enfermero(Empleado):
-    def __init__(self, id_empleado : int | None, dni : str, nombres: str, apellidos: str, fecha_nac : date,
+    def __init__(self, id_empleado : int | None, documento: DocumentoIdentidad, nombres: str, apellidos: str, fecha_nac : date,
                  cargo : str, colegiatura : str | None, area : str, activo: bool = True):
-        super().__init__(id_empleado, dni, nombres, apellidos, fecha_nac, cargo, colegiatura, activo)
+        super().__init__(id_empleado, documento, nombres, apellidos, fecha_nac, cargo, colegiatura, activo)
         # Nombre del área asignada (tabla area, mediante empleado.id_area).
         self._area = _validar_texto(area, "area")
 
@@ -189,9 +180,9 @@ class Enfermero(Empleado):
         return modulo in ['triaje', 'camas']
 
 class Medico(Empleado):
-    def __init__(self, id_empleado: int | None, dni: str, nombres: str, apellidos: str, fecha_nac: date,
+    def __init__(self, id_empleado: int | None, documento: DocumentoIdentidad, nombres: str, apellidos: str, fecha_nac: date,
                  cargo: str, colegiatura: str | None, especialidad: str, activo: bool = True):
-        super().__init__(id_empleado, dni, nombres, apellidos, fecha_nac, cargo, colegiatura, activo)
+        super().__init__(id_empleado, documento, nombres, apellidos, fecha_nac, cargo, colegiatura, activo)
         self._especialidad = _validar_texto(especialidad, "especialidad")
 
     @property
@@ -212,10 +203,10 @@ class PersonalLimpieza(Empleado):
     # Coinciden con CH_empleado_turno en schema.sql
     TURNOS_VALIDOS = ("MAÑANA", "TARDE", "NOCHE")
 
-    def __init__(self, id_empleado: int | None, dni: str, nombres: str, apellidos: str, fecha_nac: date,
+    def __init__(self, id_empleado: int | None, documento: DocumentoIdentidad, nombres: str, apellidos: str, fecha_nac: date,
                  cargo: str, turno: str, activo: bool = True):
         # El personal de limpieza usualmente no tiene colegiatura
-        super().__init__(id_empleado, dni, nombres, apellidos, fecha_nac, cargo, colegiatura=None, activo=activo)
+        super().__init__(id_empleado, documento, nombres, apellidos, fecha_nac, cargo, colegiatura=None, activo=activo)
         if turno not in self.TURNOS_VALIDOS:
             raise ValueError(f"El turno debe ser uno de: {', '.join(self.TURNOS_VALIDOS)}.")
         self._turno = turno

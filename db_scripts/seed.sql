@@ -32,6 +32,7 @@ TRUNCATE TABLE estado_episodio;
 TRUNCATE TABLE seguro;
 TRUNCATE TABLE cargo;
 TRUNCATE TABLE rol;
+TRUNCATE TABLE tipo_documento;
 
 SET FOREIGN_KEY_CHECKS = 1;
 
@@ -46,6 +47,10 @@ INSERT INTO cargo (id_cargo, nombre_cargo, tipo) VALUES
 (1, 'Médico Intensivista', 'Médico'), (2, 'Médico Internista', 'Médico'),
 (3, 'Licenciado(a) en Enfermería', 'Enfermería'), (4, 'Técnico(a) de Enfermería', 'Técnico'),
 (5, 'Operario de Limpieza', 'Mantenimiento'), (6, 'Ingeniero de Sistemas', 'Administrativo');
+
+INSERT INTO tipo_documento (id_tipo_documento, codigo, nombre_tipo_documento) VALUES
+(1, 'DNI', 'Documento Nacional de Identidad'), (2, 'CE', 'Carné de Extranjería'),
+(3, 'PAS', 'Pasaporte'), (4, 'CPP', 'Carné de Permiso Temporal de Permanencia');
 
 INSERT INTO seguro (id_seguro, nombre_seguro) VALUES
 (1, 'EsSalud'), (2, 'SIS (Seguro Integral de Salud)'), 
@@ -84,13 +89,13 @@ INSERT INTO sintoma (id_sintoma, nombre_sintoma, peso_clinico) VALUES
 -- 2. TABLAS MAESTRAS (las fechas de nacimiento son ficticias)
 -- ==============================================================================
 -- id_area, especialidad y turno solo se llenan según el tipo de empleado (Enfermero, Medico, PersonalLimpieza)
-INSERT INTO empleado (id_empleado, dni, nombres, apellidos, fecha_nac, colegiatura, id_cargo, id_area, especialidad, turno, estado_registro) VALUES
-(1, '11111111', 'Admin', 'Sistema', '1990-01-01', 'CIP-12345', 6, NULL, NULL, NULL, 1),
-(2, '22222222', 'Héctor', 'Salazar Mendoza', '1978-03-15', 'CMP-54321', 1, NULL, 'Medicina Intensiva', NULL, 1),
-(3, '33333333', 'Favio Enrique', 'Brañez Choquemamani', '1998-07-20', 'CEP-98765', 3, 5, NULL, NULL, 1),
-(4, '44444444', 'Renzo Alexander', 'Moya Ángeles', '1999-11-05', NULL, 5, NULL, NULL, 'MAÑANA', 1),
-(5, '55555555', 'Leonardo', 'Veliz Neyra', '1985-09-30', 'CMP-67890', 2, NULL, 'Medicina Interna', NULL, 1),
-(6, '99999999', 'Médico', 'Despedido', '1975-12-12', 'CMP-00000', 2, NULL, 'Medicina Interna', NULL, 0); -- Empleado inactivo para probar borrado lógico
+INSERT INTO empleado (id_empleado, id_tipo_documento, num_documento, nombres, apellidos, fecha_nac, colegiatura, id_cargo, id_area, especialidad, turno, estado_registro) VALUES
+(1, 1, '11111111', 'Admin', 'Sistema', '1990-01-01', 'CIP-12345', 6, NULL, NULL, NULL, 1),
+(2, 1, '22222222', 'Héctor', 'Salazar Mendoza', '1978-03-15', 'CMP-54321', 1, NULL, 'Medicina Intensiva', NULL, 1),
+(3, 1, '33333333', 'Favio Enrique', 'Brañez Choquemamani', '1998-07-20', 'CEP-98765', 3, 5, NULL, NULL, 1),
+(4, 1, '44444444', 'Renzo Alexander', 'Moya Ángeles', '1999-11-05', NULL, 5, NULL, NULL, 'MAÑANA', 1),
+(5, 1, '55555555', 'Leonardo', 'Veliz Neyra', '1985-09-30', 'CMP-67890', 2, NULL, 'Medicina Interna', NULL, 1),
+(6, 1, '99999999', 'Médico', 'Despedido', '1975-12-12', 'CMP-00000', 2, NULL, 'Medicina Interna', NULL, 0); -- Empleado inactivo para probar borrado lógico
 
 INSERT INTO usuario (id_usuario, id_empleado, id_rol, hash_clave, activo) VALUES
 (1, 1, 1, '$2b$12$Kx6Fi0botsesFpvqW3KwZ.C6GmZ3TrcA3oRU1lGRsL51tNMWc1jZC', 1),
@@ -99,10 +104,11 @@ INSERT INTO usuario (id_usuario, id_empleado, id_rol, hash_clave, activo) VALUES
 (4, 4, 5, '$2b$12$6NyKLTdaDDiRnwyC7v/EheyivOh8k7wpmJp/0ucVgGyxRwlug6LeS', 1),
 (5, 6, 3, '$2b$12$LlWJNQC.mWXbMt7Q5uTWI.EnkvnjmBydy8AMrc69HXCknF60ieyLO', 0); -- Usuario desactivado
 
-INSERT INTO paciente (id_paciente, dni, nombres, apellidos, fecha_nac, sexo, id_seguro) VALUES
-(1, '70123456', 'Rosa', 'Mendoza Flores', '1959-05-14', 'F', 1),
-(2, '70987654', 'Carlos', 'García Pérez', '1980-11-22', 'M', 2),
-(3, '71234567', 'Luis', 'Sánchez Rivas', '1995-02-10', 'M', 4);
+INSERT INTO paciente (id_paciente, id_tipo_documento, num_documento, nombres, apellidos, fecha_nac, sexo, id_seguro) VALUES
+(1, 1, '70123456', 'Rosa', 'Mendoza Flores', '1959-05-14', 'F', 1),
+(2, 1, '70987654', 'Carlos', 'García Pérez', '1980-11-22', 'M', 2),
+(3, 1, '71234567', 'Luis', 'Sánchez Rivas', '1995-02-10', 'M', 4),
+(4, 2, '001234567', 'María José', 'Rodríguez Silva', '1988-06-03', 'F', 4); -- Paciente extranjera con carné de extranjería
 
 INSERT INTO cama (id_cama, codigo, id_area, id_tipo_cama, id_estado_cama, estado_registro) VALUES
 (1, 'TRA-01', 1, 1, 3, 1), (2, 'TRA-02', 1, 1, 1, 1),

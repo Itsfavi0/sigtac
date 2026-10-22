@@ -49,7 +49,7 @@ def simular_verificacion(password_plano: str) -> None:
 
     Se usa cuando el login falla antes de comparar contra un hash real (usuario
     inexistente o desactivado), para que esas respuestas tarden lo mismo que una
-    clave incorrecta y no se pueda deducir qué DNI existen midiendo tiempos.
+    clave incorrecta y no se pueda deducir qué documentos existen midiendo tiempos.
     """
     verificar_password(password_plano, _HASH_SENUELO)
 

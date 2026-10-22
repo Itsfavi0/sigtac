@@ -211,7 +211,7 @@ El episodio puede tener múltiples registros de triaje para conservar reclasific
 
 ## 8. Base de datos
 
-El documento indica **21 tablas implementadas** en `schema.sql`, con datos de prueba en `seed.sql`.
+El documento indica **22 tablas implementadas** en `schema.sql`, con datos de prueba en `seed.sql`.
 
 Categorías principales:
 
@@ -233,7 +233,7 @@ La base utiliza:
 - `usuario` se separa de `empleado` porque no todo empleado necesita acceso al sistema y el historial del empleado no debe depender de eliminar sus credenciales.
 - `rol` se separa de `cargo` porque el cargo laboral y los permisos del software son conceptos distintos.
 - La jerarquía `Empleado` se guarda en una sola tabla `empleado`. Los atributos propios de cada subclase (`id_area` para `Enfermero`, `especialidad` para `Medico`, `turno` para `PersonalLimpieza`) son columnas que admiten `NULL`. La coherencia entre tipo de empleado y atributo la garantizan las clases Python, no la BD.
-- El formato del DNI (8 dígitos) se define una sola vez en `models/persona.py` (`es_dni_valido`); `UsuarioDAO` lo reutiliza.
+- Una persona (paciente o empleado) se identifica con un documento: tipo (`tipo_documento`: DNI, carné de extranjería, pasaporte o CPP) + número, únicos en conjunto. El formato de cada tipo se define una sola vez en `models/documento.py` (`DocumentoIdentidad`); los DAO lo reutilizan.
 - Se conserva el estado actual de la cama en `cama` y el historial en `historial_estado_cama`.
 - `triaje_sintoma` resuelve la relación muchos-a-muchos entre triaje y síntomas.
 - La relación episodio → triaje es uno-a-muchos para conservar reclasificaciones.
@@ -261,7 +261,7 @@ Debe:
 
 Debe:
 - Implementar CRUD.
-- Permitir búsquedas por DNI.
+- Permitir búsquedas por documento de identidad (tipo + número).
 - Aplicar borrado lógico mediante `estado_registro = FALSE`, asociado a RN-11.
 
 ### `cama_dao.py`

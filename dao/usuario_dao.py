@@ -1,7 +1,7 @@
 import logging
 from dao.base_dao import BaseDAO
 from models.excepciones import PersistenciaError
-from models.persona import es_dni_valido
+from models.documento import DocumentoIdentidad
 from utils.security import simular_verificacion, verificar_password
 
 logger = logging.getLogger(__name__)
@@ -52,38 +52,41 @@ class UsuarioDAO(BaseDAO):
         )
 
     @staticmethod
-    def autenticar(dni: str, password_plano: str) -> dict | None:
+    def autenticar(tipo_documento: str, num_documento: str, password_plano: str) -> dict | None:
         """
-        Busca un empleado por su DNI, verifica que su acceso esté activo (activo = True),
+        Busca un empleado por su documento (tipo y número), verifica que su acceso esté activo (activo = True),
         compara la clave plana con el hash almacenado usando bcrypt y retorna los datos de sesión.
         """
         # 1. Validación y saneamiento de entradas
-        if not dni or not isinstance(dni, str) or not password_plano or not isinstance(password_plano, str):
+        if not password_plano or not isinstance(password_plano, str):
             logger.warning("Intento de autenticación con credenciales nulas o en formato inválido.")
             return None
 
-        dni_limpio = dni.strip()
-        if not es_dni_valido(dni_limpio):
-            logger.warning("Intento de autenticación con DNI de formato inválido.")
+        # DocumentoIdentidad valida el tipo y el formato del número (y lo limpia de espacios).
+        try:
+            documento = DocumentoIdentidad(tipo_documento, num_documento)
+        except ValueError:
+            logger.warning("Intento de autenticación con documento de formato inválido.")
             return None
 
-        # 2. Consulta: empleado + usuario + rol + cargo
+        # 2. Consulta: empleado + tipo de documento + usuario + rol + cargo
         query = """
             SELECT 
-                e.id_empleado, e.dni, e.nombres, e.apellidos, e.colegiatura, 
+                e.id_empleado, td.codigo AS tipo_documento, e.num_documento, e.nombres, e.apellidos, e.colegiatura, 
                 c.nombre_cargo AS cargo_nombre, c.tipo AS cargo_tipo,
                 u.id_usuario, u.hash_clave, u.activo,
                 u.intentos_fallidos, u.bloqueado_hasta,
                 (u.bloqueado_hasta IS NOT NULL AND u.bloqueado_hasta > NOW()) AS bloqueada,
                 r.id_rol, r.nombre_rol
             FROM empleado e
+            JOIN tipo_documento td ON e.id_tipo_documento = td.id_tipo_documento
             JOIN usuario u ON e.id_empleado = u.id_empleado
             JOIN rol r ON u.id_rol = r.id_rol
             JOIN cargo c ON e.id_cargo = c.id_cargo
-            WHERE e.dni = %s AND e.estado_registro = TRUE
+            WHERE td.codigo = %s AND e.num_documento = %s AND e.estado_registro = TRUE
         """
         try:
-            resultado = UsuarioDAO._consultar_uno(query, (dni_limpio,))
+            resultado = UsuarioDAO._consultar_uno(query, (documento.tipo.value, documento.numero))
         except PersistenciaError as e:  # incluye ConexionBDError
             logger.error("ERROR DAO [autenticar]: no se pudo consultar el usuario: %s", e)
             return None

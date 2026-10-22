@@ -60,7 +60,7 @@ class BaseDAO:
             logger.error("ERROR DAO: restricción de integridad violada (errno=%s).", e.errno)
             raise PersistenciaError("Los datos no cumplen las restricciones de la base de datos.") from e
         except mysql.connector.Error as e:
-            # Solo se registra el código: el mensaje de MySQL puede incluir los valores enviados (DNI, nombres).
+            # Solo se registra el código: el mensaje de MySQL puede incluir los valores enviados (documentos, nombres).
             logger.error("ERROR DAO: fallo de MySQL (errno=%s).", e.errno)
             raise PersistenciaError("No se pudo completar la operación en la base de datos.") from e
         finally:

@@ -8,14 +8,16 @@ from mysql.connector import errorcode
 from dao import base_dao
 from dao.paciente_dao import PacienteDAO
 from models.excepciones import ConexionBDError, PersistenciaError, RegistroDuplicadoError
+from models.documento import DocumentoIdentidad, TipoDocumento
 from models.persona import Paciente
 
 DNI = "70123456"
+DOCUMENTO = DocumentoIdentidad(TipoDocumento.DNI, DNI)
 
 
 def fila(estado_registro=1, **cambios):
     datos = {
-        "id_paciente": 1, "dni": DNI, "nombres": "Rosa", "apellidos": "Mendoza Flores",
+        "id_paciente": 1, "tipo_documento": "DNI", "num_documento": DNI, "nombres": "Rosa", "apellidos": "Mendoza Flores",
         "fecha_nac": date(1959, 5, 14), "sexo": "F", "id_seguro": 1,
         "nombre_seguro": "EsSalud", "estado_registro": estado_registro,
     }
@@ -24,7 +26,7 @@ def fila(estado_registro=1, **cambios):
 
 
 def paciente(id_paciente=None, activo=True):
-    return Paciente(id_paciente, DNI, "Rosa", "Mendoza Flores", date(1959, 5, 14), "F", 1, activo=activo)
+    return Paciente(id_paciente, DOCUMENTO, "Rosa", "Mendoza Flores", date(1959, 5, 14), "F", 1, activo=activo)
 
 
 class BD:
@@ -53,19 +55,28 @@ class BD:
 
 
 # ---- Lectura y mapeo fila → Paciente
-def test_buscar_por_dni_devuelve_un_paciente(monkeypatch):
+def test_buscar_por_documento_devuelve_un_paciente(monkeypatch):
     bd = BD(monkeypatch, row=fila())
-    p = PacienteDAO.buscar_por_dni(DNI)
+    p = PacienteDAO.buscar_por_documento(DOCUMENTO)
     assert isinstance(p, Paciente)
-    assert (p.id_paciente, p.dni, p.sexo, p.id_seguro) == (1, DNI, "F", 1)
+    assert (p.id_paciente, p.documento, p.sexo, p.id_seguro) == (1, DOCUMENTO, "F", 1)
     assert p.fecha_nac == date(1959, 5, 14)
-    assert bd.params == (DNI,)
+    assert "WHERE td.codigo = %s AND p.num_documento = %s" in bd.sql
+    assert bd.params == ("DNI", DNI)
     assert DNI not in bd.sql  # el dato viaja aparte, nunca dentro del SQL
+
+
+def test_buscar_paciente_extranjero(monkeypatch):
+    bd = BD(monkeypatch, row=fila(tipo_documento="CE", num_documento="001234567"))
+    ce = DocumentoIdentidad(TipoDocumento.CARNE_EXTRANJERIA, "001234567")
+    assert PacienteDAO.buscar_por_documento(ce).documento == ce
+    assert bd.params == ("CE", "001234567")
+    assert "JOIN tipo_documento" in bd.sql
 
 
 def test_el_nombre_del_seguro_se_obtiene_con_join(monkeypatch):
     bd = BD(monkeypatch, row=fila())
-    assert PacienteDAO.buscar_por_dni(DNI).nombre_seguro == "EsSalud"
+    assert PacienteDAO.buscar_por_documento(DOCUMENTO).nombre_seguro == "EsSalud"
     assert "JOIN seguro" in bd.sql
 
 
@@ -75,9 +86,9 @@ def test_estado_registro_se_convierte_a_bool(monkeypatch, estado_registro, activ
     assert PacienteDAO.buscar_por_id(1).activo is activo
 
 
-def test_buscar_por_dni_incluye_a_los_anulados(monkeypatch):
+def test_buscar_por_documento_incluye_a_los_anulados(monkeypatch):
     bd = BD(monkeypatch, row=fila(estado_registro=0))
-    assert PacienteDAO.buscar_por_dni(DNI) is not None
+    assert PacienteDAO.buscar_por_documento(DOCUMENTO) is not None
     assert "estado_registro = TRUE" not in bd.sql
 
 
@@ -87,18 +98,27 @@ def test_buscar_por_id(monkeypatch):
     assert "WHERE p.id_paciente = %s" in bd.sql and bd.params == (1,)
 
 
-@pytest.mark.parametrize("metodo, argumento", [("buscar_por_id", 99), ("buscar_por_dni", "99999999")])
+@pytest.mark.parametrize("metodo, argumento", [
+    ("buscar_por_id", 99), ("buscar_por_documento", DocumentoIdentidad(TipoDocumento.DNI, "99999999")),
+])
 def test_inexistente_devuelve_none(monkeypatch, metodo, argumento):
     BD(monkeypatch, row=None)
     assert getattr(PacienteDAO, metodo)(argumento) is None
 
 
-@pytest.mark.parametrize("dni", ["1234", "123456789", "abcdefgh", "", None, 70123456, "7012345' OR '1'='1"])
-def test_dni_invalido_se_rechaza_sin_consultar_la_bd(monkeypatch, dni):
+@pytest.mark.parametrize("documento", [DNI, None, ("DNI", DNI), "7012345' OR '1'='1"])
+def test_buscar_sin_documento_identidad_se_rechaza_sin_consultar_la_bd(monkeypatch, documento):
+    # El formato lo valida DocumentoIdentidad al crearse; el DAO solo exige recibir uno.
     bd = BD(monkeypatch, row=fila())
     with pytest.raises(ValueError):
-        PacienteDAO.buscar_por_dni(dni)
+        PacienteDAO.buscar_por_documento(documento)
     bd.clase.assert_not_called()
+
+
+def test_fila_con_tipo_de_documento_desconocido_se_rechaza(monkeypatch):
+    BD(monkeypatch, row=fila(tipo_documento="XX"))
+    with pytest.raises(ValueError):
+        PacienteDAO.buscar_por_id(1)
 
 
 def test_fila_con_datos_invalidos_no_se_convierte_en_paciente(monkeypatch):
@@ -113,10 +133,19 @@ def test_crear_inserta_y_devuelve_el_id(monkeypatch):
     bd = BD(monkeypatch, lastrowid=7)
     assert PacienteDAO.crear(paciente()) == 7
     assert bd.sql.startswith("INSERT INTO paciente")
-    assert bd.params == (DNI, "Rosa", "Mendoza Flores", date(1959, 5, 14), "F", 1)
+    assert "(SELECT id_tipo_documento FROM tipo_documento WHERE codigo = %s)" in bd.sql
+    assert bd.params == ("DNI", DNI, "Rosa", "Mendoza Flores", date(1959, 5, 14), "F", 1)
 
 
-def test_crear_con_dni_existente_lanza_registro_duplicado(monkeypatch):
+def test_crear_paciente_extranjero(monkeypatch):
+    bd = BD(monkeypatch, lastrowid=8)
+    pasaporte = DocumentoIdentidad(TipoDocumento.PASAPORTE, "AB1234567")
+    p = Paciente(None, pasaporte, "John", "Smith", date(1990, 1, 1), "M", 4)
+    assert PacienteDAO.crear(p) == 8
+    assert bd.params[:2] == ("PAS", "AB1234567")
+
+
+def test_crear_con_documento_existente_lanza_registro_duplicado(monkeypatch):
     duplicado = mysql.connector.IntegrityError(msg="Duplicate entry", errno=errorcode.ER_DUP_ENTRY)
     BD(monkeypatch, error_en_execute=duplicado)
     with pytest.raises(RegistroDuplicadoError):
@@ -139,11 +168,11 @@ def test_crear_rechaza_pacientes_con_id_o_anulados(monkeypatch, p):
 
 
 # ---- actualizar
-def test_actualizar_no_modifica_el_dni(monkeypatch):
+def test_actualizar_no_modifica_el_documento(monkeypatch):
     bd = BD(monkeypatch, rowcount=1)
     assert PacienteDAO.actualizar(paciente(id_paciente=1)) is True
     set_clausula = bd.sql.split("SET")[1].split("WHERE")[0]
-    assert "dni" not in set_clausula
+    assert "documento" not in set_clausula
     assert DNI not in bd.params
     assert bd.params[-1] == 1  # el WHERE usa el id
 
@@ -179,14 +208,14 @@ def test_sin_conexion_se_propaga(monkeypatch):
     bd = BD(monkeypatch)
     bd.clase.return_value.obtener_conexion.side_effect = ConexionBDError("sin servidor")
     with pytest.raises(ConexionBDError):
-        PacienteDAO.buscar_por_dni(DNI)
+        PacienteDAO.buscar_por_documento(DOCUMENTO)
 
 
 # ---- Los logs no filtran datos personales
-def test_los_logs_no_contienen_dni_ni_nombres(monkeypatch, caplog):
+def test_los_logs_no_contienen_documento_ni_nombres(monkeypatch, caplog):
     caplog.set_level("DEBUG")
     BD(monkeypatch, row=fila(), lastrowid=7)
     PacienteDAO.crear(paciente())
-    PacienteDAO.buscar_por_dni(DNI)
+    PacienteDAO.buscar_por_documento(DOCUMENTO)
     PacienteDAO.anular(1)
     assert DNI not in caplog.text and "Rosa" not in caplog.text and "Mendoza" not in caplog.text

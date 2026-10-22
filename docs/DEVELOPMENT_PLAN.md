@@ -45,7 +45,7 @@
 ### Tareas
 
 - [x] `schema.sql`
-- [x] 21 tablas
+- [x] 22 tablas (`tipo_documento` añadida el 2026-10-21)
 - [x] Claves primarias
 - [x] Claves foráneas
 - [x] Restricciones
@@ -91,7 +91,8 @@
 
 ### `persona.py`
 
-- [x] Clase abstracta `Persona` (valida DNI de 8 dígitos, nombres y fecha de nacimiento)
+- [x] Clase abstracta `Persona` (recibe un `DocumentoIdentidad`; valida nombres y fecha de nacimiento)
+- [x] `DocumentoIdentidad` y `TipoDocumento` (`models/documento.py`): DNI, CE, pasaporte y CPP
 - [x] Clase abstracta `Empleado` (con `activo` y baja lógica `anular()`, RN-11)
 - [x] `Paciente` (con `sexo`, `id_seguro` y baja lógica `anular()`, RN-11)
 - [x] `Enfermero` (`area`)
@@ -175,8 +176,8 @@ Motivo del orden: ver `CHANGELOG.md` (2026-10-12).
 
 - [x] Crear paciente.
 - [x] Buscar paciente.
-- [x] Buscar por DNI.
-- [x] Actualizar paciente (el DNI no se modifica).
+- [x] Buscar por documento (tipo + número).
+- [x] Actualizar paciente (el documento no se modifica).
 - [x] Borrado lógico con `estado_registro = FALSE`.
 
 ### `cama_dao.py`
