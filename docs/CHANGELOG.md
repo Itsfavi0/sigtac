@@ -5,6 +5,41 @@
 
 ---
 
+## [2026-10-21] — Pacientes sin identificar (NN)
+
+### Cambio
+- `paciente.id_tipo_documento` y `paciente.num_documento` admiten `NULL` (paciente sin identificar). Nuevo `CHECK CH_paciente_documento`: los dos son `NULL` o los dos tienen valor. La FK a `tipo_documento` pasa a `ON UPDATE RESTRICT`. `empleado` no cambia: su documento sigue siendo obligatorio.
+- `Persona` admite `documento=None` solo en las subclases que lo permiten (`_ADMITE_SIN_DOCUMENTO`, `True` solo en `Paciente`).
+- `Paciente`: propiedad `identificado`, fábrica `Paciente.no_identificado(sexo, edad_estimada, id_seguro)` y método `identificar(documento, nombres, apellidos, fecha_nac)`.
+- `PacienteDAO`: `LEFT JOIN tipo_documento`, `crear` acepta pacientes sin documento, nuevos `listar_no_identificados()` e `identificar(paciente)`.
+- `seed.sql`: un paciente NN.
+
+### Archivos afectados
+- `db_scripts/schema.sql`, `db_scripts/seed.sql`, `models/persona.py`, `dao/paciente_dao.py`
+- `tests/test_persona.py`, `tests/test_paciente_dao.py`, `tests/test_estados_vs_bd.py`, `docs/`
+
+### Motivo
+A emergencia llegan pacientes inconscientes o sin papeles que hay que atender (y registrar su triaje) antes de saber quiénes son. Hasta ahora el registro exigía documento, nombres y fecha de nacimiento reales.
+
+### Impacto
+- Pruebas: 497 pasan.
+- **No verificado aún en MySQL** (igual que el cambio anterior de `tipo_documento`).
+- El futuro controlador de pacientes debe ofrecer "registrar NN" y, más adelante, "identificar".
+
+### Decisiones
+- **Documento `NULL`, no un tipo "SIN DOCUMENTO":** un tipo falso obligaría a inventar un número único. Un `UNIQUE` de MySQL admite varios `NULL`, así que puede haber varios NN a la vez, y el `CHECK` impide un tipo sin número o al revés.
+- **Fecha de nacimiento estimada en lugar de `NULL`:** la edad aproximada es útil en la atención y así `calcular_edad()` sigue funcionando para todos. Se guarda el 1 de enero de (año actual − edad), con lo que la edad calculada coincide con la estimada todo el año. No se añadió una columna "fecha estimada": mientras el paciente no esté identificado, sus datos se consideran provisionales.
+- **Nombres "NN":** convención de los hospitales para pacientes sin nombre. La constante vive en `Paciente.NOMBRE_NO_IDENTIFICADO` y un test comprueba que el seed la use.
+- **Identificar es una operación aparte y se hace una sola vez:** `actualizar` sigue sin tocar el documento. `Paciente.identificar` lanza `ReglaNegocioError` si ya está identificado y valida todo antes de modificar. En la BD, `WHERE num_documento IS NULL` impide sobrescribir el documento aunque dos usuarios identifiquen al mismo paciente a la vez.
+- **Atributo de clase `_ADMITE_SIN_DOCUMENTO` en lugar de repetir la validación en `Empleado`:** por defecto toda persona exige documento; solo `Paciente` lo relaja.
+- No se creó una subclase `PacienteNoIdentificado`: al identificarlo, el objeto tendría que cambiar de clase.
+
+### Pendientes
+- Si el documento del NN ya pertenece a otro paciente, `identificar` lanza `RegistroDuplicadoError`. Unir los dos registros queda para la Fase 4.
+- Verificar en una base temporal y recrear `sigtac_db`; actualizar `diagrama.png`.
+
+---
+
 ## [2026-10-21] — Documento de identidad para personas extranjeras
 
 ### Cambio

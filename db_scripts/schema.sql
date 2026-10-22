@@ -186,8 +186,8 @@ CREATE TABLE usuario (
 
 CREATE TABLE paciente (
     id_paciente INT AUTO_INCREMENT,
-    id_tipo_documento INT NOT NULL,
-    num_documento VARCHAR(15) NOT NULL COMMENT 'El formato según el tipo lo valida DocumentoIdentidad en Python',
+    id_tipo_documento INT NULL COMMENT 'NULL junto con num_documento: paciente sin identificar (NN)',
+    num_documento VARCHAR(15) NULL COMMENT 'El formato según el tipo lo valida DocumentoIdentidad en Python',
     nombres VARCHAR(100) NOT NULL,
     apellidos VARCHAR(100) NOT NULL,
     fecha_nac DATE NOT NULL,
@@ -196,9 +196,13 @@ CREATE TABLE paciente (
     estado_registro BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'TRUE=Activo, FALSE=Anulado',
     
     CONSTRAINT PK_paciente PRIMARY KEY (id_paciente),
+    -- UNIQUE admite varios NULL: puede haber varios pacientes sin identificar a la vez.
     CONSTRAINT UN_paciente_documento UNIQUE (id_tipo_documento, num_documento),
+    -- Tipo y número van juntos: los dos con valor (identificado) o los dos NULL (sin identificar).
+    CONSTRAINT CH_paciente_documento CHECK ((id_tipo_documento IS NULL) = (num_documento IS NULL)),
     CONSTRAINT CH_paciente_sexo CHECK (sexo IN ('M', 'F')),
-    CONSTRAINT FK_paciente_tipo_documento FOREIGN KEY (id_tipo_documento) REFERENCES tipo_documento(id_tipo_documento) ON DELETE RESTRICT ON UPDATE CASCADE,
+    -- ON UPDATE RESTRICT: una columna usada en un CHECK no admite CASCADE.
+    CONSTRAINT FK_paciente_tipo_documento FOREIGN KEY (id_tipo_documento) REFERENCES tipo_documento(id_tipo_documento) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT FK_paciente_seguro FOREIGN KEY (id_seguro) REFERENCES seguro(id_seguro) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 

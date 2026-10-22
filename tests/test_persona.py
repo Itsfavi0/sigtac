@@ -3,6 +3,7 @@ from datetime import date, datetime
 import pytest
 
 from models.documento import DocumentoIdentidad, TipoDocumento
+from models.excepciones import ReglaNegocioError
 from models.persona import Empleado, Enfermero, Medico, Paciente, PersonalLimpieza, Persona
 
 
@@ -62,11 +63,18 @@ def test_empleado_es_abstracto():
 
 # ---- Validaciones comunes de Persona (se prueban en todas las subclases)
 # El formato de cada tipo de documento se prueba en test_documento.py.
-@pytest.mark.parametrize("documento", ["70123456", None, ("DNI", "70123456")])
+@pytest.mark.parametrize("documento", ["70123456", ("DNI", "70123456")])
 @pytest.mark.parametrize("fabrica", FABRICAS)
 def test_documento_debe_ser_un_documento_identidad(fabrica, documento):
     with pytest.raises(ValueError, match="documento"):
         fabrica(documento=documento)
+
+
+@pytest.mark.parametrize("fabrica", FABRICAS_EMPLEADO)
+def test_empleado_sin_documento_se_rechaza(fabrica):
+    # Solo un paciente puede registrarse sin identificar
+    with pytest.raises(ValueError, match="documento"):
+        fabrica(documento=None)
 
 
 @pytest.mark.parametrize("tipo, numero", [
@@ -213,6 +221,87 @@ def test_los_atributos_son_de_solo_lectura():
         paciente.activo = True
     with pytest.raises(AttributeError):
         paciente.sexo = "M"
+
+
+# ---- Paciente sin identificar (NN)
+def test_paciente_con_documento_esta_identificado():
+    assert nuevo_paciente().identificado is True
+
+
+def test_paciente_no_identificado(monkeypatch):
+    fijar_hoy(monkeypatch, date(2026, 10, 21))
+    paciente = Paciente.no_identificado(sexo="M", edad_estimada=45, id_seguro=4)
+    assert paciente.identificado is False
+    assert paciente.documento is None
+    assert paciente.id_paciente is None
+    assert (paciente.nombres, paciente.apellidos) == ("NN", "NN")
+    assert paciente.fecha_nac == date(1981, 1, 1)
+    assert paciente.calcular_edad() == 45  # la edad estimada se conserva todo el año
+    assert (paciente.sexo, paciente.id_seguro, paciente.activo) == ("M", 4, True)
+
+
+@pytest.mark.parametrize("edad", [0, 120])  # límites aceptados
+def test_edad_estimada_en_los_limites(monkeypatch, edad):
+    fijar_hoy(monkeypatch, date(2026, 10, 21))
+    assert Paciente.no_identificado("F", edad, 4).calcular_edad() == edad
+
+
+@pytest.mark.parametrize("edad", [-1, 121, 45.5, "45", None, True])
+def test_edad_estimada_invalida_se_rechaza(edad):
+    with pytest.raises(ValueError, match="edad estimada"):
+        Paciente.no_identificado("F", edad, 4)
+
+
+def test_paciente_no_identificado_valida_sexo_y_seguro():
+    with pytest.raises(ValueError, match="sexo"):
+        Paciente.no_identificado("X", 30, 4)
+    with pytest.raises(ValueError, match="id_seguro"):
+        Paciente.no_identificado("M", 30, None)
+
+
+def test_paciente_no_identificado_se_reconstruye_desde_la_bd():
+    # Así lo crea el DAO a partir de una fila con tipo y número NULL
+    paciente = nuevo_paciente(id_paciente=5, documento=None, nombres="NN", apellidos="NN")
+    assert paciente.identificado is False and paciente.id_paciente == 5
+
+
+def test_resumen_de_paciente_no_identificado():
+    assert Paciente.no_identificado("M", 45, 4).obtener_resumen().startswith("PACIENTE: [SIN IDENTIFICAR - NN, NN]")
+
+
+def test_identificar_reemplaza_los_datos_provisionales():
+    paciente = Paciente.no_identificado("M", 45, 4)
+    ce = DocumentoIdentidad(TipoDocumento.CARNE_EXTRANJERIA, "001234567")
+    paciente.identificar(ce, " Pedro ", "Ramírez", date(1980, 3, 2))
+    assert paciente.identificado is True
+    assert paciente.documento == ce
+    assert (paciente.nombres, paciente.apellidos, paciente.fecha_nac) == ("Pedro", "Ramírez", date(1980, 3, 2))
+    assert (paciente.sexo, paciente.id_seguro) == ("M", 4)  # lo demás no cambia
+
+
+def test_no_se_identifica_dos_veces():
+    paciente = nuevo_paciente()
+    with pytest.raises(ReglaNegocioError, match="ya está identificado"):
+        paciente.identificar(dni("11111111"), "Otro", "Nombre", date(1990, 1, 1))
+    assert paciente.documento == dni("70123456")
+
+
+@pytest.mark.parametrize("cambio, mensaje", [
+    (dict(documento=None), "documento"),
+    (dict(documento="70123456"), "documento"),
+    (dict(nombres="  "), "nombres"),
+    (dict(apellidos=None), "apellidos"),
+    (dict(fecha_nac="1980-03-02"), "fecha"),
+    (dict(fecha_nac=date(2999, 1, 1)), "futura"),
+])
+def test_identificar_con_datos_invalidos_no_modifica_al_paciente(cambio, mensaje):
+    paciente = Paciente.no_identificado("M", 45, 4)
+    datos = dict(documento=dni("70123456"), nombres="Pedro", apellidos="Ramírez", fecha_nac=date(1980, 3, 2))
+    datos.update(cambio)
+    with pytest.raises(ValueError, match=mensaje):
+        paciente.identificar(**datos)
+    assert paciente.identificado is False
+    assert (paciente.nombres, paciente.apellidos) == ("NN", "NN")
 
 
 # ---- calcular_edad: valores límite alrededor del cumpleaños

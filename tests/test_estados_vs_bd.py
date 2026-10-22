@@ -46,6 +46,11 @@ def test_la_fabrica_de_camas_cubre_los_tipos_de_la_bd():
     assert set(CamaDAO.CLASES_POR_TIPO) == tipos_en_seed
 
 
+def test_el_seed_tiene_un_paciente_sin_identificar_con_el_nombre_del_modelo():
+    nn = Paciente.NOMBRE_NO_IDENTIFICADO
+    assert f"NULL, NULL, '{nn}', '{nn}'," in SEED
+
+
 def test_los_tipos_de_documento_coinciden_con_la_bd():
     bloque = re.search(r"INSERT INTO tipo_documento \(.*?\) VALUES(.*?);", SEED, re.S).group(1)
     codigos_en_seed = set(re.findall(r"\(\d+, '([^']+)', '[^']+'\)", bloque))

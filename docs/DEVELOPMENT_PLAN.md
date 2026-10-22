@@ -93,6 +93,7 @@
 
 - [x] Clase abstracta `Persona` (recibe un `DocumentoIdentidad`; valida nombres y fecha de nacimiento)
 - [x] `DocumentoIdentidad` y `TipoDocumento` (`models/documento.py`): DNI, CE, pasaporte y CPP
+- [x] Paciente sin identificar (NN): `Paciente.no_identificado` e `identificar`
 - [x] Clase abstracta `Empleado` (con `activo` y baja lógica `anular()`, RN-11)
 - [x] `Paciente` (con `sexo`, `id_seguro` y baja lógica `anular()`, RN-11)
 - [x] `Enfermero` (`area`)
@@ -178,6 +179,7 @@ Motivo del orden: ver `CHANGELOG.md` (2026-10-12).
 - [x] Buscar paciente.
 - [x] Buscar por documento (tipo + número).
 - [x] Actualizar paciente (el documento no se modifica).
+- [x] Pacientes sin identificar: crear, `listar_no_identificados` e `identificar`.
 - [x] Borrado lógico con `estado_registro = FALSE`.
 
 ### `cama_dao.py`

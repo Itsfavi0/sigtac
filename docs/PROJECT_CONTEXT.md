@@ -234,6 +234,7 @@ La base utiliza:
 - `rol` se separa de `cargo` porque el cargo laboral y los permisos del software son conceptos distintos.
 - La jerarquía `Empleado` se guarda en una sola tabla `empleado`. Los atributos propios de cada subclase (`id_area` para `Enfermero`, `especialidad` para `Medico`, `turno` para `PersonalLimpieza`) son columnas que admiten `NULL`. La coherencia entre tipo de empleado y atributo la garantizan las clases Python, no la BD.
 - Una persona (paciente o empleado) se identifica con un documento: tipo (`tipo_documento`: DNI, carné de extranjería, pasaporte o CPP) + número, únicos en conjunto. El formato de cada tipo se define una sola vez en `models/documento.py` (`DocumentoIdentidad`); los DAO lo reutilizan.
+- Un paciente puede ingresar sin identificar (NN): sin documento (tipo y número `NULL`), con nombres "NN" y una fecha de nacimiento estimada a partir de la edad aparente. Al identificarlo se registran sus datos reales una sola vez. Los empleados siempre tienen documento.
 - Se conserva el estado actual de la cama en `cama` y el historial en `historial_estado_cama`.
 - `triaje_sintoma` resuelve la relación muchos-a-muchos entre triaje y síntomas.
 - La relación episodio → triaje es uno-a-muchos para conservar reclasificaciones.

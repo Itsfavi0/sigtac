@@ -189,6 +189,87 @@ def test_actualizar_sin_id_se_rechaza(monkeypatch):
     bd.clase.assert_not_called()
 
 
+# ---- Pacientes sin identificar (NN)
+def fila_nn(**cambios):
+    datos = dict(id_paciente=5, tipo_documento=None, num_documento=None, nombres="NN", apellidos="NN",
+                 fecha_nac=date(1981, 1, 1), sexo="M", id_seguro=4)
+    datos.update(cambios)
+    return fila(**datos)
+
+
+def test_fila_sin_documento_se_convierte_en_paciente_no_identificado(monkeypatch):
+    bd = BD(monkeypatch, row=fila_nn())
+    p = PacienteDAO.buscar_por_id(5)
+    assert p.identificado is False and p.documento is None
+    assert "LEFT JOIN tipo_documento" in bd.sql  # sin LEFT JOIN, el paciente NN no se encontraría
+
+
+def test_crear_paciente_no_identificado_envia_null_en_el_documento(monkeypatch):
+    bd = BD(monkeypatch, lastrowid=9)
+    assert PacienteDAO.crear(Paciente.no_identificado("M", 45, 4)) == 9
+    assert bd.params[:4] == (None, None, "NN", "NN")
+
+
+def test_listar_no_identificados(monkeypatch):
+    bd = BD(monkeypatch)
+    bd.cursor.fetchall.return_value = [fila_nn(), fila_nn(id_paciente=6)]
+    pacientes = PacienteDAO.listar_no_identificados()
+    assert [p.id_paciente for p in pacientes] == [5, 6]
+    assert all(not p.identificado for p in pacientes)
+    assert "WHERE p.num_documento IS NULL AND p.estado_registro = TRUE" in bd.sql
+
+
+def test_listar_no_identificados_vacio(monkeypatch):
+    bd = BD(monkeypatch)
+    bd.cursor.fetchall.return_value = []
+    assert PacienteDAO.listar_no_identificados() == []
+
+
+def paciente_identificado():
+    p = Paciente(5, None, "NN", "NN", date(1981, 1, 1), "M", 4)
+    p.identificar(DocumentoIdentidad(TipoDocumento.PASAPORTE, "AB1234567"), "John", "Smith", date(1980, 3, 2))
+    return p
+
+
+def test_identificar_guarda_documento_y_datos_reales(monkeypatch):
+    bd = BD(monkeypatch, rowcount=1)
+    assert PacienteDAO.identificar(paciente_identificado()) is True
+    assert bd.sql.startswith("UPDATE paciente SET id_tipo_documento = (SELECT")
+    assert "WHERE id_paciente = %s AND num_documento IS NULL" in bd.sql  # no sobrescribe un documento
+    assert bd.params == ("PAS", "AB1234567", "John", "Smith", date(1980, 3, 2), 5)
+
+
+def test_identificar_inexistente_o_ya_identificado_devuelve_false(monkeypatch):
+    BD(monkeypatch, rowcount=0)
+    assert PacienteDAO.identificar(paciente_identificado()) is False
+
+
+def test_identificar_con_documento_de_otro_paciente_lanza_registro_duplicado(monkeypatch):
+    duplicado = mysql.connector.IntegrityError(msg="Duplicate entry", errno=errorcode.ER_DUP_ENTRY)
+    BD(monkeypatch, error_en_execute=duplicado)
+    with pytest.raises(RegistroDuplicadoError):
+        PacienteDAO.identificar(paciente_identificado())
+
+
+@pytest.mark.parametrize("p", [
+    Paciente.no_identificado("M", 45, 4),               # sin id
+    Paciente(5, None, "NN", "NN", date(1981, 1, 1), "M", 4),  # sin documento
+])
+def test_identificar_rechaza_pacientes_sin_id_o_sin_documento(monkeypatch, p):
+    bd = BD(monkeypatch)
+    with pytest.raises(ValueError):
+        PacienteDAO.identificar(p)
+    bd.clase.assert_not_called()
+
+
+def test_identificar_no_registra_datos_personales_en_el_log(monkeypatch, caplog):
+    caplog.set_level("DEBUG")
+    BD(monkeypatch, rowcount=1)
+    PacienteDAO.identificar(paciente_identificado())
+    assert "AB1234567" not in caplog.text and "Smith" not in caplog.text
+    assert "id_paciente=5" in caplog.text
+
+
 # ---- anular (RN-11)
 def test_anular_es_borrado_logico(monkeypatch):
     bd = BD(monkeypatch, rowcount=1)

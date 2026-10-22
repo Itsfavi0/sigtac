@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from datetime import date, datetime
 
 from models.documento import DocumentoIdentidad
+from models.excepciones import ReglaNegocioError
 
 
 def _hoy() -> date:
@@ -31,22 +32,35 @@ def _validar_activo(valor) -> bool:
     return valor
 
 
+def _validar_documento(valor) -> DocumentoIdentidad:
+    # El formato del número lo valida DocumentoIdentidad al crearse; aquí solo se exige que lo sea.
+    if not isinstance(valor, DocumentoIdentidad):
+        raise ValueError("documento debe ser un DocumentoIdentidad.")
+    return valor
+
+
+def _validar_fecha_nac(valor) -> date:
+    # datetime es subclase de date: se excluye para no mezclar fechas con horas.
+    if not isinstance(valor, date) or isinstance(valor, datetime):
+        raise ValueError("La fecha de nacimiento debe ser una fecha (date).")
+    if valor > _hoy():
+        raise ValueError("La fecha de nacimiento no puede ser futura.")
+    return valor
+
+
 #CLASE PADRE
 class Persona(ABC):
     """Superclase abstracta que define los atributos comunes de la persona"""
-    def __init__(self, documento: DocumentoIdentidad, nombres: str, apellidos: str, fecha_nac : date):
-        # El formato del número lo valida DocumentoIdentidad al crearse; aquí solo se exige que lo sea.
-        if not isinstance(documento, DocumentoIdentidad):
-            raise ValueError("documento debe ser un DocumentoIdentidad.")
-        # datetime es subclase de date: se excluye para no mezclar fechas con horas.
-        if not isinstance(fecha_nac, date) or isinstance(fecha_nac, datetime):
-            raise ValueError("La fecha de nacimiento debe ser una fecha (date).")
-        if fecha_nac > _hoy():
-            raise ValueError("La fecha de nacimiento no puede ser futura.")
-        self._documento = documento
+    # Solo un paciente puede registrarse sin documento (paciente sin identificar, NN).
+    _ADMITE_SIN_DOCUMENTO = False
+
+    def __init__(self, documento: DocumentoIdentidad | None, nombres: str, apellidos: str, fecha_nac : date):
+        if documento is None and not self._ADMITE_SIN_DOCUMENTO:
+            raise ValueError("El documento es obligatorio.")
+        self._documento = None if documento is None else _validar_documento(documento)
         self._nombres = _validar_texto(nombres, "nombres")
         self._apellidos = _validar_texto(apellidos, "apellidos")
-        self._fecha_nac = fecha_nac
+        self._fecha_nac = _validar_fecha_nac(fecha_nac)
 
     @property
     def documento(self): return self._documento
@@ -71,10 +85,21 @@ class Persona(ABC):
 
 #SUBCLASE: PACIENTE
 class Paciente(Persona):
+    """
+    Paciente del servicio de emergencia.
+
+    Puede registrarse sin documento (documento=None) cuando llega sin identificar, por ejemplo
+    inconsciente y sin papeles. Mientras no se identifique, sus nombres y su fecha de nacimiento
+    son provisionales (ver no_identificado); identificar() los reemplaza por los reales.
+    """
     # Coinciden con CH_paciente_sexo en schema.sql
     SEXOS_VALIDOS = ("M", "F")
+    _ADMITE_SIN_DOCUMENTO = True
+    # Nombre provisional de un paciente sin identificar (como en los hospitales: "NN", sin nombre).
+    NOMBRE_NO_IDENTIFICADO = "NN"
+    EDAD_MAXIMA_ESTIMADA = 120
 
-    def __init__(self, id_paciente : int | None, documento: DocumentoIdentidad, nombres: str, apellidos: str, fecha_nac : date,
+    def __init__(self, id_paciente : int | None, documento: DocumentoIdentidad | None, nombres: str, apellidos: str, fecha_nac : date,
                  sexo: str, id_seguro: int, activo: bool = True, nombre_seguro: str | None = None):
         super().__init__(documento, nombres, apellidos, fecha_nac)
         if sexo not in self.SEXOS_VALIDOS:
@@ -107,9 +132,42 @@ class Paciente(Persona):
     @property
     def activo(self): return self._activo
 
+    @property
+    def identificado(self) -> bool:
+        """False si el paciente aún no tiene documento (paciente NN)."""
+        return self._documento is not None
+
+    @classmethod
+    def no_identificado(cls, sexo: str, edad_estimada: int, id_seguro: int) -> "Paciente":
+        """
+        Crea un paciente sin identificar (aún sin id de BD). Nombres y apellidos quedan como "NN" y la
+        fecha de nacimiento se estima a partir de la edad aparente: el 1 de enero de (año actual - edad).
+        """
+        if isinstance(edad_estimada, bool) or not isinstance(edad_estimada, int) \
+                or not 0 <= edad_estimada <= cls.EDAD_MAXIMA_ESTIMADA:
+            raise ValueError(f"La edad estimada debe ser un entero entre 0 y {cls.EDAD_MAXIMA_ESTIMADA}.")
+        fecha_estimada = date(_hoy().year - edad_estimada, 1, 1)
+        return cls(None, None, cls.NOMBRE_NO_IDENTIFICADO, cls.NOMBRE_NO_IDENTIFICADO,
+                   fecha_estimada, sexo, id_seguro)
+
+    def identificar(self, documento: DocumentoIdentidad, nombres: str, apellidos: str, fecha_nac: date):
+        """
+        Registra la identidad real de un paciente que ingresó sin identificar. Solo se hace una vez:
+        el documento de un paciente identificado no cambia.
+        """
+        if self.identificado:
+            raise ReglaNegocioError("El paciente ya está identificado.")
+        # Se valida todo antes de modificar: si un dato es inválido, el paciente queda como estaba.
+        documento = _validar_documento(documento)
+        nombres = _validar_texto(nombres, "nombres")
+        apellidos = _validar_texto(apellidos, "apellidos")
+        fecha_nac = _validar_fecha_nac(fecha_nac)
+        self._documento, self._nombres, self._apellidos, self._fecha_nac = documento, nombres, apellidos, fecha_nac
+
     def obtener_resumen(self) -> str:
         seguro = self.nombre_seguro or f"id {self.id_seguro}"
-        return f"PACIENTE: [{self.documento} - {self.apellidos}, {self.nombres}] | Sexo: {self.sexo} | Seguro: {seguro}"
+        documento = self.documento or "SIN IDENTIFICAR"
+        return f"PACIENTE: [{documento} - {self.apellidos}, {self.nombres}] | Sexo: {self.sexo} | Seguro: {seguro}"
 
     def agregar_episodio(self, episodio):
         self._episodios.append(episodio)

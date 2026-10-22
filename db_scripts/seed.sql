@@ -108,7 +108,8 @@ INSERT INTO paciente (id_paciente, id_tipo_documento, num_documento, nombres, ap
 (1, 1, '70123456', 'Rosa', 'Mendoza Flores', '1959-05-14', 'F', 1),
 (2, 1, '70987654', 'Carlos', 'García Pérez', '1980-11-22', 'M', 2),
 (3, 1, '71234567', 'Luis', 'Sánchez Rivas', '1995-02-10', 'M', 4),
-(4, 2, '001234567', 'María José', 'Rodríguez Silva', '1988-06-03', 'F', 4); -- Paciente extranjera con carné de extranjería
+(4, 2, '001234567', 'María José', 'Rodríguez Silva', '1988-06-03', 'F', 4), -- Paciente extranjera con carné de extranjería
+(5, NULL, NULL, 'NN', 'NN', '1981-01-01', 'M', 4); -- Paciente sin identificar: edad estimada (~45 años)
 
 INSERT INTO cama (id_cama, codigo, id_area, id_tipo_cama, id_estado_cama, estado_registro) VALUES
 (1, 'TRA-01', 1, 1, 3, 1), (2, 'TRA-02', 1, 1, 1, 1),
