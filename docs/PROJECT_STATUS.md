@@ -16,16 +16,16 @@
 
 - Base de datos (22 tablas) implementada con las restricciones de RN-05 y RN-10 y el bloqueo temporal de cuentas.
 - **Fase 2 (models) cerrada:** todas las clases del plan existen y tienen pruebas automáticas.
-- **Fase 3 (DAO) en curso:** `db_connection.py`, `base_dao.py`, `usuario_dao.py`, `paciente_dao.py`, `cama_dao.py` (lectura), `auditoria_dao.py` y `transaccion.py` están terminados y probados.
+- **Fase 3 (DAO) en curso:** `db_connection.py`, `base_dao.py`, `usuario_dao.py`, `paciente_dao.py`, `cama_dao.py`, `auditoria_dao.py` y `transaccion.py` están terminados y probados.
 - `sigtac_db` recreada con el esquema actual (2026-10-21).
 - `models/persona.py` alineado con las tablas `paciente` y `empleado`, con validaciones de entrada (2026-10-12).
 - Pacientes y empleados se identifican con `DocumentoIdentidad` (DNI, carné de extranjería, pasaporte o CPP) (2026-10-21).
 - Un paciente puede ingresar sin identificar (NN) e identificarse después (2026-10-21).
-- Pruebas: **558 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
+- Pruebas: **580 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
 
 ### Tarea actual
 
-Ninguna en curso. Siguiente tarea: **`cama_dao.cambiar_estado`** con historial, usando `transaccion()` y `UPDATE` condicional.
+Ninguna en curso. Siguiente tarea: **`triaje_dao.py`** (episodio, signos vitales, triaje y síntomas, en una transacción).
 
 ---
 
@@ -36,7 +36,7 @@ Ninguna en curso. Siguiente tarea: **`cama_dao.cambiar_estado`** con historial, 
 | Fase 0 — Entorno y estructura | Completada (`.venv` recreado dentro del proyecto el 2026-10-11) |
 | Fase 1 — Base de datos | Completada. Verificada en MySQL 8.0.46 (2026-10-12 y 2026-10-21) y antes en MariaDB 11.8 |
 | Fase 2 — Models | Completada (2026-10-12) |
-| Fase 3 — DAO | En curso: `db_connection.py`, `base_dao.py`, `usuario_dao.py`, `paciente_dao.py`, `cama_dao.py` (lectura), `auditoria_dao.py` y `transaccion.py` terminados |
+| Fase 3 — DAO | En curso: `db_connection.py`, `base_dao.py`, `usuario_dao.py`, `paciente_dao.py`, `cama_dao.py`, `auditoria_dao.py` y `transaccion.py` terminados |
 | Fase 4 — Controllers | Pendiente (la carpeta `controllers/` aún no existe) |
 | Fase 5 — Utils | Parcial: `security.py` y `logging_config.py` hechos; falta `pdf_generator.py` |
 | Fase 6 — Views | Pendiente (la carpeta `views/` aún no existe) |
@@ -65,7 +65,7 @@ Ninguna en curso. Siguiente tarea: **`cama_dao.cambiar_estado`** con historial, 
 - `dao/transaccion.py`: `with transaccion():` con COMMIT/ROLLBACK, bloques anidados que se unen al externo (`test_transaccion.py`, 16 pruebas). Verificado en MySQL 8.0.46 con una base temporal (21 comprobaciones, incluida una conexión cortada a mitad).
 - `dao/base_dao.py`: clase base de los DAO (cursor, cierre y traducción de errores a `PersistenciaError`/`RegistroDuplicadoError`) (`test_base_dao.py`, 23 pruebas).
 - `dao/paciente_dao.py`: buscar por id/documento, crear (también sin identificar), listar e identificar pacientes NN, actualizar (sin tocar el documento) y baja lógica (`test_paciente_dao.py`, 38 pruebas). Verificado en MySQL 8.0.46 con una base temporal (2026-10-12: 15 comprobaciones; 2026-10-21, con documentos y NN: 33).
-- `dao/cama_dao.py`: búsqueda por id/código y listados; fábrica de subclases por `nombre_tipo_cama` (`test_cama_dao.py`, 25 pruebas). Verificado en MySQL 8.0.46 con una base temporal (11 comprobaciones). Falta cambiar estado (siguiente tarea).
+- `dao/cama_dao.py`: búsqueda por id/código y listados; fábrica de subclases por `nombre_tipo_cama`; `cambiar_estado` (UPDATE condicional + historial en una transacción) (`test_cama_dao.py`, 47 pruebas). Verificado en MySQL 8.0.46 con una base temporal (lectura: 11 comprobaciones; `cambiar_estado`: ver CHANGELOG del 2026-10-21).
 - `dao/usuario_dao.py`: hereda de `BaseDAO`; login con tipo + número de documento, JOIN a `empleado`, `tipo_documento` y `rol`, bcrypt, usuario inactivo, señuelo y bloqueo de 5 intentos durante 15 min (`test_usuario_dao.py`, 39 pruebas).
 - `dao/auditoria_dao.py`: `registrar` (bitácora de solo inserción; acción con `AccionAuditoria`, tabla con lista blanca, detalles como JSON) y `listar_por_registro` (`test_auditoria_dao.py`, 32 pruebas). Verificado en MySQL 8.0.46 con una base temporal junto con las transacciones (JSON con tildes, auditoría deshecha si falla la operación y viceversa).
 - `seed.sql` tiene hashes bcrypt válidos. El login con un usuario del seed se verificó a mano contra una base temporal (ver CHANGELOG del 2026-10-11).
@@ -108,9 +108,9 @@ Ninguna en curso. Siguiente tarea: **`cama_dao.cambiar_estado`** con historial, 
 
 ## Próximo trabajo previsto
 
-1. `cama_dao.cambiar_estado` con historial.
-2. `triaje_dao.py`.
-3. `asignacion_dao.py`.
+1. `triaje_dao.py`.
+2. `asignacion_dao.py`.
+3. Fase 4: controladores (`auth_controller`, `triaje_controller`, `cama_controller`).
 
 Respecto al plan original, `auditoria_dao.py` se hizo antes que `triaje_dao.py` y `asignacion_dao.py` porque es de una sola tabla y no depende de transacciones (ver `CHANGELOG.md` del 2026-10-12).
 

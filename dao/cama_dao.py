@@ -1,15 +1,21 @@
+import logging
+
 from dao.base_dao import BaseDAO
+from dao.transaccion import transaccion
 from models.cama import Cama, CamaHospitalizacion, CamaObservacion, CamaTraumaShock, CamaUCI
 from models.estados import EstadoCama
+from models.excepciones import CamaNoDisponibleError
+
+logger = logging.getLogger(__name__)
 
 
 class CamaDAO(BaseDAO):
     """
-    DAO de la tabla cama (solo lectura). Convierte cada fila en la subclase de Cama que
-    corresponde a su tipo (fábrica simple), para que la compatibilidad con el nivel de triaje
-    se decida por polimorfismo con cama.es_compatible(nivel), no en SQL.
+    DAO de la tabla cama. Convierte cada fila en la subclase de Cama que corresponde a su tipo
+    (fábrica simple), para que la compatibilidad con el nivel de triaje se decida por
+    polimorfismo con cama.es_compatible(nivel), no en SQL.
 
-    Solo devuelve camas activas (estado_registro = TRUE): el modelo Cama no representa la baja.
+    Solo trabaja con camas activas (estado_registro = TRUE): el modelo Cama no representa la baja.
     """
 
     # Fábrica: nombre del tipo en la tabla tipo_cama → subclase. Se usa el nombre (UNIQUE)
@@ -71,3 +77,60 @@ class CamaDAO(BaseDAO):
             (EstadoCama.DISPONIBLE.value,),
         )
         return [CamaDAO._a_cama(f) for f in filas]
+
+    @staticmethod
+    def cambiar_estado(cama: Cama, estado_anterior: EstadoCama | str) -> None:
+        """
+        Guarda el estado actual de `cama` y lo registra en historial_estado_cama, en una transacción.
+
+        La transición la valida antes el modelo (cama.reservar(), cama.dar_alta()...); este método
+        solo la persiste:
+
+            anterior = cama.estado
+            cama.reservar()
+            CamaDAO.cambiar_estado(cama, anterior)
+
+        El UPDATE es condicional: solo cambia la cama si en la BD sigue en `estado_anterior`. Si otro
+        usuario la cambió antes (o la cama no existe o está dada de baja) lanza CamaNoDisponibleError
+        y no se guarda nada; el objeto `cama` queda desactualizado y conviene volver a consultarla.
+        Se lanza una excepción en lugar de devolver False para que, dentro de la transacción de un
+        controlador, se deshaga toda la operación.
+        """
+        if not isinstance(cama, Cama):
+            raise ValueError("cama debe ser una Cama.")
+        id_cama = cama.id_cama
+        if isinstance(id_cama, bool) or not isinstance(id_cama, int) or id_cama <= 0:
+            raise ValueError("La cama no tiene un id válido.")
+        try:
+            estado_anterior = EstadoCama(estado_anterior)
+        except ValueError:
+            raise ValueError("Estado anterior no reconocido.") from None
+        estado_nuevo = cama.estado
+        if estado_nuevo == estado_anterior:
+            raise ValueError("La cama no cambió de estado.")
+
+        # Los ids de estado se obtienen del catálogo por su nombre (el valor del Enum), con subconsultas.
+        with transaccion():
+            filas = CamaDAO._ejecutar(
+                """
+                UPDATE cama
+                SET id_estado_cama = (SELECT id_estado_cama FROM estado_cama WHERE nombre_estado_cama = %s)
+                WHERE id_cama = %s AND estado_registro = TRUE
+                  AND id_estado_cama = (SELECT id_estado_cama FROM estado_cama WHERE nombre_estado_cama = %s)
+                """,
+                (estado_nuevo.value, id_cama, estado_anterior.value),
+            )
+            if filas == 0:
+                logger.warning("Cambio de estado rechazado: la cama ya no está en %s (id_cama=%s).",
+                               estado_anterior.value, id_cama)
+                raise CamaNoDisponibleError(
+                    f"La cama {cama.codigo} ya no está en estado {estado_anterior.value}: otro usuario la cambió."
+                )
+            CamaDAO._insertar(
+                """
+                INSERT INTO historial_estado_cama (id_cama, id_estado_cama)
+                VALUES (%s, (SELECT id_estado_cama FROM estado_cama WHERE nombre_estado_cama = %s))
+                """,
+                (id_cama, estado_nuevo.value),
+            )
+        logger.info("Cama %s: %s -> %s.", id_cama, estado_anterior.value, estado_nuevo.value)

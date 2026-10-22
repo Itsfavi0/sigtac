@@ -11,7 +11,10 @@ class CamaEstadoInvalidoError(SigtacError):
     pass
 
 class CamaNoDisponibleError(SigtacError):
-    """Se lanza cuando el orquestador intenta asignar una cama que ya fue tomada por otro usuario."""
+    """
+    Se lanza cuando la cama ya no está en el estado esperado en la BD (otro usuario la tomó o la
+    cambió antes) o ya no existe.
+    """
     pass
 
 class UsuarioSinPermisoError(SigtacError):

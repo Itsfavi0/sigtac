@@ -5,6 +5,40 @@
 
 ---
 
+## [2026-10-21] — `CamaDAO.cambiar_estado` con historial
+
+### Cambio
+- `dao/cama_dao.py`: nuevo `CamaDAO.cambiar_estado(cama, estado_anterior)`. Dentro de `transaccion()` ejecuta un `UPDATE` condicional (solo cambia la cama si en la BD sigue en `estado_anterior`, está activa y existe) y un `INSERT` en `historial_estado_cama`.
+- `models/excepciones.py`: el docstring de `CamaNoDisponibleError` cubre cualquier cambio de estado en conflicto, no solo la asignación.
+- `tests/test_cama_dao.py`: 22 pruebas nuevas (47 en total). La clase `BD` simulada también reemplaza `ConexionBD` en `dao.transaccion`.
+
+### Archivos afectados
+- `dao/cama_dao.py`, `models/excepciones.py`, `tests/test_cama_dao.py`, `docs/`
+
+### Motivo
+Primer uso real de `transaccion()`. Cambiar el estado de una cama son dos escrituras: sin transacción, un fallo en el historial dejaría un cambio sin registrar. Lo necesitarán la asignación de camas, el alta (RN-07) y la confirmación de limpieza (RN-08).
+
+### Impacto
+- Pruebas: 580 pasan.
+- Verificado en MySQL 8.0.46 con una base temporal (`sigtac_scratch_tmp`, ya eliminada), con `CamaDAO`, `AuditoriaDAO` y `transaccion()` reales y una segunda conexión que hace de "otra PC". 19 comprobaciones pasaron:
+  - Ciclo completo de TRA-02: DISPONIBLE → RESERVADA → OCUPADA → EN LIMPIEZA → DISPONIBLE; cada paso queda guardado y el historial tiene los 4 cambios en orden.
+  - Conflicto entre dos PCs: esta PC carga OBS-01 (DISPONIBLE), la otra la ocupa, y esta intenta reservarla con datos desactualizados → `CamaNoDisponibleError`; la cama conserva el estado de la otra PC, no se escribe historial y la transacción queda cerrada.
+  - Una cama inexistente y una dada de baja (RN-11) lanzan `CamaNoDisponibleError` y no cambian.
+  - Dentro de la transacción de un controlador: si falla un paso posterior se deshacen estado, historial y auditoría; si todo sale bien, la otra PC no ve nada hasta el COMMIT y después ve los tres.
+
+### Decisiones
+- **El modelo decide, el DAO guarda:** las transiciones válidas siguen siendo de la máquina de estados de `Cama` (`reservar`, `dar_alta`, `liberar_limpieza`...). El DAO no repite esas reglas; solo recibe la cama ya cambiada y el estado del que partió.
+- **`UPDATE` condicional para la concurrencia:** el objeto en memoria puede estar desactualizado (el modelo permitió reservar porque creía que la cama estaba DISPONIBLE). La condición `id_estado_cama = <estado_anterior>` hace que la BD tenga la última palabra.
+- **0 filas → excepción, no `False`:** dentro de la transacción de un controlador, la excepción deshace toda la operación; un `False` que nadie revise dejaría confirmar el resto. Por la misma razón, una cama inexistente o dada de baja también lanza `CamaNoDisponibleError` (el `UPDATE` no distingue esos casos de un conflicto).
+- **No se registra un "cambio" al mismo estado:** `cambiar_estado` lanza `ValueError` si el estado no cambió (p. ej. `fuera_de_servicio()` sobre una cama que ya lo estaba).
+- **Los ids de estado se obtienen del catálogo por nombre** con subconsultas sobre `estado_cama` (el valor del Enum), igual que `CamaDAO.listar_disponibles`.
+- **La auditoría la registra el controlador**, dentro de la misma transacción; el DAO no audita por su cuenta.
+
+### Pendientes
+- Usar `cambiar_estado` desde `asignacion_dao.py` y desde los controladores de la Fase 4.
+
+---
+
 ## [2026-10-21] — Transacciones explícitas (`dao/transaccion.py`)
 
 ### Cambio
