@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from models.excepciones import NivelTriajeInvalidoError, ReglaNegocioError
-from models.triaje import EpisodioEmergencia, SignosVitales, Sintoma, Triaje
+from models.triaje import EpisodioEmergencia, SignosVitales, Sintoma, Triaje, ordenar_por_prioridad
 
 AHORA = datetime(2026, 10, 11, 12, 0)
 
@@ -320,3 +320,58 @@ def test_sintoma_es_inmutable():
 def test_sintoma_rechaza_peso_negativo():
     with pytest.raises(ValueError):
         Sintoma(1, "Tos leve", -1)
+
+
+@pytest.mark.parametrize("campo, valor", [("fc", "75"), ("temp", None), ("sato2", True), ("pa_sis", [120])])
+def test_signos_vitales_deben_ser_numeros(campo, valor):
+    datos = dict(pa_sis=120, pa_dia=80, fc=75, fr=16, temp=36.8, sato2=98, id_si=None)
+    datos[campo] = valor
+    with pytest.raises(ValueError, match=f"{campo} debe ser un número"):
+        SignosVitales(**datos)
+
+
+def test_signos_vitales_aceptan_enteros_y_decimales():
+    assert SignosVitales(120, 80, 75, 16, 37, 98.0, id_si=None).a_diccionario()["temp"] == 37
+
+
+# ---- Nivel actual y cola de espera
+def test_nivel_actual_es_el_del_triaje_vigente():
+    ep = nuevo_episodio()
+    assert ep.nivel_actual is None
+    ep.agregar_triaje(nuevo_triaje(3, AHORA, 1))
+    reevaluado = nuevo_triaje(4, AHORA + timedelta(minutes=30), 2)
+    reevaluado.reclasificar(2, "Empeoró el dolor y bajó la saturación.")
+    ep.agregar_triaje(reevaluado)
+    assert ep.nivel_actual == 2
+
+
+def en_espera(id_episodio, nivel, minutos_desde_ingreso):
+    ep = EpisodioEmergencia(id_episodio, 1, "Motivo", estado=EpisodioEmergencia.ESTADO_EN_ESPERA,
+                            fecha_ingreso=AHORA - timedelta(minutes=minutos_desde_ingreso))
+    if nivel is not None:
+        ep.agregar_triaje(nuevo_triaje(nivel, AHORA, id_episodio))
+    return ep
+
+
+def ids(episodios):
+    return [e.id_episodio for e in episodios]
+
+
+def test_la_cola_ordena_por_nivel_y_luego_por_llegada():
+    cola = [en_espera(1, 3, 60), en_espera(2, 1, 5), en_espera(3, 3, 90), en_espera(4, 2, 10)]
+    assert ids(ordenar_por_prioridad(cola)) == [2, 4, 3, 1]
+
+
+def test_a_igual_nivel_e_ingreso_va_primero_el_id_menor():
+    assert ids(ordenar_por_prioridad([en_espera(7, 3, 10), en_espera(5, 3, 10)])) == [5, 7]
+
+
+def test_sin_triaje_van_al_final_por_orden_de_llegada():
+    cola = [en_espera(1, None, 5), en_espera(2, 5, 1), en_espera(3, None, 30)]
+    assert ids(ordenar_por_prioridad(cola)) == [2, 3, 1]
+
+
+def test_ordenar_no_modifica_la_lista_original():
+    cola = [en_espera(1, 3, 5), en_espera(2, 1, 5)]
+    ordenar_por_prioridad(cola)
+    assert ids(cola) == [1, 2]

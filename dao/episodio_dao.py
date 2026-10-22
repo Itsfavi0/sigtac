@@ -1,6 +1,7 @@
 import logging
 
 from dao.base_dao import BaseDAO
+from dao.filtros_episodio import condicion
 from dao.triaje_dao import TriajeDAO
 from models.estados import EstadoEpisodio
 from models.excepciones import ReglaNegocioError
@@ -71,6 +72,54 @@ class EpisodioDAO(BaseDAO):
         # episodio cerrado y se conserva el estado leído de la BD.
         return EpisodioDAO._a_episodio(fila, signos_vitales=TriajeDAO.listar_signos_por_episodio(id_episodio),
                                        triajes=TriajeDAO.listar_por_episodio(id_episodio))
+
+    @staticmethod
+    def _listar(filtro: str, valor) -> list[EpisodioEmergencia]:
+        """Episodios que cumplen `filtro`, cada uno con su historial completo, por orden de llegada."""
+        filas = EpisodioDAO._consultar_varios(
+            EpisodioDAO._SELECT + " WHERE " + condicion(filtro) + " ORDER BY ep.fecha_ingreso, ep.id_episodio",
+            (valor,),
+        )
+        if not filas:
+            return []
+        triajes, signos = TriajeDAO.listar_historial(filtro, valor)
+        return [EpisodioDAO._a_episodio(f, triajes=triajes.get(f["id_episodio"], ()),
+                                        signos_vitales=signos.get(f["id_episodio"], ()))
+                for f in filas]
+
+    @staticmethod
+    def listar_por_estado(estado: EstadoEpisodio | str) -> list[EpisodioEmergencia]:
+        """
+        Episodios activos en `estado` (p. ej. la cola de espera de cama), con su historial, por orden
+        de llegada. La prioridad la decide el modelo (models.triaje.ordenar_por_prioridad).
+
+        Son 4 consultas fijas, sin importar cuántos episodios haya. Dentro de transaccion() todas leen
+        la misma foto de la BD (InnoDB, REPEATABLE READ), aunque otra PC cambie algo entre una y otra.
+        """
+        try:
+            estado = EstadoEpisodio(estado)
+        except ValueError:
+            raise ValueError("Estado de episodio no reconocido.") from None
+        return EpisodioDAO._listar("estado", estado.value)
+
+    @staticmethod
+    def listar_por_paciente(id_paciente: int) -> list[EpisodioEmergencia]:
+        """Todos los episodios del paciente (activos y anulados), con su historial, del más antiguo al más reciente."""
+        return EpisodioDAO._listar("paciente", EpisodioDAO._validar_id(id_paciente, "id_paciente"))
+
+    @staticmethod
+    def bloquear(id_episodio: int) -> bool:
+        """
+        Bloquea la fila del episodio hasta el final de la transacción (SELECT ... FOR UPDATE). Se llama
+        al empezar una operación que no siempre cambia el estado del episodio (p. ej. un segundo
+        triaje), para que otra PC no lo dé de alta a mitad de camino. Devuelve False si el episodio
+        no existe o está anulado.
+        """
+        EpisodioDAO._validar_id(id_episodio, "id_episodio")
+        return EpisodioDAO._bloquear(
+            "SELECT id_episodio FROM episodio_emergencia WHERE id_episodio = %s AND estado_registro = TRUE FOR UPDATE",
+            (id_episodio,),
+        )
 
     @staticmethod
     def cambiar_estado(episodio: EpisodioEmergencia, estado_anterior: EstadoEpisodio | str) -> None:

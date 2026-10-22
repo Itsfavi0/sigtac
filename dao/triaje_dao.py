@@ -1,6 +1,7 @@
 import logging
 
 from dao.base_dao import BaseDAO
+from dao.filtros_episodio import condicion
 from dao.transaccion import transaccion
 from models.triaje import SignosVitales, Sintoma, Triaje
 
@@ -131,6 +132,62 @@ class TriajeDAO(BaseDAO):
         for fila in filas:
             por_id[fila["id_triaje"]].agregar_sintoma(TriajeDAO._a_sintoma(fila))
         return triajes
+
+    @staticmethod
+    def listar_historial(filtro: str, valor) -> tuple[dict[int, list[Triaje]], dict[int, list[SignosVitales]]]:
+        """
+        Historial de todos los episodios que cumplen `filtro` (ver dao/filtros_episodio.py): sus triajes
+        con síntomas y sus signos vitales, en 3 consultas fijas en lugar de 3 por episodio.
+
+        Devuelve dos diccionarios id_episodio → lista, en el mismo orden que listar_por_episodio y
+        listar_signos_por_episodio. Un episodio sin triajes o sin signos no aparece en el diccionario.
+        """
+        cond = condicion(filtro)
+        triajes_por_episodio, por_id = {}, {}
+        filas = TriajeDAO._consultar_varios(
+            """
+            SELECT t.id_episodio, t.id_triaje, nf.numero AS nivel_final, ns.numero AS nivel_sugerido,
+                   t.id_empleado, t.fecha_hora, t.justificacion, t.estado_registro
+            FROM triaje t
+            JOIN episodio_emergencia ep ON t.id_episodio = ep.id_episodio
+            JOIN nivel_triaje nf ON t.id_nivel = nf.id_nivel
+            LEFT JOIN nivel_triaje ns ON t.id_nivel_sugerido = ns.id_nivel
+            WHERE """ + cond + " ORDER BY t.id_episodio, t.fecha_hora, t.id_triaje",
+            (valor,),
+        )
+        for fila in filas:
+            triaje = TriajeDAO._a_triaje(fila)
+            triajes_por_episodio.setdefault(fila["id_episodio"], []).append(triaje)
+            por_id[triaje.id_triaje] = triaje
+
+        if por_id:
+            filas = TriajeDAO._consultar_varios(
+                """
+                SELECT ts.id_triaje, s.id_sintoma, s.nombre_sintoma, s.peso_clinico
+                FROM triaje_sintoma ts
+                JOIN sintoma s ON ts.id_sintoma = s.id_sintoma
+                JOIN triaje t ON ts.id_triaje = t.id_triaje
+                JOIN episodio_emergencia ep ON t.id_episodio = ep.id_episodio
+                WHERE """ + cond + " ORDER BY ts.id_triaje, s.id_sintoma",
+                (valor,),
+            )
+            for fila in filas:
+                # Fuera de una transacción, otra PC pudo agregar un triaje entre las dos consultas
+                if fila["id_triaje"] in por_id:
+                    por_id[fila["id_triaje"]].agregar_sintoma(TriajeDAO._a_sintoma(fila))
+
+        signos_por_episodio = {}
+        filas = TriajeDAO._consultar_varios(
+            """
+            SELECT sv.id_episodio, sv.id_si, sv.pa_sis, sv.pa_dia, sv.fc, sv.fr, sv.temp, sv.sato2
+            FROM signos_vitales sv
+            JOIN episodio_emergencia ep ON sv.id_episodio = ep.id_episodio
+            WHERE """ + cond + " ORDER BY sv.id_episodio, sv.fecha_hora, sv.id_si",
+            (valor,),
+        )
+        for fila in filas:
+            signos_por_episodio.setdefault(fila["id_episodio"], []).append(TriajeDAO._a_signos(fila))
+        return triajes_por_episodio, signos_por_episodio
 
     @staticmethod
     def listar_signos_por_episodio(id_episodio: int) -> list[SignosVitales]:

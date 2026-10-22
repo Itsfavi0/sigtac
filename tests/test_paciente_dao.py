@@ -376,3 +376,45 @@ def test_los_logs_no_contienen_documento_ni_nombres(monkeypatch, caplog):
     PacienteDAO.buscar_por_documento(DOCUMENTO)
     PacienteDAO.anular(1)
     assert DNI not in caplog.text and "Rosa" not in caplog.text and "Mendoza" not in caplog.text
+
+
+# ---- Catálogo, pacientes de una cola y bloqueo
+def test_listar_seguros(monkeypatch):
+    bd = BD(monkeypatch)
+    bd.cursor.fetchall.return_value = [{"id_seguro": 1, "nombre_seguro": "EsSalud"}]
+    assert PacienteDAO.listar_seguros() == [{"id_seguro": 1, "nombre_seguro": "EsSalud"}]
+
+
+def test_listar_por_estado_de_episodio_devuelve_el_paciente_de_cada_episodio(monkeypatch):
+    bd = BD(monkeypatch)
+    bd.cursor.fetchall.return_value = [
+        fila(id_episodio=2), fila(id_episodio=9, id_paciente=5, tipo_documento=None, num_documento=None,
+                                  nombres="NN", apellidos="NN"),
+    ]
+    pacientes = PacienteDAO.listar_por_estado_de_episodio("EN ESPERA DE CAMA")
+    assert pacientes[2].nombres == "Rosa" and not pacientes[9].identificado
+    sql, params = " ".join(bd.cursor.execute.call_args.args[0].split()), bd.cursor.execute.call_args.args[1]
+    assert "ep.estado_registro = TRUE" in sql and params == ("EN ESPERA DE CAMA",)
+
+
+def test_listar_por_estado_de_episodio_desconocido(monkeypatch):
+    bd = BD(monkeypatch)
+    with pytest.raises(ValueError, match="Estado"):
+        PacienteDAO.listar_por_estado_de_episodio("ESPERANDO")
+    bd.clase.assert_not_called()
+
+
+def test_bloquear_paciente_solo_dentro_de_una_transaccion(monkeypatch):
+    bd = BD(monkeypatch, row={"id_paciente": 1})
+    with pytest.raises(RuntimeError):
+        PacienteDAO.bloquear(1)
+    bd.clase.return_value.en_transaccion = True
+    assert PacienteDAO.bloquear(1) is True
+    sql = " ".join(bd.cursor.execute.call_args.args[0].split())
+    assert sql.endswith("FOR UPDATE") and "estado_registro = TRUE" in sql
+
+
+def test_bloquear_paciente_inexistente_o_anulado(monkeypatch):
+    bd = BD(monkeypatch, row=None)
+    bd.clase.return_value.en_transaccion = True
+    assert PacienteDAO.bloquear(1) is False

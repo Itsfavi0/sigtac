@@ -210,3 +210,92 @@ def test_cambiar_estado_con_datos_invalidos_no_llega_a_la_bd(monkeypatch, episod
     with pytest.raises(ValueError, match=mensaje):
         EpisodioDAO.cambiar_estado(episodio, anterior)
     bd.clase.assert_not_called()
+
+
+# ---- listar_por_estado / listar_por_paciente (historial en consultas fijas)
+def fila_triaje(id_episodio, id_triaje, nivel=3):
+    return {"id_episodio": id_episodio, "id_triaje": id_triaje, "nivel_final": nivel, "nivel_sugerido": nivel,
+            "id_empleado": 3, "fecha_hora": INGRESO, "justificacion": None, "estado_registro": 1}
+
+
+def fila_signos(id_episodio, id_si):
+    return {"id_episodio": id_episodio, "id_si": id_si, "pa_sis": 120, "pa_dia": 80, "fc": 85, "fr": 18,
+            "temp": Decimal("37.00"), "sato2": 97}
+
+
+def test_listar_por_estado_carga_el_historial_de_todos_en_cuatro_consultas(monkeypatch):
+    bd = BD(monkeypatch, filas_por_consulta=[
+        [fila(id_episodio=2), fila(id_episodio=3, id_paciente=3)],
+        [fila_triaje(2, 10, nivel=2), fila_triaje(3, 11)],
+        [{"id_triaje": 10, "id_sintoma": 7, "nombre_sintoma": "Dolor Abdominal Intenso", "peso_clinico": Decimal("5.00")}],
+        [fila_signos(2, 20), fila_signos(3, 21), fila_signos(3, 22)],
+    ])
+    episodios = EpisodioDAO.listar_por_estado(EstadoEpisodio.EN_ESPERA)
+    assert [e.id_episodio for e in episodios] == [2, 3]
+    assert [e.nivel_actual for e in episodios] == [2, 3]
+    assert [s.nombre for s in episodios[0].triajes[0].sintomas] == ["Dolor Abdominal Intenso"]
+    assert [len(e.signos_vitales) for e in episodios] == [1, 2]
+    sentencias = bd.sentencias()
+    assert len(sentencias) == 4
+    assert all(params == ("EN ESPERA DE CAMA",) for _, params in sentencias)
+    assert all("ep.estado_registro = TRUE" in sql for sql, _ in sentencias)
+    assert "ORDER BY ep.fecha_ingreso, ep.id_episodio" in sentencias[0][0]
+
+
+def test_un_episodio_sin_historial_queda_con_historial_vacio(monkeypatch):
+    BD(monkeypatch, filas_por_consulta=[[fila(id_episodio=4, nombre_estado_episodio="EN ESPERA DE TRIAJE")], [], []])
+    episodio, = EpisodioDAO.listar_por_estado("EN ESPERA DE TRIAJE")
+    assert episodio.triajes == () and episodio.signos_vitales == ()
+
+
+def test_listar_por_estado_sin_episodios_hace_una_sola_consulta(monkeypatch):
+    bd = BD(monkeypatch, filas_por_consulta=[[]])
+    assert EpisodioDAO.listar_por_estado(EstadoEpisodio.EN_ESPERA) == []
+    assert len(bd.sentencias()) == 1
+
+
+def test_listar_por_estado_desconocido_no_consulta_la_bd(monkeypatch):
+    bd = BD(monkeypatch)
+    with pytest.raises(ValueError, match="Estado"):
+        EpisodioDAO.listar_por_estado("ESPERANDO")
+    bd.clase.assert_not_called()
+
+
+def test_listar_por_paciente(monkeypatch):
+    bd = BD(monkeypatch, filas_por_consulta=[[fila(estado_registro=0)], [], []])
+    episodio, = EpisodioDAO.listar_por_paciente(2)
+    assert not episodio.activo  # incluye los anulados
+    sql, params = bd.sentencias()[0]
+    assert "ep.id_paciente = %s" in sql and params == (2,)
+
+
+@pytest.mark.parametrize("id_paciente", [None, 0, "2", True])
+def test_listar_por_paciente_con_id_invalido(monkeypatch, id_paciente):
+    bd = BD(monkeypatch)
+    with pytest.raises(ValueError, match="id_paciente"):
+        EpisodioDAO.listar_por_paciente(id_paciente)
+    bd.clase.assert_not_called()
+
+
+# ---- bloquear (SELECT ... FOR UPDATE)
+def test_bloquear_fuera_de_una_transaccion_es_un_error(monkeypatch):
+    bd = BD(monkeypatch, row={"id_episodio": 2})
+    with pytest.raises(RuntimeError, match="transaccion"):
+        EpisodioDAO.bloquear(2)
+    bd.cursor.execute.assert_not_called()
+
+
+@pytest.mark.parametrize("row, esperado", [({"id_episodio": 2}, True), (None, False)])
+def test_bloquear_dentro_de_una_transaccion(monkeypatch, row, esperado):
+    bd = BD(monkeypatch, row=row)
+    bd.bd.en_transaccion = True
+    assert EpisodioDAO.bloquear(2) is esperado
+    sql, params = bd.sentencias()[0]
+    assert sql.endswith("FOR UPDATE") and "estado_registro = TRUE" in sql and params == (2,)
+
+
+def test_bloquear_con_id_invalido(monkeypatch):
+    bd = BD(monkeypatch)
+    with pytest.raises(ValueError):
+        EpisodioDAO.bloquear(0)
+    bd.clase.assert_not_called()

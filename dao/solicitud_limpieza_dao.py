@@ -40,6 +40,15 @@ class SolicitudLimpiezaDAO(BaseDAO):
         return id_nuevo
 
     @staticmethod
+    def buscar_por_id(id_solicitud: int) -> SolicitudLimpieza | None:
+        """La solicitud con ese id (pendiente o atendida), o None si no existe."""
+        SolicitudLimpiezaDAO._validar_id(id_solicitud, "id_solicitud")
+        fila = SolicitudLimpiezaDAO._consultar_uno(
+            SolicitudLimpiezaDAO._SELECT + " WHERE s.id_solicitud = %s", (id_solicitud,)
+        )
+        return SolicitudLimpiezaDAO._a_solicitud(fila) if fila else None
+
+    @staticmethod
     def listar_pendientes() -> list[SolicitudLimpieza]:
         """Solicitudes sin atender, de la más antigua a la más reciente (bandeja del personal de limpieza)."""
         filas = SolicitudLimpiezaDAO._consultar_varios(

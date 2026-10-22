@@ -1,8 +1,10 @@
 import logging
 
 from dao.base_dao import BaseDAO
+from dao.filtros_episodio import condicion
 from dao.transaccion import transaccion
 from models.documento import DocumentoIdentidad
+from models.estados import EstadoEpisodio
 from models.excepciones import ReglaNegocioError
 from models.persona import Paciente
 
@@ -69,6 +71,47 @@ class PacienteDAO(BaseDAO):
             PacienteDAO._SELECT + " WHERE p.num_documento IS NULL AND p.estado_registro = TRUE ORDER BY p.id_paciente"
         )
         return [PacienteDAO._a_paciente(fila) for fila in filas]
+
+    @staticmethod
+    def listar_seguros() -> list[dict]:
+        """Catálogo de seguros para el formulario de registro: [{"id_seguro": 1, "nombre_seguro": "EsSalud"}, ...]."""
+        return PacienteDAO._consultar_varios("SELECT id_seguro, nombre_seguro FROM seguro ORDER BY id_seguro")
+
+    @staticmethod
+    def listar_por_estado_de_episodio(estado: EstadoEpisodio | str) -> dict[int, Paciente]:
+        """
+        Pacientes de los episodios activos en `estado` (p. ej. la cola de espera), en una sola
+        consulta: devuelve id_episodio → Paciente, para mostrar el nombre de cada uno en la cola.
+        """
+        try:
+            estado = EstadoEpisodio(estado)
+        except ValueError:
+            raise ValueError("Estado de episodio no reconocido.") from None
+        filas = PacienteDAO._consultar_varios(
+            """
+            SELECT ep.id_episodio, p.id_paciente, td.codigo AS tipo_documento, p.num_documento, p.nombres,
+                   p.apellidos, p.fecha_nac, p.sexo, p.id_seguro, s.nombre_seguro, p.estado_registro
+            FROM episodio_emergencia ep
+            JOIN paciente p ON ep.id_paciente = p.id_paciente
+            LEFT JOIN tipo_documento td ON p.id_tipo_documento = td.id_tipo_documento
+            JOIN seguro s ON p.id_seguro = s.id_seguro
+            WHERE """ + condicion("estado"),
+            (estado.value,),
+        )
+        return {fila["id_episodio"]: PacienteDAO._a_paciente(fila) for fila in filas}
+
+    @staticmethod
+    def bloquear(id_paciente: int) -> bool:
+        """
+        Bloquea la fila del paciente hasta el final de la transacción (SELECT ... FOR UPDATE), p. ej.
+        al abrir un episodio: si dos PCs admiten a la misma persona a la vez, la segunda espera y luego
+        ve el episodio que abrió la primera. Devuelve False si el paciente no existe o está anulado.
+        """
+        PacienteDAO._validar_id(id_paciente, "id_paciente")
+        return PacienteDAO._bloquear(
+            "SELECT id_paciente FROM paciente WHERE id_paciente = %s AND estado_registro = TRUE FOR UPDATE",
+            (id_paciente,),
+        )
 
     @staticmethod
     def crear(paciente: Paciente) -> int:

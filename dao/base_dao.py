@@ -49,6 +49,20 @@ class BaseDAO:
         return BaseDAO._ejecutar_con_cursor(sql, params, lambda cursor: cursor.rowcount)
 
     @staticmethod
+    def _bloquear(sql: str, params: tuple) -> bool:
+        """
+        Ejecuta un SELECT ... FOR UPDATE: bloquea las filas leídas hasta el COMMIT o ROLLBACK, así otra
+        PC que quiera la misma fila espera a que termine esta operación. Devuelve False si no hay filas.
+
+        Solo tiene sentido dentro de transaccion(): con autocommit el bloqueo se libera al instante.
+        Debe ser la primera lectura de la transacción, para que las consultas siguientes vean los
+        cambios que otra PC confirmó mientras se esperaba el bloqueo.
+        """
+        if not ConexionBD().en_transaccion:
+            raise RuntimeError("Un bloqueo de filas (FOR UPDATE) solo funciona dentro de transaccion().")
+        return BaseDAO._consultar_uno(sql, params) is not None
+
+    @staticmethod
     def _ejecutar_con_cursor(sql: str, params: tuple, obtener_resultado):
         """Abre un cursor, ejecuta la sentencia, extrae el resultado y cierra el cursor siempre."""
         if not isinstance(params, tuple):

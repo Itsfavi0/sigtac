@@ -35,6 +35,10 @@ class SignosVitales:
         # Validaciones de integridad antes de instanciar
         valores = {'pa_sis': pa_sis, 'pa_dia': pa_dia, 'fc': fc, 'fr': fr, 'temp': temp, 'sato2': sato2}
         for nombre, valor in valores.items():
+            # bool es subclase de int: True no es una medición. Un texto (p. ej. "120" de un formulario)
+            # lo convierte la vista antes de llegar aquí.
+            if isinstance(valor, bool) or not isinstance(valor, (int, float)):
+                raise ValueError(f"{nombre} debe ser un número.")
             minimo, maximo = self.RANGOS[nombre]
             if not (minimo <= valor <= maximo):
                 raise ValueError(f"{nombre} fuera del rango admitido ({minimo}-{maximo}): {valor}")
@@ -207,6 +211,12 @@ class EpisodioEmergencia:
         """True si el episodio terminó (alta, referido o fuga) o fue anulado."""
         return self._estado in self.ESTADOS_CERRADOS or not self._activo
 
+    @property
+    def nivel_actual(self) -> int | None:
+        """Nivel final del triaje vigente (el que rige la prioridad), o None si aún no tiene triaje."""
+        triaje = self.obtener_triaje_actual()
+        return triaje.nivel_final if triaje else None
+
     def _exigir_abierto(self, accion: str):
         if self.cerrado:
             motivo = "anulado" if not self._activo else f"en estado {self._estado}"
@@ -266,3 +276,15 @@ class EpisodioEmergencia:
     def anular(self):
         """RN-11: baja lógica; el episodio nunca se borra físicamente."""
         self._activo = False
+
+def ordenar_por_prioridad(episodios) -> list[EpisodioEmergencia]:
+    """
+    Orden de la cola de espera: primero el nivel de triaje más urgente (1 = Rojo) y, a igual nivel,
+    el que llegó antes (fecha de ingreso; si coincide, el id menor). Los episodios sin triaje van al
+    final, por orden de llegada: es el caso de la cola de espera de triaje.
+    """
+    def clave(episodio: EpisodioEmergencia):
+        nivel = episodio.nivel_actual
+        return (nivel if nivel is not None else 6, episodio.fecha_ingreso, episodio.id_episodio or 0)
+
+    return sorted(episodios, key=clave)

@@ -221,4 +221,41 @@ def test_listar_con_id_invalido_no_consulta_la_bd(monkeypatch, metodo, id_episod
 
 def test_triaje_dao_no_tiene_metodos_para_modificar_ni_borrar():  # RN-09
     publicos = {nombre for nombre in vars(TriajeDAO) if not nombre.startswith("_")}
-    assert publicos == {"listar_sintomas", "registrar", "listar_por_episodio", "listar_signos_por_episodio"}
+    assert publicos == {"listar_sintomas", "registrar", "listar_por_episodio", "listar_signos_por_episodio",
+                        "listar_historial"}
+
+
+# ---- listar_historial (varios episodios a la vez)
+def fila_triaje_ep(id_episodio, id_triaje, nivel=3):
+    return {"id_episodio": id_episodio, "id_triaje": id_triaje, "nivel_final": nivel, "nivel_sugerido": nivel,
+            "id_empleado": 3, "fecha_hora": AHORA, "justificacion": None, "estado_registro": 1}
+
+
+def test_listar_historial_agrupa_por_episodio(monkeypatch):
+    bd = BD(monkeypatch, filas_por_consulta=[
+        [fila_triaje_ep(1, 10), fila_triaje_ep(1, 11, nivel=2), fila_triaje_ep(2, 12)],
+        [{"id_triaje": 11, "id_sintoma": 2, "nombre_sintoma": "Dolor Torácico Opresivo", "peso_clinico": Decimal("8.5")},
+         {"id_triaje": 99, "id_sintoma": 3, "nombre_sintoma": "Disnea", "peso_clinico": Decimal("8")}],
+        [{"id_episodio": 2, "id_si": 5, "pa_sis": 120, "pa_dia": 80, "fc": 85, "fr": 18,
+          "temp": Decimal("37.20"), "sato2": 97}],
+    ])
+    triajes, signos = TriajeDAO.listar_historial("paciente", 1)
+    assert {k: [t.id_triaje for t in v] for k, v in triajes.items()} == {1: [10, 11], 2: [12]}
+    # el síntoma de un triaje que no se leyó (id 99) se ignora
+    assert [s.id_sintoma for s in triajes[1][1].sintomas] == [2] and triajes[1][0].sintomas == ()
+    assert list(signos) == [2] and signos[2][0].a_diccionario()["temp"] == 37.2
+    assert all(params == (1,) and "ep.id_paciente = %s" in sql for sql, params in bd.sentencias())
+
+
+def test_listar_historial_sin_triajes_no_consulta_los_sintomas(monkeypatch):
+    bd = BD(monkeypatch, filas_por_consulta=[[], []])
+    assert TriajeDAO.listar_historial("estado", "EN ESPERA DE CAMA") == ({}, {})
+    assert len(bd.sentencias()) == 2
+
+
+@pytest.mark.parametrize("filtro", ["id_episodio", "", "estado; DROP TABLE triaje"])
+def test_listar_historial_con_filtro_fuera_de_la_lista_blanca(monkeypatch, filtro):
+    bd = BD(monkeypatch)
+    with pytest.raises(ValueError, match="Filtro"):
+        TriajeDAO.listar_historial(filtro, 1)
+    bd.clase.assert_not_called()

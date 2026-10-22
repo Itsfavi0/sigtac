@@ -5,6 +5,44 @@
 
 ---
 
+## [2026-10-22] — Base para los controladores: colas, historial en bloque y bloqueo de filas
+
+### Cambio
+- `models/triaje.py`:
+  - `EpisodioEmergencia.nivel_actual`: nivel final del triaje vigente (o `None`).
+  - `ordenar_por_prioridad(episodios)`: orden de la cola de espera (nivel más urgente primero; a igual nivel, el que llegó antes; sin triaje, al final por llegada).
+  - `SignosVitales` rechaza valores que no sean números (`ValueError`), p. ej. el texto `"120"` de un formulario o `True`.
+- `dao/filtros_episodio.py` (nuevo): lista blanca de condiciones SQL fijas (`estado`, `paciente`) para cargar varios episodios a la vez.
+- `TriajeDAO.listar_historial(filtro, valor)`: triajes con síntomas y signos vitales de muchos episodios en 3 consultas fijas.
+- `EpisodioDAO.listar_por_estado(estado)` y `listar_por_paciente(id_paciente)`: episodios con su historial completo (4 consultas, no 3 por episodio); `EpisodioDAO.bloquear(id_episodio)`.
+- `PacienteDAO.listar_seguros()`, `listar_por_estado_de_episodio(estado)` (id_episodio → Paciente, para mostrar nombres en una cola) y `bloquear(id_paciente)`.
+- `SolicitudLimpiezaDAO.buscar_por_id(id_solicitud)`.
+- `BaseDAO._bloquear(sql, params)`: `SELECT ... FOR UPDATE`; lanza `RuntimeError` fuera de `transaccion()`.
+
+### Archivos afectados
+- `models/triaje.py`, `dao/filtros_episodio.py` (nuevo), `dao/base_dao.py`, `dao/triaje_dao.py`, `dao/episodio_dao.py`, `dao/paciente_dao.py`, `dao/solicitud_limpieza_dao.py`
+- `tests/test_triaje.py`, `tests/test_triaje_dao.py`, `tests/test_episodio_dao.py`, `tests/test_paciente_dao.py`, `tests/test_asignacion_dao.py`
+
+### Motivo
+Los controladores de la Fase 4 necesitaban: la cola de espera (RN-01: solo con triaje; prioridad por nivel), saber si un paciente ya tiene un episodio abierto, y evitar que dos PCs pisen la misma operación cuando no hay un cambio de estado que sirva de `UPDATE` condicional (p. ej. un segundo triaje mientras otra PC da de alta).
+
+### Impacto
+- Pruebas: 883 pasan tras este cambio. SQL nuevo pendiente de verificar en base temporal (se verifica junto con los controladores, ver la entrada de la verificación).
+
+### Decisiones
+- **Historial en bloque, no N+1:** cargar 20 episodios de la cola con `buscar_por_id` serían 60 consultas; con `listar_historial` son 3, filtrando por el mismo criterio que la lista de episodios (JOIN con `episodio_emergencia`).
+- **Filtros como lista blanca:** el criterio (`estado` o `paciente`) elige un fragmento SQL fijo; el valor viaja siempre como parámetro. Se evitó generar `IN (%s, %s, ...)` dinámico.
+- **La prioridad de la cola es del modelo:** `ordenar_por_prioridad` usa `obtener_triaje_actual`; repetir esa regla en SQL (último triaje activo por episodio) la duplicaría.
+- **`SELECT ... FOR UPDATE` en una consulta propia y sin JOIN:** bloquear con el `_SELECT` de paciente también bloquearía las filas de `seguro` y `tipo_documento` y pondría en fila a todas las admisiones con el mismo seguro. `FOR UPDATE OF p` lo evitaría, pero MariaDB (usada en desarrollo) no lo admite.
+- **El bloqueo va primero en la transacción:** en REPEATABLE READ la foto de la BD se toma en la primera lectura normal; si el bloqueo va antes, las lecturas siguientes ven lo que otra PC confirmó mientras se esperaba.
+- **`_bloquear` exige transacción:** con autocommit el bloqueo se libera al instante y no protegería nada; es un error de programación (`RuntimeError`).
+- **`SignosVitales` valida el tipo:** antes un texto llegaba a la comparación de rangos y lanzaba `TypeError` (que no es `ValueError` y la vista no capturaría).
+
+### Pendientes
+- Verificar el SQL nuevo y los bloqueos en una base temporal.
+
+---
+
 ## [2026-10-21] — Fase 4: `auth_controller.py` (sesión y permisos)
 
 ### Cambio

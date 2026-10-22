@@ -211,3 +211,16 @@ def test_atender_con_ids_invalidos_no_llega_a_la_bd(monkeypatch, ids):
     with pytest.raises(ValueError):
         SolicitudLimpiezaDAO.atender(*ids)
     bd.clase.assert_not_called()
+
+
+def test_buscar_solicitud_por_id(monkeypatch):
+    bd = BD(monkeypatch, row=fila_solicitud(id_solicitud=3))
+    assert SolicitudLimpiezaDAO.buscar_por_id(3).id_solicitud == 3
+    assert "s.id_solicitud = %s" in bd.sql and bd.params == (3,)
+
+
+def test_buscar_solicitud_inexistente_o_id_invalido(monkeypatch):
+    BD(monkeypatch, row=None)
+    assert SolicitudLimpiezaDAO.buscar_por_id(3) is None
+    with pytest.raises(ValueError):
+        SolicitudLimpiezaDAO.buscar_por_id(0)
