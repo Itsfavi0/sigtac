@@ -21,12 +21,12 @@
 - `models/persona.py` alineado con las tablas `paciente` y `empleado`, con validaciones de entrada (2026-10-12).
 - Pacientes y empleados se identifican con `DocumentoIdentidad` (DNI, carné de extranjería, pasaporte o CPP) (2026-10-21).
 - Un paciente puede ingresar sin identificar (NN) e identificarse después (2026-10-21).
-- **Fase 4 (controllers) cerrada (2026-10-22)**, en la rama `feat/fase4-controladores`: los cinco controladores del plan están hechos, probados y verificados en MySQL 8.0.46 (56 comprobaciones, `scripts/verificar_controladores.py`).
-- Pruebas: **1099 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
+- **Fase 4 (controllers) cerrada (2026-10-22)** y fusionada en `main`: los cinco controladores del plan están hechos, probados y verificados en MySQL 8.0.46 (56 comprobaciones, `scripts/verificar_controladores.py`).
+- Pruebas: **1104 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
 
 ### Tarea actual
 
-Ninguna en curso. La Fase 4 está en la rama `feat/fase4-controladores` (sin fusionar con `main` ni subir). Siguiente: revisar la rama y decidir entre la Fase 5 (`pdf_generator.py`) y la Fase 6 (vistas).
+Ninguna en curso. Siguiente: decidir entre la Fase 5 (`pdf_generator.py`) y la Fase 6 (vistas).
 
 ---
 
@@ -38,7 +38,7 @@ Ninguna en curso. La Fase 4 está en la rama `feat/fase4-controladores` (sin fus
 | Fase 1 — Base de datos | Completada. Verificada en MySQL 8.0.46 (2026-10-12 y 2026-10-21) y antes en MariaDB 11.8 |
 | Fase 2 — Models | Completada (2026-10-12) |
 | Fase 3 — DAO | Completada (2026-10-21) |
-| Fase 4 — Controllers | Completada (2026-10-22, rama `feat/fase4-controladores`). Verificada en MySQL 8.0.46 |
+| Fase 4 — Controllers | Completada (2026-10-22). Verificada en MySQL 8.0.46 |
 | Fase 5 — Utils | Parcial: `security.py` y `logging_config.py` hechos; falta `pdf_generator.py` |
 | Fase 6 — Views | Pendiente (la carpeta `views/` aún no existe) |
 | Fase 7 — Integración y pruebas | Pendiente |
@@ -137,9 +137,8 @@ Ninguno bloqueante. Las decisiones menores están en "Pendientes conocidos".
 
 ## Próximo trabajo previsto
 
-1. Revisar la rama `feat/fase4-controladores` y fusionarla con `main`.
-2. Validar con el equipo la matriz de permisos (`models/permisos.py`; ver CHANGELOG del 2026-10-21).
-3. Fase 5: `utils/pdf_generator.py` (exportar los indicadores de `ReporteController`) o Fase 6: vistas con CustomTkinter, que ya pueden usar los controladores.
+1. Validar con el equipo la matriz de permisos (`models/permisos.py`; ver CHANGELOG del 2026-10-21).
+2. Fase 5: `utils/pdf_generator.py` (exportar los indicadores de `ReporteController`) o Fase 6: vistas con CustomTkinter, que ya pueden usar los controladores.
 
 Respecto al plan original, `auditoria_dao.py` se hizo antes que `triaje_dao.py` y `asignacion_dao.py` porque es de una sola tabla y no depende de transacciones (ver `CHANGELOG.md` del 2026-10-12).
 

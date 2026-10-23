@@ -4,6 +4,12 @@ from datetime import datetime
 from models.estados import EstadoEpisodio
 from models.excepciones import NivelTriajeInvalidoError, ReglaNegocioError
 
+
+def _es_nivel_valido(nivel) -> bool:
+    # Solo enteros del 1 al 5: True (que vale 1) o 2.0 también pasarían un simple "in range(1, 6)".
+    return isinstance(nivel, int) and not isinstance(nivel, bool) and 1 <= nivel <= 5
+
+
 # CATÁLOGO: SÍNTOMA
 @dataclass(frozen=True)
 class Sintoma:
@@ -70,7 +76,7 @@ class SignosVitales:
 # TRANSACCIÓN: TRIAJE
 class Triaje:
     def __init__(self, id_triaje: int, nivel_sugerido: int, id_empleado: int, fecha_hora: datetime):
-        if nivel_sugerido not in range(1, 6):
+        if not _es_nivel_valido(nivel_sugerido):
             raise NivelTriajeInvalidoError("El nivel sugerido debe estar entre 1 (Rojo) y 5 (Azul).")
 
         self._id_triaje = id_triaje
@@ -133,7 +139,7 @@ class Triaje:
         añadirse con EpisodioEmergencia.agregar_triaje(), preservando así
         el historial completo que exige RN-09.
         """
-        if nuevo_nivel not in range(1, 6):
+        if not _es_nivel_valido(nuevo_nivel):
             raise NivelTriajeInvalidoError("El nivel de triaje debe estar entre 1 (Rojo) y 5 (Azul).")
         if not justificacion or len(justificacion.strip()) < 10:
             raise ValueError("Debe proporcionar una justificación médica válida (mínimo 10 caracteres).")

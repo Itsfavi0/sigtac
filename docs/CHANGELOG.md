@@ -5,6 +5,31 @@
 
 ---
 
+## [2026-10-22] — Revisión de la Fase 4 antes de fusionar con `main`
+
+### Cambio
+- `models/triaje.py`: `Triaje` (nivel sugerido) y `Triaje.reclasificar` (nivel nuevo) solo aceptan enteros del 1 al 5 (`_es_nivel_valido`). Antes `True` pasaba como nivel 1 y `2.0` como nivel 2, porque `True in range(1, 6)` y `2.0 in range(1, 6)` son verdaderos en Python.
+- `scripts/verificar_controladores.py`: se quita un import sin usar y se comenta por qué el `DROP DATABASE` arma el nombre con una constante (un nombre de base no puede ir como parámetro).
+- Pruebas: `test_el_nivel_debe_ser_un_entero` en `tests/test_triaje.py` (5 casos).
+
+### Archivos afectados
+- `models/triaje.py`, `scripts/verificar_controladores.py`, `tests/test_triaje.py`, `docs/`
+
+### Motivo
+Revisión de la rama `feat/fase4-controladores` antes de fusionarla. Con los controladores, el nivel final llega desde la vista (`TriajeController.registrar(..., nivel_final=...)`): un valor mal convertido (un checkbox, un `float`) no debe aceptarse como nivel.
+
+### Impacto
+- Pruebas: 1104 pasan. Verificación en MySQL repetida: 56 de 56.
+- Sin cambios de comportamiento para niveles enteros válidos.
+
+### Decisiones
+- **La regla queda en el modelo:** es la validación del nivel de triaje; el controlador no la repite.
+
+### Pendientes
+- Ninguno nuevo.
+
+---
+
 ## [2026-10-22] — Verificación de la Fase 4 en MySQL 8.0.46 (`scripts/verificar_controladores.py`)
 
 ### Cambio

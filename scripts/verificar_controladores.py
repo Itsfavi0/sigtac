@@ -93,7 +93,8 @@ def main():
         os.environ.update(DB_HOST=host, DB_PORT=str(puerto), DB_USER=usuario, DB_PASS=clave, DB_NAME=BD_TEMPORAL)
         ejecutar_flujo(otra_pc)
     finally:
-        admin.cursor().execute(f"DROP DATABASE IF EXISTS {BD_TEMPORAL}")
+        # El nombre de una base no puede ir como parámetro (%s); BD_TEMPORAL es una constante del script.
+        admin.cursor().execute("DROP DATABASE IF EXISTS " + BD_TEMPORAL)
         admin.close()
         print(f"\nBase {BD_TEMPORAL} eliminada.")
 
@@ -110,7 +111,6 @@ def ejecutar_flujo(otra_pc):
     from controllers.triaje_controller import TriajeController
     from dao.db_connection import ConexionBD
     from dao.episodio_dao import EpisodioDAO
-    from dao.triaje_dao import TriajeDAO
     from models.estados import EstadoCama, EstadoEpisodio
     from models.estrategias import ReglaManchester
     from models.excepciones import (CamaEstadoInvalidoError, ReglaNegocioError, UsuarioSinPermisoError)

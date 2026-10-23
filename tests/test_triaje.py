@@ -375,3 +375,11 @@ def test_ordenar_no_modifica_la_lista_original():
     cola = [en_espera(1, 3, 5), en_espera(2, 1, 5)]
     ordenar_por_prioridad(cola)
     assert ids(cola) == [1, 2]
+
+
+@pytest.mark.parametrize("nivel", [True, False, 2.0, "2", None])
+def test_el_nivel_debe_ser_un_entero(nivel):
+    with pytest.raises(NivelTriajeInvalidoError):
+        Triaje(None, nivel, 3, AHORA)
+    with pytest.raises(NivelTriajeInvalidoError):
+        nuevo_triaje(3).reclasificar(nivel, "Justificación suficientemente larga.")
