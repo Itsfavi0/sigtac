@@ -41,10 +41,11 @@ python scripts/verificar_controladores.py
 ## Estructura
 
 ```text
-controllers/  Casos de uso: auth (Sesion, exigir_permiso), paciente, triaje, cama, reporte y colas.py (EntradaCola)
+controllers/  Casos de uso: auth (Sesion, exigir_permiso), paciente, triaje, cama, reporte, admin y colas.py (EntradaCola)
 dao/          Acceso a datos: db_connection.py (Singleton ConexionBD), base_dao.py, transaccion.py, filtros_episodio.py,
               reporte_dao.py y un *_dao.py por entidad
-models/       Dominio: persona, documento, cama, triaje, asignacion, estrategias, permisos, estados y auditoria (Enum), excepciones
+models/       Dominio: persona, documento, cama, triaje, asignacion, usuario (CuentaUsuario, política de claves),
+              estrategias, permisos, estados y auditoria (Enum), excepciones
 utils/        security.py (bcrypt) y logging_config.py
 db_scripts/   schema.sql, seed.sql, crear_usuario_app.sql y diagrama.png
 tests/        pytest: un test_*.py por módulo; conftest.py con los dobles de los controladores
@@ -129,7 +130,8 @@ RN-10: reclasificar exige justificación escrita (≥ 10 caracteres) · RN-11: b
 
 - Nunca versionar ni mostrar `.env`; nunca poner credenciales en el código. Las variables de conexión son
   obligatorias (sin valores por defecto). Usar un usuario de BD con `SELECT, INSERT, UPDATE`, no `root`.
-- Contraseñas solo con bcrypt (`utils/security.py`); nunca registrar claves, hashes, números de documento ni nombres en logs.
+- Contraseñas solo con bcrypt (`utils/security.py`); nunca registrar claves, hashes, números de documento ni nombres en logs
+  ni en la bitácora. Una clave nueva pasa por `validar_clave_nueva` (`models/usuario.py`) y el hash lo calcula el controlador.
 - `UsuarioDAO.autenticar` devuelve siempre `None` ante cualquier fallo (sin revelar la causa), valida el documento
   con `DocumentoIdentidad`, usa `simular_verificacion` en las salidas tempranas y bloquea 5 intentos fallidos durante 15 min.
 - Las claves del seed son solo de desarrollo; nunca usarlas fuera de local.

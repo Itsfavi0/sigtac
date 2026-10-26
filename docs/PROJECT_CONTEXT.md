@@ -290,6 +290,8 @@ Cada operación de cama es una transacción del controlador que combina varios D
 | Dar de alta (RN-07) | `episodio.dar_alta()`, `cama.dar_alta()` | estados + `AsignacionDAO.liberar` + `SolicitudLimpiezaDAO.crear` |
 | Confirmar limpieza (RN-08) | `cama.liberar_limpieza()` | estado + `SolicitudLimpiezaDAO.atender` |
 | Cancelar una reserva | `episodio.cancelar_asignacion()`, `cama.cancelar_reserva()` | estados + `AsignacionDAO.anular` (sin limpieza) |
+| Referir o registrar una fuga | `episodio.referir()` / `episodio.registrar_fuga()` y, si tenía cama, `cama.cancelar_reserva()` o `cama.dar_alta()` | estados + `AsignacionDAO.anular` o `liberar` + `SolicitudLimpiezaDAO.crear` |
+| Fuera de servicio / volver a servicio | `cama.fuera_de_servicio()`, `cama.volver_a_servicio()` | estado (sin asignación vigente ni limpieza pendiente) |
 
 Una asignación liberada (alta) y una anulada (reserva cancelada) se distinguen en el historial. Un paciente NN que resulta estar ya registrado se fusiona con él (`Paciente.fusionar_en` + `PacienteDAO.fusionar`): sus episodios pasan al paciente real y el NN se anula. Un episodio cerrado (alta, referido, fuga o anulado) no admite triajes nuevos.
 
@@ -324,6 +326,7 @@ Para el alcance del curso se prefiere esta solución explícita frente a AOP/dec
 - El acceso depende del **rol** del usuario (`usuario.id_rol`), no del cargo ni de la subclase de `Empleado`. La matriz rol → permisos está en `models/permisos.py` (`Rol`, `Permiso`, `PERMISOS_POR_ROL`, `tiene_permiso`); un rol desconocido no tiene permisos.
 - Los controladores comprueban el permiso con `exigir_permiso(sesion, permiso)` (`controllers/auth_controller.py`), que usa `tiene_permiso(nombre_rol, permiso)` y lanza `UsuarioSinPermisoError` si falta: el modelo solo responde, no lanza esa excepción.
 - La `Sesion` (usuario conectado) se crea en `AuthController.iniciar_sesion` y se pasa a cada controlador; al cerrar sesión se invalida y esos controladores dejan de operar.
+- Las cuentas las administra `AdminController` (permiso `ADMINISTRACION`): la clave nueva se valida con `validar_clave_nueva` (`models/usuario.py`), se convierte en hash bcrypt y nunca se guarda, se devuelve ni se audita. Un administrador no puede desactivarse ni cambiar su propio rol.
 
 ---
 

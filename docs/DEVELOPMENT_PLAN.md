@@ -250,6 +250,12 @@ Motivo del orden: ver `CHANGELOG.md` (2026-10-12).
 - [x] Buscar o registrar al paciente (con documento o NN).
 - [x] Abrir el episodio de emergencia (uno abierto por paciente; bloqueo de fila contra la doble admisión).
 - [x] Identificar y fusionar pacientes NN (con auditoría).
+- [x] Editar los datos (PACIENTES); dar de baja y reactivar (ADMINISTRACION).
+
+### `admin_controller.py`
+
+- [x] Cuentas de usuario: crear, cambiar rol, activar/desactivar, restablecer la clave y desbloquear.
+- [x] Consultar la bitácora por período, tabla y usuario.
 
 ### `triaje_controller.py`
 
@@ -273,7 +279,8 @@ Motivo del orden: ver `CHANGELOG.md` (2026-10-12).
 - [x] Obtener camas compatibles.
 - [x] Reservar mediante transacción atómica.
 - [x] Evitar inconsistencias por concurrencia (`UPDATE` condicional; verificado en MySQL).
-- [ ] Fuera de servicio / volver a servicio (pendiente de decidir quién puede).
+- [x] Fuera de servicio / volver a servicio (GESTION_CAMAS; sin paciente asignado ni limpieza pendiente).
+- [x] Referir y registrar una fuga (liberan la cama si la había).
 
 ### `reporte_controller.py`
 
@@ -349,7 +356,7 @@ Debe permitir:
 
 En los controladores (sin interfaz), verificado en MySQL con `scripts/verificar_controladores.py` (2026-10-22); falta repetirlo desde las vistas:
 
-- [ ] Login → sesión → permisos (la sesión del script se crea a mano: falta el login con un usuario del seed).
+- [x] Login → sesión → permisos (`verificar_controladores.py` inicia sesión con una cuenta creada por el administrador).
 - [x] Paciente → episodio.
 - [x] Episodio → signos/síntomas.
 - [x] Triaje → clasificación.

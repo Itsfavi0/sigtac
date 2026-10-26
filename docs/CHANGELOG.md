@@ -5,6 +5,78 @@
 
 ---
 
+## [2026-10-26] — Pendientes de la Fase 4: referir, fuga, fuera de servicio, edición de pacientes y administración
+
+### Cambio
+- **Cierre de episodios** (`models/triaje.py`): `EpisodioEmergencia.referir()` (solo desde EN ESPERA DE CAMA o EN ATENCIÓN: exige triaje) y `registrar_fuga()` (desde cualquier estado abierto). Ambos, y `dar_alta`, cierran con `_cerrar`, que guarda la fecha de egreso.
+  - `EpisodioDAO.cambiar_estado` pone `fecha_alta = NOW()` en cualquier cierre (alta, referido o fuga), no solo en el alta.
+  - `ReporteDAO.promedio_estancia_min` ahora filtra por ALTA MÉDICA.
+  - `CamaController.referir` y `registrar_fuga` liberan la cama si el paciente tenía una: si solo estaba reservada vuelve a DISPONIBLE y la asignación se anula; si estaba ocupada pasa a EN LIMPIEZA con su solicitud (RN-07).
+- **Mantenimiento de camas** (`CamaController`): `poner_fuera_de_servicio(id_cama, motivo)` y `volver_a_servicio(id_cama)`.
+  - El motivo es obligatorio (máx. 200 caracteres) y queda en la bitácora.
+  - Se rechaza una cama con paciente asignado, con limpieza pendiente o que ya está fuera de servicio.
+  - Nuevo `SolicitudLimpiezaDAO.buscar_pendiente_por_cama`.
+- **Pacientes** (`models/persona.py`):
+  - `Paciente.actualizar_datos(...)` devuelve los campos que cambiaron. Un NN conserva "NN" como nombre hasta que se identifica.
+  - `Paciente.reactivar()`: un NN dado de baja no se reactiva.
+  - En `PacienteController`:
+    - `actualizar_datos`: permiso PACIENTES; bloquea la fila primero. La auditoría guarda solo los nombres de los campos.
+    - `dar_de_baja` y `reactivar`: permiso ADMINISTRACION. No se da de baja a un paciente con un episodio abierto.
+  - `PacienteDAO.actualizar` solo modifica pacientes activos.
+  - Nuevos `PacienteDAO.reactivar` (UPDATE condicional) y la acción de auditoría `REACTIVAR`.
+- **Administración** (nuevos `models/usuario.py` y `controllers/admin_controller.py`, permiso ADMINISTRACION):
+  - `CuentaUsuario`, con las transiciones `activar`, `desactivar`, `cambiar_rol` y `desbloquear`.
+  - `validar_clave_nueva`: mínimo 8 caracteres, letras y números, máximo 72 bytes y sin espacios en los extremos.
+  - `AdminController` ofrece: `listar_cuentas`, `listar_empleados_sin_cuenta`, `listar_roles`, `crear_cuenta`, `cambiar_rol`, `desactivar`, `activar`, `restablecer_clave`, `desbloquear`, `bitacora(desde, hasta, tabla, id_usuario, limite)` e `historial_de_registro`.
+  - `UsuarioDAO` gana los métodos de administración de cuentas: `listar_cuentas`, `buscar_cuenta`, `crear_cuenta`, `cambiar_rol` y `cambiar_activo` (los dos últimos con UPDATE condicional), `restablecer_clave` y `desbloquear`.
+  - `AuditoriaDAO.listar` consulta la bitácora por período, con filtros opcionales y un tope de 1000 filas.
+- `BaseDAO._validar_periodo` (antes solo en `ReporteDAO`): ahora también lo usa `AuditoriaDAO`.
+- `scripts/verificar_controladores.py` se amplía con todos estos flujos. Incluye un **login real** con una cuenta creada por el administrador: cambio de rol, desactivación, bloqueo por 5 intentos, desbloqueo y clave restablecida.
+- Pruebas:
+  - nuevas: `tests/test_admin_controller.py` (86) y `tests/test_usuario.py` (27);
+  - ampliadas: `test_cama_controller` (92), `test_paciente_controller` (78), `test_usuario_dao`, `test_auditoria_dao`, `test_paciente_dao`, `test_asignacion_dao`, `test_episodio_dao`, `test_reporte_dao`, `test_triaje` y `test_persona`.
+
+### Archivos afectados
+- `models/triaje.py`, `models/persona.py`, `models/auditoria.py`, `models/usuario.py` (nuevo)
+- `dao/base_dao.py`, `dao/episodio_dao.py`, `dao/reporte_dao.py`, `dao/paciente_dao.py`, `dao/solicitud_limpieza_dao.py`, `dao/usuario_dao.py`, `dao/auditoria_dao.py`
+- `controllers/cama_controller.py`, `controllers/paciente_controller.py`, `controllers/admin_controller.py` (nuevo)
+- `scripts/verificar_controladores.py`, `tests/`, `docs/`, `CLAUDE.md`
+
+### Motivo
+Eran los "pendientes conocidos" de la Fase 4:
+- operaciones sin controlador (camas fuera de servicio, editar y reactivar pacientes, cuentas y bitácora);
+- estados del catálogo sin transición en el modelo (REFERIDO y FUGADO).
+
+Las vistas de la Fase 6 los necesitan.
+
+### Impacto
+- Pruebas: **1349 pasan** (antes 1104).
+- `promedio_estancia_min` ya no cuenta los referidos ni las fugas, aunque todos tienen fecha de egreso.
+- Sin cambios de esquema (`accion` de la bitácora es `VARCHAR` sin `CHECK`): no hace falta recrear `sigtac_db`.
+- Verificación ampliada en MySQL (`scripts/verificar_controladores.py`, ejecutada por el usuario con su cuenta de administrador): **todas las comprobaciones correctas**, incluido el login real con la cuenta creada por el administrador.
+
+### Decisiones
+- **`fecha_alta` es la fecha de egreso:** se guarda en todo cierre, porque el episodio terminó igual. Por eso el indicador de estancia filtra por ALTA MÉDICA: si no, una fuga a los pocos minutos acortaría el promedio.
+- **Referir exige triaje y la fuga no:** referir es una decisión clínica sobre un paciente evaluado; irse se puede antes de que lo vean.
+- **Referir y fuga con permiso GESTION_CAMAS (médico y jefe de guardia):** liberan una cama, igual que el alta. Queda por validar con el equipo si el enfermero también debe registrar una fuga desde la sala de espera.
+- **Fuera de servicio con GESTION_CAMAS:**
+  - El modelo admite decretarlo desde cualquier estado (no cambió).
+  - El controlador lo impide si hay una asignación vigente o una limpieza pendiente; si no, quedarían abiertas sobre una cama fuera de servicio.
+  - Para una cama con un paciente dentro falta el **traslado de cama**.
+- **Baja y reactivación de pacientes con ADMINISTRACION:** son correcciones de registros (un duplicado, una baja por error), no parte de la atención. Editar los datos sí es de PACIENTES.
+- **Un administrador no se desactiva ni cambia su propio rol:** así el sistema no se queda sin administrador por un clic equivocado. Lo hace otro administrador.
+- **Política de claves en el modelo, hash en el controlador:** el DAO rechaza cualquier valor que no sea un hash bcrypt, como defensa por si se le pasara la clave en texto plano por error. Ni la clave ni el hash van a la bitácora ni a los logs.
+- **72 bytes como máximo:** bcrypt ignora (y bcrypt 5 rechaza) lo que pase de 72 bytes. Se mide en bytes UTF-8: "ñ" ocupa 2.
+
+### Pendientes
+- Traslado de cama, para un paciente cuya cama falla.
+- Validar con el equipo los permisos nuevos: fuga con GESTION_CAMAS, y baja y reactivación con ADMINISTRACION.
+- Una cuenta desactivada que ya tenía la sesión abierta en otra PC la conserva hasta cerrarla: la sesión vive en la aplicación.
+- Que cada usuario pueda cambiar su propia clave (hoy solo la restablece el administrador).
+- Actualizar `db_scripts/diagrama.png`.
+
+---
+
 ## [2026-10-22] — Revisión de la Fase 4 antes de fusionar con `main`
 
 ### Cambio
