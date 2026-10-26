@@ -10,5 +10,6 @@ class AccionAuditoria(StrEnum):
     INSERT = "INSERT"
     UPDATE = "UPDATE"
     ANULAR = "ANULAR"            # RN-11: baja lógica
+    REACTIVAR = "REACTIVAR"      # se revierte una baja lógica
     IDENTIFICAR = "IDENTIFICAR"  # paciente sin identificar (NN) que recibe su documento
     FUSIONAR = "FUSIONAR"        # paciente NN que resultó ser un paciente ya registrado

@@ -160,6 +160,8 @@ class EpisodioEmergencia:
     ESTADO_EN_ESPERA = EstadoEpisodio.EN_ESPERA
     ESTADO_EN_ATENCION = EstadoEpisodio.EN_ATENCION
     ESTADO_ALTA = EstadoEpisodio.ALTA
+    ESTADO_REFERIDO = EstadoEpisodio.REFERIDO
+    ESTADO_FUGADO = EstadoEpisodio.FUGADO
     # Un episodio cerrado ya no admite triajes ni signos vitales nuevos.
     ESTADOS_CERRADOS = (EstadoEpisodio.ALTA, EstadoEpisodio.REFERIDO, EstadoEpisodio.FUGADO)
 
@@ -276,7 +278,31 @@ class EpisodioEmergencia:
         """Solo se da de alta a un paciente que está siendo atendido en una cama."""
         if self._estado != self.ESTADO_EN_ATENCION:
             raise ReglaNegocioError(f"No se puede dar de alta un episodio en estado {self._estado}.")
-        self._estado = self.ESTADO_ALTA
+        self._cerrar(self.ESTADO_ALTA)
+
+    def referir(self):
+        """
+        El paciente se traslada a otro establecimiento (p. ej. no hay cama compatible o necesita una
+        especialidad que este hospital no tiene). Referir exige haberlo evaluado: solo desde EN ESPERA
+        DE CAMA o EN ATENCIÓN, es decir, con triaje. Si tenía cama, la libera el controlador.
+        """
+        self._exigir_abierto("referir al paciente")
+        if self._estado not in (self.ESTADO_EN_ESPERA, self.ESTADO_EN_ATENCION):
+            raise ReglaNegocioError(f"No se puede referir un episodio en estado {self._estado}: falta el triaje.")
+        self._cerrar(self.ESTADO_REFERIDO)
+
+    def registrar_fuga(self):
+        """
+        El paciente se retiró sin alta médica (fuga o abandono). Puede pasar en cualquier momento
+        mientras el episodio siga abierto, incluso antes del triaje. Si tenía cama, la libera el controlador.
+        """
+        self._exigir_abierto("registrar una fuga")
+        self._cerrar(self.ESTADO_FUGADO)
+
+    def _cerrar(self, estado: EstadoEpisodio):
+        # La fecha de egreso (columna fecha_alta) se guarda para todo cierre: alta, referencia o fuga.
+        # En la BD la pone MySQL (EpisodioDAO.cambiar_estado); esta es solo la del objeto en memoria.
+        self._estado = estado
         self._fecha_alta = datetime.now()
 
     def anular(self):

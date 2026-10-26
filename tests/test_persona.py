@@ -510,3 +510,62 @@ def test_resumen_es_polimorfico():
 @pytest.mark.parametrize("fabrica", FABRICAS_EMPLEADO)
 def test_los_empleados_no_deciden_permisos(fabrica):
     assert not hasattr(fabrica(), "tiene_permiso")
+
+
+# ---- Paciente: editar datos y reactivar
+def test_actualizar_datos_devuelve_los_campos_que_cambiaron():
+    paciente = nuevo_paciente(nombre_seguro="EsSalud")
+    cambios = paciente.actualizar_datos(" Rosa ", "Mendoza Quispe", date(1959, 5, 14), "F", 2)
+    assert cambios == ["apellidos", "id_seguro"]
+    assert (paciente.apellidos, paciente.id_seguro) == ("Mendoza Quispe", 2)
+    assert paciente.nombre_seguro is None  # era el nombre del seguro anterior
+
+
+def test_actualizar_datos_sin_cambios():
+    paciente = nuevo_paciente()
+    assert paciente.actualizar_datos("Rosa", "Mendoza Flores", date(1959, 5, 14), "F", 1) == []
+
+
+@pytest.mark.parametrize("cambios", [
+    dict(nombres="  "), dict(apellidos=None), dict(fecha_nac=date(2999, 1, 1)), dict(sexo="m"),
+    dict(id_seguro=0), dict(id_seguro=None),
+])
+def test_actualizar_datos_invalidos_no_modifica_nada(cambios):
+    paciente = nuevo_paciente()
+    datos = dict(nombres="Ana", apellidos="Mendoza Flores", fecha_nac=date(1959, 5, 14), sexo="F", id_seguro=1)
+    datos.update(cambios)
+    with pytest.raises(ValueError):
+        paciente.actualizar_datos(**datos)
+    assert paciente.nombres == "Rosa"
+
+
+def test_no_se_editan_los_datos_de_un_paciente_dado_de_baja():
+    with pytest.raises(ReglaNegocioError, match="dado de baja"):
+        nuevo_paciente(activo=False).actualizar_datos("Rosa", "Mendoza", date(1959, 5, 14), "F", 1)
+
+
+def test_a_un_nn_se_le_corrigen_sexo_edad_y_seguro_pero_no_el_nombre():
+    nn = Paciente.no_identificado("M", 40, 1)
+    assert nn.actualizar_datos("NN", "NN", date(1990, 1, 1), "F", 2) == ["fecha_nac", "sexo", "id_seguro"]
+    with pytest.raises(ReglaNegocioError, match="al identificarlo"):
+        nn.actualizar_datos("Juan", "NN", date(1990, 1, 1), "F", 2)
+    assert nn.nombres == "NN"
+
+
+def test_reactivar_un_paciente_dado_de_baja():
+    paciente = nuevo_paciente(activo=False)
+    paciente.reactivar()
+    assert paciente.activo
+
+
+def test_reactivar_un_paciente_activo_se_rechaza():
+    with pytest.raises(ReglaNegocioError, match="ya está activo"):
+        nuevo_paciente().reactivar()
+
+
+def test_un_nn_dado_de_baja_no_se_reactiva():
+    nn = Paciente.no_identificado("M", 40, 1)
+    nn.anular()
+    with pytest.raises(ReglaNegocioError, match="sin identificar"):
+        nn.reactivar()
+    assert not nn.activo

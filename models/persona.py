@@ -102,20 +102,28 @@ class Paciente(Persona):
     def __init__(self, id_paciente : int | None, documento: DocumentoIdentidad | None, nombres: str, apellidos: str, fecha_nac : date,
                  sexo: str, id_seguro: int, activo: bool = True, nombre_seguro: str | None = None):
         super().__init__(documento, nombres, apellidos, fecha_nac)
-        if sexo not in self.SEXOS_VALIDOS:
-            raise ValueError("El sexo debe ser 'M' o 'F'.")
-        if id_seguro is None:
-            raise ValueError("id_seguro es obligatorio.")
         self._id_paciente = _validar_id(id_paciente, "id_paciente")
-        self._sexo = sexo
+        self._sexo = self._validar_sexo(sexo)
         # id_seguro es la FK a la tabla seguro; nombre_seguro es opcional y solo sirve
         # para mostrarlo (el DAO lo obtiene con un JOIN).
-        self._id_seguro = _validar_id(id_seguro, "id_seguro")
+        self._id_seguro = self._validar_seguro(id_seguro)
         self._nombre_seguro = None if nombre_seguro is None else _validar_texto(nombre_seguro, "nombre_seguro")
         self._episodios = []
         # Espejo de paciente.estado_registro en la BD (RN-11: no se elimina
         # físicamente, solo se anula lógicamente conservando el registro).
         self._activo = _validar_activo(activo)
+
+    @classmethod
+    def _validar_sexo(cls, sexo) -> str:
+        if sexo not in cls.SEXOS_VALIDOS:
+            raise ValueError("El sexo debe ser 'M' o 'F'.")
+        return sexo
+
+    @staticmethod
+    def _validar_seguro(id_seguro) -> int:
+        if id_seguro is None:
+            raise ValueError("id_seguro es obligatorio.")
+        return _validar_id(id_seguro, "id_seguro")
 
     @property
     def id_paciente(self): return self._id_paciente
@@ -187,6 +195,34 @@ class Paciente(Persona):
             raise ValueError("Un paciente no se puede fusionar consigo mismo.")
         self.anular()
 
+    def actualizar_datos(self, nombres: str, apellidos: str, fecha_nac: date, sexo: str, id_seguro: int) -> list[str]:
+        """
+        Corrige los datos personales del paciente y devuelve los nombres de los campos que cambiaron
+        (lista vacía si no cambió nada). El documento no se edita: identifica a la persona.
+
+        Un paciente sin identificar conserva "NN" como nombre: su nombre real se registra con
+        identificar(), que además le asigna el documento. Aquí solo se corrigen su sexo, su fecha de
+        nacimiento estimada y su seguro.
+        """
+        if not self.activo:
+            raise ReglaNegocioError("El paciente está dado de baja: reactívelo antes de editar sus datos.")
+        # Se valida todo antes de modificar: si un dato es inválido, el paciente queda como estaba.
+        nuevos = {
+            "nombres": _validar_texto(nombres, "nombres"),
+            "apellidos": _validar_texto(apellidos, "apellidos"),
+            "fecha_nac": _validar_fecha_nac(fecha_nac),
+            "sexo": self._validar_sexo(sexo),
+            "id_seguro": self._validar_seguro(id_seguro),
+        }
+        if not self.identificado and (nuevos["nombres"], nuevos["apellidos"]) != (self._nombres, self._apellidos):
+            raise ReglaNegocioError("El nombre de un paciente sin identificar se registra al identificarlo.")
+        cambios = [campo for campo, valor in nuevos.items() if getattr(self, "_" + campo) != valor]
+        if "id_seguro" in cambios:
+            self._nombre_seguro = None  # el nombre mostrado era el del seguro anterior
+        for campo in cambios:
+            setattr(self, "_" + campo, nuevos[campo])
+        return cambios
+
     def obtener_resumen(self) -> str:
         seguro = self.nombre_seguro or f"id {self.id_seguro}"
         documento = self.documento or "SIN IDENTIFICAR"
@@ -198,6 +234,18 @@ class Paciente(Persona):
     def anular(self):
         """RN-11: baja lógica. El registro se conserva, solo deja de estar activo."""
         self._activo = False
+
+    def reactivar(self):
+        """
+        Revierte la baja lógica (p. ej. el paciente se dio de baja por error y vuelve a emergencia).
+        Un paciente sin identificar dado de baja no se reactiva: lo normal es que se haya fusionado
+        con su registro real, y reactivarlo duplicaría a la persona.
+        """
+        if self.activo:
+            raise ReglaNegocioError("El paciente ya está activo.")
+        if not self.identificado:
+            raise ReglaNegocioError("Un paciente sin identificar dado de baja no se reactiva: regístrelo de nuevo.")
+        self._activo = True
 
 class Empleado(Persona):
     """

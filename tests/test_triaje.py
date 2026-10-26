@@ -383,3 +383,50 @@ def test_el_nivel_debe_ser_un_entero(nivel):
         Triaje(None, nivel, 3, AHORA)
     with pytest.raises(NivelTriajeInvalidoError):
         nuevo_triaje(3).reclasificar(nivel, "Justificación suficientemente larga.")
+
+
+# ---- Referir y registrar una fuga
+def test_referir_desde_espera_de_cama_o_atencion():
+    for preparar in (lambda ep: None, lambda ep: ep.asignar_cama()):
+        ep = episodio_con_triaje()
+        preparar(ep)
+        ep.referir()
+        assert ep.estado == EpisodioEmergencia.ESTADO_REFERIDO
+        assert ep.cerrado and ep.fecha_alta is not None
+
+
+def test_no_se_refiere_sin_triaje():
+    ep = nuevo_episodio()
+    with pytest.raises(ReglaNegocioError, match="falta el triaje"):
+        ep.referir()
+    assert ep.estado == EpisodioEmergencia.ESTADO_EN_ESPERA_TRIAJE and ep.fecha_alta is None
+
+
+@pytest.mark.parametrize("preparar", [
+    lambda ep: None,                                                     # antes del triaje
+    lambda ep: ep.agregar_triaje(nuevo_triaje()),                        # esperando cama
+    lambda ep: (ep.agregar_triaje(nuevo_triaje()), ep.asignar_cama()),   # en una cama
+])
+def test_la_fuga_se_registra_en_cualquier_estado_abierto(preparar):
+    ep = nuevo_episodio()
+    preparar(ep)
+    ep.registrar_fuga()
+    assert ep.estado == EpisodioEmergencia.ESTADO_FUGADO
+    assert ep.cerrado and ep.fecha_alta is not None
+
+
+@pytest.mark.parametrize("estado", ["ALTA MÉDICA", "REFERIDO", "FUGADO / ABANDONO"])
+@pytest.mark.parametrize("cerrar", [EpisodioEmergencia.referir, EpisodioEmergencia.registrar_fuga])
+def test_un_episodio_cerrado_no_se_vuelve_a_cerrar(estado, cerrar):
+    ep = EpisodioEmergencia(1, 1, "Dolor torácico", estado=estado)
+    with pytest.raises(ReglaNegocioError):
+        cerrar(ep)
+    assert ep.estado == estado
+
+
+@pytest.mark.parametrize("cerrar", [EpisodioEmergencia.referir, EpisodioEmergencia.registrar_fuga])
+def test_un_episodio_anulado_no_se_cierra(cerrar):
+    ep = episodio_con_triaje()
+    ep.anular()
+    with pytest.raises(ReglaNegocioError, match="anulado"):
+        cerrar(ep)
