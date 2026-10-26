@@ -76,7 +76,7 @@ def test_reclasificaciones(monkeypatch):
 def test_promedios_en_minutos(monkeypatch, metodo):
     bd = BD(monkeypatch, row={"promedio": Decimal("42.5000")})
     assert getattr(ReporteDAO, metodo)(DESDE, HASTA) == 42.5
-    assert "TIMESTAMPDIFF(MINUTE" in bd.sql and bd.params == (DESDE, HASTA)
+    assert "TIMESTAMPDIFF(MINUTE" in bd.sql and bd.params[:2] == (DESDE, HASTA)
 
 
 @pytest.mark.parametrize("metodo", ["promedio_espera_triaje_min", "promedio_espera_cama_min",
@@ -107,3 +107,11 @@ def test_periodo_invalido_no_consulta_la_bd(monkeypatch, metodo, desde, hasta):
 def test_reporte_dao_solo_lee():
     publicos = {n for n in vars(ReporteDAO) if not n.startswith("_")}
     assert all(n.startswith(("contar_", "promedio_")) for n in publicos)
+
+
+def test_la_estancia_solo_cuenta_las_altas_medicas(monkeypatch):
+    # fecha_alta guarda también el egreso de referidos y fugados: no deben acortar la estancia.
+    bd = BD(monkeypatch, row={"promedio": None})
+    ReporteDAO.promedio_estancia_min(DESDE, HASTA)
+    assert "nombre_estado_episodio = %s" in bd.sql
+    assert bd.params == (DESDE, HASTA, "ALTA MÉDICA")

@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 
 import mysql.connector
 from mysql.connector import errorcode
@@ -27,6 +28,15 @@ class BaseDAO:
         if isinstance(valor, bool) or not isinstance(valor, int) or valor <= 0:
             raise ValueError(f"{nombre} debe ser un entero positivo.")
         return valor
+
+    @staticmethod
+    def _validar_periodo(desde: datetime, hasta: datetime) -> tuple[datetime, datetime]:
+        """Un período [desde, hasta) con fechas y horas: el límite superior no se incluye. Lanza ValueError."""
+        if not isinstance(desde, datetime) or not isinstance(hasta, datetime):
+            raise ValueError("El período debe indicarse con fechas y horas (datetime).")
+        if desde >= hasta:
+            raise ValueError("El inicio del período debe ser anterior al final.")
+        return desde, hasta
 
     @staticmethod
     def _consultar_uno(sql: str, params: tuple = ()) -> dict | None:

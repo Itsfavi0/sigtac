@@ -224,3 +224,21 @@ def test_buscar_solicitud_inexistente_o_id_invalido(monkeypatch):
     assert SolicitudLimpiezaDAO.buscar_por_id(3) is None
     with pytest.raises(ValueError):
         SolicitudLimpiezaDAO.buscar_por_id(0)
+
+
+def test_buscar_pendiente_por_cama(monkeypatch):
+    bd = BD(monkeypatch, row=fila_solicitud())
+    assert SolicitudLimpiezaDAO.buscar_pendiente_por_cama(4) == SolicitudLimpieza(1, 4, "UCI-02", INICIO)
+    assert "WHERE s.id_cama = %s AND s.fecha_atencion IS NULL" in bd.sql and bd.params == (4,)
+
+
+def test_buscar_pendiente_por_cama_sin_solicitud(monkeypatch):
+    BD(monkeypatch, row=None)
+    assert SolicitudLimpiezaDAO.buscar_pendiente_por_cama(4) is None
+
+
+def test_buscar_pendiente_con_id_invalido_no_llega_a_la_bd(monkeypatch):
+    bd = BD(monkeypatch)
+    with pytest.raises(ValueError):
+        SolicitudLimpiezaDAO.buscar_pendiente_por_cama(None)
+    bd.clase.assert_not_called()

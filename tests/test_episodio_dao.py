@@ -299,3 +299,14 @@ def test_bloquear_con_id_invalido(monkeypatch):
     with pytest.raises(ValueError):
         EpisodioDAO.bloquear(0)
     bd.clase.assert_not_called()
+
+
+@pytest.mark.parametrize("cerrar, estado", [(EpisodioEmergencia.referir, "REFERIDO"),
+                                            (EpisodioEmergencia.registrar_fuga, "FUGADO / ABANDONO")])
+def test_al_referir_o_fugarse_tambien_se_guarda_la_fecha_de_egreso(monkeypatch, cerrar, estado):
+    bd = BD(monkeypatch, rowcount=1)
+    ep = episodio_triado()
+    cerrar(ep)
+    EpisodioDAO.cambiar_estado(ep, EstadoEpisodio.EN_ESPERA)
+    _, params = bd.sentencias()[0]
+    assert params == (estado, True, 1, "EN ESPERA DE CAMA")

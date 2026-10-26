@@ -129,7 +129,7 @@ def test_el_log_no_incluye_los_detalles(monkeypatch, caplog):
 # ---- Solo inserción
 def test_la_bitacora_no_tiene_metodos_para_modificar_ni_borrar():
     publicos = {nombre for nombre in vars(AuditoriaDAO) if not nombre.startswith("_")}
-    assert publicos == {"TABLAS_AUDITABLES", "registrar", "listar_por_registro"}
+    assert publicos == {"TABLAS_AUDITABLES", "LIMITE_MAXIMO", "registrar", "listar_por_registro", "listar"}
 
 
 # ---- listar_por_registro
@@ -168,3 +168,42 @@ def test_accion_desconocida_en_la_bd_se_rechaza(monkeypatch):
     BD(monkeypatch, rows=[fila(accion="ACCION_RARA")])
     with pytest.raises(ValueError):
         AuditoriaDAO.listar_por_registro("paciente", 1)
+
+
+
+# ---- listar (consulta de la bitácora)
+DESDE, HASTA = datetime(2026, 10, 1), datetime(2026, 11, 1)
+
+
+def test_listar_por_periodo_del_mas_reciente_al_mas_antiguo(monkeypatch):
+    bd = BD(monkeypatch, rows=[fila(id_bitacora=3), fila(id_bitacora=2)])
+    assert [r["id_bitacora"] for r in AuditoriaDAO.listar(DESDE, HASTA)] == [3, 2]
+    assert "WHERE fecha_hora >= %s AND fecha_hora < %s ORDER BY fecha_hora DESC, id_bitacora DESC LIMIT %s" in bd.sql
+    assert bd.params == (DESDE, HASTA, 200)
+
+
+def test_listar_con_filtros(monkeypatch):
+    bd = BD(monkeypatch)
+    AuditoriaDAO.listar(DESDE, HASTA, tabla="paciente", id_usuario=3, limite=50)
+    assert "AND tabla_afectada = %s AND id_usuario = %s" in bd.sql
+    assert bd.params == (DESDE, HASTA, "paciente", 3, 50)
+
+
+@pytest.mark.parametrize("limite", [1, 1000])
+def test_listar_limites_validos(monkeypatch, limite):
+    bd = BD(monkeypatch)
+    AuditoriaDAO.listar(DESDE, HASTA, limite=limite)
+    assert bd.params[-1] == limite
+
+
+@pytest.mark.parametrize("argumentos", [
+    dict(desde=HASTA, hasta=DESDE), dict(desde="2026-10-01", hasta=HASTA), dict(tabla="no_existe"),
+    dict(id_usuario=0), dict(limite=0), dict(limite=1001), dict(limite=True), dict(limite="10"),
+])
+def test_listar_con_argumentos_invalidos_no_consulta_la_bd(monkeypatch, argumentos):
+    bd = BD(monkeypatch)
+    datos = dict(desde=DESDE, hasta=HASTA)
+    datos.update(argumentos)
+    with pytest.raises(ValueError):
+        AuditoriaDAO.listar(**datos)
+    bd.clase.assert_not_called()

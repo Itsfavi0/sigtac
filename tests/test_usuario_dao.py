@@ -1,11 +1,14 @@
 from unittest.mock import MagicMock
 
 import pytest
-from mysql.connector import Error as DBError
+from mysql.connector import Error as DBError, IntegrityError, errorcode
 
 from dao import base_dao, usuario_dao
+from dao import transaccion as transaccion_mod
 from dao.usuario_dao import UsuarioDAO
-from models.excepciones import ConexionBDError
+from models.excepciones import ConexionBDError, RegistroDuplicadoError, ReglaNegocioError
+from models.permisos import Rol
+from models.usuario import CuentaUsuario
 from utils.security import generar_hash
 
 TIPO = "DNI"
@@ -225,3 +228,188 @@ def test_si_falla_el_reinicio_el_login_correcto_igual_se_permite(monkeypatch, se
 def test_si_falla_el_registro_del_fallo_se_deniega_igual(monkeypatch, senuelo, hash_clave):
     BD(monkeypatch, fila(hash_clave), errores_en_secuencia=[None, DBError("sin permiso UPDATE")])
     assert UsuarioDAO.autenticar(TIPO, DNI, "mala") is None
+
+
+# ---- Administración de cuentas
+HASH = "$2b$12$abcdefghijklmnopqrstuv"
+
+
+def fila_cuenta(**cambios):
+    datos = {"id_usuario": 3, "id_empleado": 3, "nombres": "Ana", "apellidos": "Pérez",
+             "nombre_cargo": "Licenciado(a) en Enfermería", "nombre_rol": "Enfermero de Triaje", "activo": 1,
+             "intentos_fallidos": 0, "bloqueada": 0}
+    datos.update(cambios)
+    return datos
+
+
+def cuenta(**cambios):
+    return UsuarioDAO._a_cuenta(fila_cuenta(**cambios))
+
+
+class BDCuentas:
+    """Conexión simulada para las consultas de administración (filas, rowcount y lastrowid)."""
+
+    def __init__(self, monkeypatch, row=None, rows=None, rowcount=1, lastrowid=None, error_en_execute=None):
+        self.cursor = MagicMock()
+        self.cursor.fetchone.return_value = row
+        self.cursor.fetchall.return_value = rows or []
+        self.cursor.rowcount = rowcount
+        self.cursor.lastrowid = lastrowid
+        if error_en_execute:
+            self.cursor.execute.side_effect = error_en_execute
+        conexion = MagicMock()
+        conexion.cursor.return_value = self.cursor
+        self.clase = MagicMock()
+        self.clase.return_value.obtener_conexion.return_value = conexion
+        self.clase.return_value.en_transaccion = False
+        monkeypatch.setattr(base_dao, "ConexionBD", self.clase)
+        monkeypatch.setattr(transaccion_mod, "ConexionBD", self.clase)
+
+    @property
+    def sql(self) -> str:
+        return " ".join(self.cursor.execute.call_args.args[0].split())
+
+    @property
+    def params(self) -> tuple:
+        return self.cursor.execute.call_args.args[1]
+
+
+def test_a_cuenta_convierte_la_fila():
+    c = cuenta(activo=0, bloqueada=1, intentos_fallidos=5)
+    assert isinstance(c, CuentaUsuario)
+    assert (c.rol, c.activo, c.bloqueada, c.intentos_fallidos) == (Rol.ENFERMERO, False, True, 5)
+
+
+def test_a_cuenta_con_rol_desconocido():
+    with pytest.raises(ValueError):
+        cuenta(nombre_rol="Rol raro")
+
+
+def test_listar_cuentas_no_lee_el_hash(monkeypatch):
+    bd = BDCuentas(monkeypatch, rows=[fila_cuenta(), fila_cuenta(id_usuario=4)])
+    assert [c.id_usuario for c in UsuarioDAO.listar_cuentas()] == [3, 4]
+    assert "hash_clave" not in bd.sql
+    assert "ORDER BY e.apellidos, e.nombres" in bd.sql
+
+
+def test_buscar_cuenta(monkeypatch):
+    bd = BDCuentas(monkeypatch, row=fila_cuenta())
+    assert UsuarioDAO.buscar_cuenta(3).id_usuario == 3
+    assert bd.sql.endswith("WHERE u.id_usuario = %s") and bd.params == (3,)
+
+
+def test_buscar_cuenta_inexistente(monkeypatch):
+    BDCuentas(monkeypatch, row=None)
+    assert UsuarioDAO.buscar_cuenta(99) is None
+
+
+def test_listar_empleados_sin_cuenta(monkeypatch):
+    bd = BDCuentas(monkeypatch, rows=[{"id_empleado": 5}])
+    assert UsuarioDAO.listar_empleados_sin_cuenta() == [{"id_empleado": 5}]
+    assert "WHERE u.id_usuario IS NULL AND e.estado_registro = TRUE" in bd.sql
+
+
+@pytest.mark.parametrize("row, esperado", [({"1": 1}, True), (None, False)])
+def test_empleado_activo(monkeypatch, row, esperado):
+    bd = BDCuentas(monkeypatch, row=row)
+    assert UsuarioDAO.empleado_activo(3) is esperado
+    assert "estado_registro = TRUE" in bd.sql
+
+
+def test_crear_cuenta(monkeypatch):
+    bd = BDCuentas(monkeypatch, lastrowid=7)
+    assert UsuarioDAO.crear_cuenta(3, "Médico de Emergencia", HASH) == 7
+    assert bd.sql == ("INSERT INTO usuario (id_empleado, id_rol, hash_clave) "
+                      "VALUES (%s, (SELECT id_rol FROM rol WHERE nombre_rol = %s), %s)")
+    assert bd.params == (3, "Médico de Emergencia", HASH)
+
+
+@pytest.mark.parametrize("hash_clave", ["ClaveEnTextoPlano1", None, ""])
+def test_crear_cuenta_rechaza_algo_que_no_es_un_hash(monkeypatch, hash_clave):
+    bd = BDCuentas(monkeypatch)
+    with pytest.raises(ValueError, match="hash"):
+        UsuarioDAO.crear_cuenta(3, Rol.MEDICO, hash_clave)
+    bd.clase.assert_not_called()
+
+
+def test_crear_una_cuenta_duplicada(monkeypatch):
+    BDCuentas(monkeypatch, error_en_execute=IntegrityError(errno=errorcode.ER_DUP_ENTRY))
+    with pytest.raises(RegistroDuplicadoError):
+        UsuarioDAO.crear_cuenta(3, Rol.MEDICO, HASH)
+
+
+def test_cambiar_rol_es_condicional(monkeypatch):
+    bd = BDCuentas(monkeypatch, rowcount=1)
+    c = cuenta()
+    c.cambiar_rol(Rol.MEDICO)
+    UsuarioDAO.cambiar_rol(c, Rol.ENFERMERO)
+    assert "WHERE id_usuario = %s AND id_rol = (SELECT id_rol FROM rol WHERE nombre_rol = %s)" in bd.sql
+    assert bd.params == ("Médico de Emergencia", 3, "Enfermero de Triaje")
+
+
+def test_cambiar_rol_si_otro_usuario_lo_cambio(monkeypatch):
+    BDCuentas(monkeypatch, rowcount=0)
+    c = cuenta()
+    c.cambiar_rol(Rol.MEDICO)
+    with pytest.raises(ReglaNegocioError, match="otro usuario"):
+        UsuarioDAO.cambiar_rol(c, Rol.ENFERMERO)
+
+
+def test_cambiar_rol_sin_cambio(monkeypatch):
+    bd = BDCuentas(monkeypatch)
+    with pytest.raises(ValueError):
+        UsuarioDAO.cambiar_rol(cuenta(), Rol.ENFERMERO)
+    bd.clase.assert_not_called()
+
+
+@pytest.mark.parametrize("activo_final", [True, False])
+def test_cambiar_activo_es_condicional(monkeypatch, activo_final):
+    bd = BDCuentas(monkeypatch, rowcount=1)
+    c = cuenta(activo=int(not activo_final))
+    c.activar() if activo_final else c.desactivar()
+    UsuarioDAO.cambiar_activo(c)
+    assert bd.sql == "UPDATE usuario SET activo = %s WHERE id_usuario = %s AND activo = %s"
+    assert bd.params == (activo_final, 3, not activo_final)
+
+
+def test_cambiar_activo_si_otro_usuario_llego_antes(monkeypatch):
+    BDCuentas(monkeypatch, rowcount=0)
+    c = cuenta()
+    c.desactivar()
+    with pytest.raises(ReglaNegocioError):
+        UsuarioDAO.cambiar_activo(c)
+
+
+def test_restablecer_clave_quita_el_bloqueo(monkeypatch):
+    bd = BDCuentas(monkeypatch, rowcount=1)
+    UsuarioDAO.restablecer_clave(3, HASH)
+    assert "SET hash_clave = %s, intentos_fallidos = 0, bloqueado_hasta = NULL" in bd.sql
+    assert bd.params == (HASH, 3)
+
+
+def test_restablecer_clave_rechaza_texto_plano(monkeypatch):
+    bd = BDCuentas(monkeypatch)
+    with pytest.raises(ValueError):
+        UsuarioDAO.restablecer_clave(3, "NuevaClave1")
+    bd.clase.assert_not_called()
+
+
+@pytest.mark.parametrize("metodo, args", [("restablecer_clave", (99, HASH)), ("desbloquear", (99,))])
+def test_cuenta_inexistente_lanza_regla_negocio_error(monkeypatch, metodo, args):
+    BDCuentas(monkeypatch, rowcount=0)
+    with pytest.raises(ReglaNegocioError, match="no existe"):
+        getattr(UsuarioDAO, metodo)(*args)
+
+
+def test_desbloquear(monkeypatch):
+    bd = BDCuentas(monkeypatch, rowcount=1)
+    UsuarioDAO.desbloquear(3)
+    assert bd.sql == "UPDATE usuario SET intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id_usuario = %s"
+
+
+def test_desbloquear_propaga_los_errores_de_bd(monkeypatch):
+    # A diferencia del login, administrar una cuenta no oculta un fallo de la BD.
+    BDCuentas(monkeypatch, error_en_execute=DBError(errno=2013))
+    with pytest.raises(base_dao.PersistenciaError):
+        UsuarioDAO.desbloquear(3)
+

@@ -14,14 +14,6 @@ class ReporteDAO(BaseDAO):
     """
 
     @staticmethod
-    def _validar_periodo(desde: datetime, hasta: datetime) -> tuple[datetime, datetime]:
-        if not isinstance(desde, datetime) or not isinstance(hasta, datetime):
-            raise ValueError("El período debe indicarse con fechas y horas (datetime).")
-        if desde >= hasta:
-            raise ValueError("El inicio del período debe ser anterior al final.")
-        return desde, hasta
-
-    @staticmethod
     def _promedio(fila: dict | None) -> float | None:
         # AVG devuelve Decimal, o NULL si no hubo filas
         return None if fila is None or fila["promedio"] is None else float(fila["promedio"])
@@ -132,12 +124,18 @@ class ReporteDAO(BaseDAO):
 
     @staticmethod
     def promedio_estancia_min(desde: datetime, hasta: datetime) -> float | None:
-        """Minutos promedio desde el ingreso hasta el alta, de los episodios dados de alta en el período."""
+        """
+        Minutos promedio desde el ingreso hasta el alta, de los episodios dados de alta en el período.
+        fecha_alta guarda también el egreso de los referidos y fugados: se filtra por ALTA MÉDICA para
+        que una fuga a los pocos minutos no acorte la estancia promedio.
+        """
+        desde, hasta = ReporteDAO._validar_periodo(desde, hasta)
         return ReporteDAO._promedio(ReporteDAO._consultar_uno(
             """
             SELECT AVG(TIMESTAMPDIFF(MINUTE, fecha_ingreso, fecha_alta)) AS promedio
             FROM episodio_emergencia
             WHERE estado_registro = TRUE AND fecha_alta >= %s AND fecha_alta < %s
+              AND id_estado_ep = (SELECT id_estado_ep FROM estado_episodio WHERE nombre_estado_episodio = %s)
             """,
-            ReporteDAO._validar_periodo(desde, hasta),
+            (desde, hasta, EstadoEpisodio.ALTA.value),
         ))

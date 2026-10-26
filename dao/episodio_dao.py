@@ -133,7 +133,8 @@ class EpisodioDAO(BaseDAO):
 
         El UPDATE es condicional, como en CamaDAO.cambiar_estado: si en la BD el episodio ya no está en
         `estado_anterior` (otro usuario lo cambió, no existe o está anulado), lanza ReglaNegocioError y
-        no guarda nada. Al pasar a ALTA MÉDICA, la fecha de alta la pone MySQL.
+        no guarda nada. Al cerrar el episodio (alta, referencia o fuga), la fecha de egreso
+        (fecha_alta) la pone MySQL.
         """
         if not isinstance(episodio, EpisodioEmergencia):
             raise ValueError("episodio debe ser un EpisodioEmergencia.")
@@ -148,7 +149,7 @@ class EpisodioDAO(BaseDAO):
 
         # Una sola sentencia: no necesita transacción propia. Dentro de la de un controlador, la
         # excepción por 0 filas deshace también los pasos anteriores.
-        # La fecha de alta se toma del reloj de MySQL (el mismo de fecha_ingreso), para que se cumpla
+        # La fecha de egreso se toma del reloj de MySQL (el mismo de fecha_ingreso), para que se cumpla
         # CH_episodio_fechas aunque el reloj de la PC esté desfasado.
         filas = EpisodioDAO._ejecutar(
             """
@@ -158,7 +159,7 @@ class EpisodioDAO(BaseDAO):
             WHERE id_episodio = %s AND estado_registro = TRUE
               AND id_estado_ep = (SELECT id_estado_ep FROM estado_episodio WHERE nombre_estado_episodio = %s)
             """,
-            (estado_nuevo.value, estado_nuevo is EstadoEpisodio.ALTA, id_episodio, estado_anterior.value),
+            (estado_nuevo.value, estado_nuevo in EpisodioEmergencia.ESTADOS_CERRADOS, id_episodio, estado_anterior.value),
         )
         if filas == 0:
             logger.warning("Cambio de estado rechazado: el episodio ya no está en %s (id_episodio=%s).",

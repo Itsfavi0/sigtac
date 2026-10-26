@@ -418,3 +418,30 @@ def test_bloquear_paciente_inexistente_o_anulado(monkeypatch):
     bd = BD(monkeypatch, row=None)
     bd.clase.return_value.en_transaccion = True
     assert PacienteDAO.bloquear(1) is False
+
+
+def test_actualizar_solo_modifica_pacientes_activos(monkeypatch):
+    bd = BD(monkeypatch, rowcount=1)
+    PacienteDAO.actualizar(paciente(id_paciente=1))
+    assert "WHERE id_paciente = %s AND estado_registro = TRUE" in bd.sql
+
+
+# ---- reactivar
+def test_reactivar_es_condicional(monkeypatch):
+    bd = BD(monkeypatch, rowcount=1)
+    assert PacienteDAO.reactivar(1) is True
+    assert bd.sql == ("UPDATE paciente SET estado_registro = TRUE "
+                      "WHERE id_paciente = %s AND estado_registro = FALSE AND num_documento IS NOT NULL")
+    assert bd.params == (1,)
+
+
+def test_reactivar_sin_filas_devuelve_false(monkeypatch):
+    BD(monkeypatch, rowcount=0)
+    assert PacienteDAO.reactivar(1) is False
+
+
+def test_reactivar_con_id_invalido_no_llega_a_la_bd(monkeypatch):
+    bd = BD(monkeypatch)
+    with pytest.raises(ValueError):
+        PacienteDAO.reactivar(0)
+    bd.clase.assert_not_called()

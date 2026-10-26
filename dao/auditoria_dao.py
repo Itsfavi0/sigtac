@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import datetime
 
 from dao.base_dao import BaseDAO
 from models.auditoria import AccionAuditoria
@@ -25,6 +26,9 @@ class AuditoriaDAO(BaseDAO):
         "episodio_emergencia", "signos_vitales", "triaje", "triaje_sintoma", "asignacion_cama",
         "solicitud_limpieza", "historial_estado_cama",
     })
+
+    # Tope de filas por consulta: la bitácora crece sin límite y la vista solo muestra una página.
+    LIMITE_MAXIMO = 1000
 
     @staticmethod
     def _validar_tabla(tabla: str) -> str:
@@ -97,5 +101,36 @@ class AuditoriaDAO(BaseDAO):
             ORDER BY fecha_hora, id_bitacora
             """,
             (tabla, id_registro),
+        )
+        return [AuditoriaDAO._a_registro(fila) for fila in filas]
+
+    @staticmethod
+    def listar(desde: datetime, hasta: datetime, tabla: str | None = None, id_usuario: int | None = None,
+               limite: int = 200) -> list[dict]:
+        """
+        Registros de la bitácora del período [desde, hasta), del más reciente al más antiguo, con
+        filtros opcionales por tabla y por usuario. Devuelve como mucho `limite` filas (1 a 1000).
+        """
+        condiciones = ["fecha_hora >= %s", "fecha_hora < %s"]
+        params = list(AuditoriaDAO._validar_periodo(desde, hasta))
+        # Solo se añaden fragmentos fijos; los valores siempre van como parámetros.
+        if tabla is not None:
+            condiciones.append("tabla_afectada = %s")
+            params.append(AuditoriaDAO._validar_tabla(tabla))
+        if id_usuario is not None:
+            condiciones.append("id_usuario = %s")
+            params.append(AuditoriaDAO._validar_id(id_usuario, "id_usuario"))
+        if isinstance(limite, bool) or not isinstance(limite, int) or not 1 <= limite <= AuditoriaDAO.LIMITE_MAXIMO:
+            raise ValueError(f"limite debe ser un entero entre 1 y {AuditoriaDAO.LIMITE_MAXIMO}.")
+        params.append(limite)
+        filas = AuditoriaDAO._consultar_varios(
+            """
+            SELECT id_bitacora, id_usuario, tabla_afectada, accion, id_registro_afectado, fecha_hora, detalles_json
+            FROM bitacora_auditoria
+            WHERE """ + " AND ".join(condiciones) + """
+            ORDER BY fecha_hora DESC, id_bitacora DESC
+            LIMIT %s
+            """,
+            tuple(params),
         )
         return [AuditoriaDAO._a_registro(fila) for fila in filas]

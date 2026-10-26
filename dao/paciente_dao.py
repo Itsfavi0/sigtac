@@ -138,7 +138,8 @@ class PacienteDAO(BaseDAO):
     @staticmethod
     def actualizar(paciente: Paciente) -> bool:
         """
-        Guarda los datos editables del paciente. Devuelve False si no existe.
+        Guarda los datos editables del paciente (antes se llama a paciente.actualizar_datos()).
+        Devuelve False si no existe o está dado de baja en la BD.
         El documento no se modifica: identifica a la persona y la vincula con sus episodios.
         Para registrar el documento de un paciente sin identificar se usa identificar().
         """
@@ -148,7 +149,7 @@ class PacienteDAO(BaseDAO):
             """
             UPDATE paciente
             SET nombres = %s, apellidos = %s, fecha_nac = %s, sexo = %s, id_seguro = %s
-            WHERE id_paciente = %s
+            WHERE id_paciente = %s AND estado_registro = TRUE
             """,
             (paciente.nombres, paciente.apellidos, paciente.fecha_nac, paciente.sexo,
              paciente.id_seguro, paciente.id_paciente),
@@ -219,6 +220,24 @@ class PacienteDAO(BaseDAO):
             )
         logger.info("Paciente NN fusionado (id_nn=%s, id_destino=%s, episodios=%s).", id_nn, id_destino, movidos)
         return movidos
+
+    @staticmethod
+    def reactivar(id_paciente: int) -> bool:
+        """
+        Revierte la baja lógica (antes se llama a paciente.reactivar()). Solo reactiva pacientes
+        identificados que estén dados de baja: devuelve False si no existe, ya estaba activo o es un NN.
+        """
+        PacienteDAO._validar_id(id_paciente, "id_paciente")
+        filas = PacienteDAO._ejecutar(
+            """
+            UPDATE paciente SET estado_registro = TRUE
+            WHERE id_paciente = %s AND estado_registro = FALSE AND num_documento IS NOT NULL
+            """,
+            (id_paciente,),
+        )
+        if filas:
+            logger.info("Paciente reactivado (id_paciente=%s).", id_paciente)
+        return filas > 0
 
     @staticmethod
     def anular(id_paciente: int) -> bool:
