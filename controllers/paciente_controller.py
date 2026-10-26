@@ -15,8 +15,9 @@ from models.triaje import EpisodioEmergencia
 
 class PacienteController:
     """
-    Admisión en emergencia: registrar pacientes (con documento o sin identificar, NN), abrir su
-    episodio de emergencia, e identificar o fusionar a los pacientes NN.
+    Admisión en emergencia: registrar pacientes (con documento o sin identificar, NN), corregir sus
+    datos, abrir su episodio de emergencia, e identificar o fusionar a los pacientes NN (PACIENTES).
+    Dar de baja y reactivar un paciente es una corrección administrativa (ADMINISTRACION).
 
     Cada operación que escribe lee los datos y los guarda dentro de la misma transacción, con su
     auditoría: o queda todo registrado, o nada.
@@ -74,6 +75,59 @@ class PacienteController:
         AuditoriaDAO.registrar(sesion.id_usuario, "paciente", AccionAuditoria.INSERT, id_paciente)
         # Se relee para devolver el paciente con su id y el nombre del seguro
         return PacienteDAO.buscar_por_id(id_paciente)
+
+    # ---- Edición, baja y reactivación
+
+    def actualizar_datos(self, id_paciente: int, nombres: str, apellidos: str, fecha_nac: date, sexo: str,
+                         id_seguro: int) -> Paciente:
+        """
+        Corrige los datos personales (el documento no se edita). La fila del paciente se bloquea
+        primero: así nadie lo identifica o lo da de baja mientras tanto, y no se pisa su nombre real con
+        el "NN" que se leyó. Si no cambió nada, no se escribe ni se audita.
+        """
+        sesion = exigir_permiso(self._sesion, Permiso.PACIENTES)
+        with transaccion():
+            if not PacienteDAO.bloquear(id_paciente):
+                raise ReglaNegocioError("El paciente no existe o está dado de baja.")
+            paciente = self._cargar(id_paciente)
+            cambios = paciente.actualizar_datos(nombres, apellidos, fecha_nac, sexo, id_seguro)
+            if not cambios:
+                return paciente
+            if not PacienteDAO.actualizar(paciente):
+                raise ReglaNegocioError("Otro usuario dio de baja a este paciente.")
+            # Solo los nombres de los campos: los valores son datos personales.
+            AuditoriaDAO.registrar(sesion.id_usuario, "paciente", AccionAuditoria.UPDATE, id_paciente,
+                                   {"campos": cambios})
+            return PacienteDAO.buscar_por_id(id_paciente)
+
+    def dar_de_baja(self, id_paciente: int) -> None:
+        """
+        Baja lógica de un paciente (RN-11), p. ej. un registro duplicado por error. Un paciente que
+        sigue en emergencia (con un episodio abierto) no se da de baja.
+        """
+        sesion = exigir_permiso(self._sesion, Permiso.ADMINISTRACION)
+        with transaccion():
+            # El bloqueo hace esperar a una admisión simultánea, que luego verá al paciente dado de baja.
+            if not PacienteDAO.bloquear(id_paciente):
+                raise ReglaNegocioError("El paciente no existe o ya está dado de baja.")
+            abierto = self._episodio_abierto(id_paciente)
+            if abierto is not None:
+                raise ReglaNegocioError(
+                    f"El paciente tiene un episodio abierto (n.º {abierto.id_episodio}): ciérrelo antes."
+                )
+            PacienteDAO.anular(id_paciente)
+            AuditoriaDAO.registrar(sesion.id_usuario, "paciente", AccionAuditoria.ANULAR, id_paciente)
+
+    def reactivar(self, id_paciente: int) -> Paciente:
+        """Revierte la baja de un paciente identificado (un NN dado de baja no se reactiva)."""
+        sesion = exigir_permiso(self._sesion, Permiso.ADMINISTRACION)
+        with transaccion():
+            paciente = self._cargar(id_paciente)
+            paciente.reactivar()  # reglas del modelo
+            if not PacienteDAO.reactivar(id_paciente):
+                raise ReglaNegocioError("Otro usuario ya reactivó a este paciente.")
+            AuditoriaDAO.registrar(sesion.id_usuario, "paciente", AccionAuditoria.REACTIVAR, id_paciente)
+        return paciente
 
     # ---- Episodio de emergencia
 

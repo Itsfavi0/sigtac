@@ -47,7 +47,8 @@ def limpieza(sesion_de):
 # ---- Permisos
 
 GESTION = [("camas_compatibles", (7,)), ("asignar", (7, 3)), ("ocupar", (3,)),
-           ("cancelar_asignacion", (7,)), ("dar_alta", (7,))]
+           ("cancelar_asignacion", (7,)), ("dar_alta", (7,)), ("referir", (7,)), ("registrar_fuga", (7,)),
+           ("poner_fuera_de_servicio", (3, "Monitor dañado")), ("volver_a_servicio", (3,))]
 LIMPIEZA = [("solicitudes_limpieza", ()), ("confirmar_limpieza", (1,))]
 
 
@@ -274,6 +275,163 @@ def test_no_se_da_alta_si_el_paciente_no_llego_a_la_cama(datos, ctrl):
     with pytest.raises(CamaEstadoInvalidoError, match="no está ocupada"):
         ctrl.dar_alta(7)
     assert datos.escrituras() == [] and datos.llamadas()[-1] == "rollback"
+
+
+
+# ---- Referir y registrar una fuga
+
+CIERRES = [("referir", EstadoEpisodio.REFERIDO), ("registrar_fuga", EstadoEpisodio.FUGADO)]
+
+
+@pytest.mark.parametrize("metodo, estado_final", CIERRES)
+def test_cerrar_un_episodio_sin_cama(datos, ctrl, metodo, estado_final):
+    datos["EpisodioDAO"].buscar_por_id.return_value = episodio(EstadoEpisodio.EN_ESPERA)
+    datos["AsignacionDAO"].buscar_vigente_por_episodio.return_value = None
+    assert getattr(ctrl, metodo)(7) is None
+    assert datos.escrituras() == ["EpisodioDAO.cambiar_estado", "AuditoriaDAO.registrar"]
+    ep, anterior = datos["EpisodioDAO"].cambiar_estado.call_args.args
+    assert (ep.estado, anterior) == (estado_final, EstadoEpisodio.EN_ESPERA)
+    assert datos.auditoria().args == (10, "episodio_emergencia", AccionAuditoria.UPDATE, 7, {
+        "estado_anterior": "EN ESPERA DE CAMA", "estado_nuevo": estado_final.value,
+    })
+    assert datos.llamadas()[-1] == "commit"
+
+
+@pytest.mark.parametrize("metodo, estado_final", CIERRES)
+def test_cerrar_un_episodio_con_cama_ocupada_la_manda_a_limpieza(datos, ctrl, metodo, estado_final):  # RN-07
+    datos["EpisodioDAO"].buscar_por_id.return_value = episodio(EstadoEpisodio.EN_ATENCION)
+    datos["AsignacionDAO"].buscar_vigente_por_episodio.return_value = ASIGNACION
+    datos["CamaDAO"].buscar_por_id.return_value = uci(EstadoCama.OCUPADA)
+    datos["SolicitudLimpiezaDAO"].crear.return_value = 12
+    assert getattr(ctrl, metodo)(7) == 12
+    assert datos.escrituras() == ["EpisodioDAO.cambiar_estado", "CamaDAO.cambiar_estado", "AsignacionDAO.liberar",
+                                  "SolicitudLimpiezaDAO.crear", "AuditoriaDAO.registrar"]
+    cama, anterior = datos["CamaDAO"].cambiar_estado.call_args.args
+    assert (cama.estado, anterior) == (EstadoCama.EN_LIMPIEZA, EstadoCama.OCUPADA)
+    datos["AsignacionDAO"].liberar.assert_called_once_with(5)
+    assert datos.auditoria().args[4] == {"estado_anterior": "EN ATENCIÓN (CON CAMA)",
+                                         "estado_nuevo": estado_final.value, "id_cama": 3, "id_solicitud_limpieza": 12}
+
+
+@pytest.mark.parametrize("metodo, estado_final", CIERRES)
+def test_cerrar_un_episodio_con_cama_reservada_la_libera_sin_limpieza(datos, ctrl, metodo, estado_final):
+    datos["EpisodioDAO"].buscar_por_id.return_value = episodio(EstadoEpisodio.EN_ATENCION)
+    datos["AsignacionDAO"].buscar_vigente_por_episodio.return_value = ASIGNACION
+    datos["CamaDAO"].buscar_por_id.return_value = uci(EstadoCama.RESERVADA)
+    assert getattr(ctrl, metodo)(7) is None
+    assert datos.escrituras() == ["EpisodioDAO.cambiar_estado", "CamaDAO.cambiar_estado", "AsignacionDAO.anular",
+                                  "AuditoriaDAO.registrar"]
+    cama, anterior = datos["CamaDAO"].cambiar_estado.call_args.args
+    assert (cama.estado, anterior) == (EstadoCama.DISPONIBLE, EstadoCama.RESERVADA)
+    datos["AsignacionDAO"].anular.assert_called_once_with(5)
+    assert datos.auditoria().args[4]["id_solicitud_limpieza"] is None
+
+
+def test_no_se_refiere_sin_triaje(datos, ctrl):
+    datos["EpisodioDAO"].buscar_por_id.return_value = episodio(EstadoEpisodio.EN_ESPERA_TRIAJE, nivel=None)
+    datos["AsignacionDAO"].buscar_vigente_por_episodio.return_value = None
+    with pytest.raises(ReglaNegocioError, match="falta el triaje"):
+        ctrl.referir(7)
+    assert datos.escrituras() == [] and datos.llamadas()[-1] == "rollback"
+
+
+def test_la_fuga_se_registra_aun_sin_triaje(datos, ctrl):
+    datos["EpisodioDAO"].buscar_por_id.return_value = episodio(EstadoEpisodio.EN_ESPERA_TRIAJE, nivel=None)
+    datos["AsignacionDAO"].buscar_vigente_por_episodio.return_value = None
+    ctrl.registrar_fuga(7)
+    ep, _ = datos["EpisodioDAO"].cambiar_estado.call_args.args
+    assert ep.estado == EstadoEpisodio.FUGADO
+
+
+@pytest.mark.parametrize("metodo", ["referir", "registrar_fuga"])
+def test_un_episodio_cerrado_no_se_vuelve_a_cerrar(datos, ctrl, metodo):
+    datos["EpisodioDAO"].buscar_por_id.return_value = episodio(EstadoEpisodio.ALTA)
+    datos["AsignacionDAO"].buscar_vigente_por_episodio.return_value = None
+    with pytest.raises(ReglaNegocioError):
+        getattr(ctrl, metodo)(7)
+    assert datos.escrituras() == []
+
+
+def test_si_otra_pc_cerro_el_episodio_no_se_toca_la_cama(datos, ctrl):
+    datos["EpisodioDAO"].buscar_por_id.return_value = episodio(EstadoEpisodio.EN_ATENCION)
+    datos["AsignacionDAO"].buscar_vigente_por_episodio.return_value = ASIGNACION
+    datos["CamaDAO"].buscar_por_id.return_value = uci(EstadoCama.OCUPADA)
+    datos["EpisodioDAO"].cambiar_estado.side_effect = ReglaNegocioError("otro usuario lo cambió")
+    with pytest.raises(ReglaNegocioError):
+        ctrl.referir(7)
+    datos["CamaDAO"].cambiar_estado.assert_not_called()
+    assert datos.llamadas()[-1] == "rollback"
+
+
+# ---- Fuera de servicio
+
+@pytest.fixture
+def cama_libre(datos):
+    datos["CamaDAO"].buscar_por_id.return_value = uci(EstadoCama.DISPONIBLE)
+    datos["AsignacionDAO"].buscar_vigente_por_cama.return_value = None
+    datos["SolicitudLimpiezaDAO"].buscar_pendiente_por_cama.return_value = None
+    return datos
+
+
+def test_poner_fuera_de_servicio_audita_el_motivo(cama_libre, ctrl):
+    ctrl.poner_fuera_de_servicio(3, "  Ventilador con falla  ")
+    assert cama_libre.escrituras() == ["CamaDAO.cambiar_estado", "AuditoriaDAO.registrar"]
+    cama, anterior = cama_libre["CamaDAO"].cambiar_estado.call_args.args
+    assert (cama.estado, anterior) == (EstadoCama.FUERA_SERVICIO, EstadoCama.DISPONIBLE)
+    assert cama_libre.auditoria().args == (10, "cama", AccionAuditoria.UPDATE, 3, {
+        "estado_anterior": "DISPONIBLE", "estado_nuevo": "FUERA DE SERVICIO", "motivo": "Ventilador con falla",
+    })
+
+
+@pytest.mark.parametrize("motivo", [None, "", "   ", "x" * 201, 5])
+def test_fuera_de_servicio_exige_un_motivo_valido(cama_libre, ctrl, motivo):
+    with pytest.raises(ValueError, match="motivo"):
+        ctrl.poner_fuera_de_servicio(3, motivo)
+    assert cama_libre.llamadas() == []  # se valida antes de tocar la BD
+
+
+def test_el_motivo_admite_justo_200_caracteres(cama_libre, ctrl):
+    ctrl.poner_fuera_de_servicio(3, "x" * 200)
+    assert cama_libre.llamadas()[-1] == "commit"
+
+
+def test_no_se_saca_de_servicio_una_cama_con_paciente(cama_libre, ctrl):
+    cama_libre["CamaDAO"].buscar_por_id.return_value = uci(EstadoCama.OCUPADA)
+    cama_libre["AsignacionDAO"].buscar_vigente_por_cama.return_value = ASIGNACION
+    with pytest.raises(ReglaNegocioError, match="paciente asignado"):
+        ctrl.poner_fuera_de_servicio(3, "Monitor dañado")
+    assert cama_libre.escrituras() == []
+
+
+def test_no_se_saca_de_servicio_una_cama_con_limpieza_pendiente(cama_libre, ctrl):
+    cama_libre["CamaDAO"].buscar_por_id.return_value = uci(EstadoCama.EN_LIMPIEZA)
+    cama_libre["SolicitudLimpiezaDAO"].buscar_pendiente_por_cama.return_value = SolicitudLimpieza(1, 3, "UCI-01", AHORA)
+    with pytest.raises(ReglaNegocioError, match="limpieza pendiente"):
+        ctrl.poner_fuera_de_servicio(3, "Monitor dañado")
+    assert cama_libre.escrituras() == []
+
+
+def test_una_cama_fuera_de_servicio_no_se_vuelve_a_sacar(cama_libre, ctrl):
+    cama_libre["CamaDAO"].buscar_por_id.return_value = uci(EstadoCama.FUERA_SERVICIO)
+    with pytest.raises(ReglaNegocioError, match="ya está fuera de servicio"):
+        ctrl.poner_fuera_de_servicio(3, "Monitor dañado")
+    assert cama_libre.escrituras() == []
+
+
+def test_volver_a_servicio(datos, ctrl):
+    datos["CamaDAO"].buscar_por_id.return_value = uci(EstadoCama.FUERA_SERVICIO)
+    ctrl.volver_a_servicio(3)
+    cama, anterior = datos["CamaDAO"].cambiar_estado.call_args.args
+    assert (cama.estado, anterior) == (EstadoCama.DISPONIBLE, EstadoCama.FUERA_SERVICIO)
+    assert datos.auditoria().args == (10, "cama", AccionAuditoria.UPDATE, 3,
+                                      {"estado_anterior": "FUERA DE SERVICIO", "estado_nuevo": "DISPONIBLE"})
+
+
+def test_volver_a_servicio_una_cama_que_no_estaba_fuera(datos, ctrl):
+    datos["CamaDAO"].buscar_por_id.return_value = uci(EstadoCama.DISPONIBLE)
+    with pytest.raises(CamaEstadoInvalidoError):
+        ctrl.volver_a_servicio(3)
+    assert datos.escrituras() == []
 
 
 # ---- Limpieza

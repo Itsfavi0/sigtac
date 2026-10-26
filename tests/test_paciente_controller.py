@@ -51,6 +51,7 @@ OPERACIONES = [
     ("abrir_episodio", (1, "Dolor torácico")),
     ("identificar", (5, "DNI", DNI, "Rosa", "Mendoza", NACIMIENTO)),
     ("fusionar", (5, 1)),
+    ("actualizar_datos", (1, "Rosa", "Mendoza", NACIMIENTO, "F", 1)),
 ]
 
 
@@ -270,3 +271,126 @@ def test_fusionar_un_paciente_inexistente(datos, ctrl):
     datos["PacienteDAO"].buscar_por_id.side_effect = [nn(5), None]
     with pytest.raises(ReglaNegocioError, match="no existe"):
         ctrl.fusionar(5, 99)
+
+
+# ---- Editar datos
+
+def test_actualizar_datos_guarda_y_audita_solo_los_nombres_de_los_campos(datos, ctrl):
+    datos["PacienteDAO"].bloquear.return_value = True
+    datos["PacienteDAO"].buscar_por_id.side_effect = [rosa(), "releído"]
+    datos["PacienteDAO"].actualizar.return_value = True
+    assert ctrl.actualizar_datos(1, "Rosa", "Mendoza Quispe", NACIMIENTO, "F", 2) == "releído"
+    assert datos.llamadas()[:3] == ["inicio", "PacienteDAO.bloquear", "PacienteDAO.buscar_por_id"]
+    assert datos.escrituras() == ["PacienteDAO.actualizar", "AuditoriaDAO.registrar"]
+    guardado = datos["PacienteDAO"].actualizar.call_args.args[0]
+    assert (guardado.apellidos, guardado.id_seguro) == ("Mendoza Quispe", 2)
+    assert datos.auditoria().args == (10, "paciente", AccionAuditoria.UPDATE, 1, {"campos": ["apellidos", "id_seguro"]})
+    assert datos.llamadas()[-1] == "commit"
+
+
+def test_actualizar_sin_cambios_no_escribe_ni_audita(datos, ctrl):
+    datos["PacienteDAO"].bloquear.return_value = True
+    datos["PacienteDAO"].buscar_por_id.return_value = rosa()
+    ctrl.actualizar_datos(1, "Rosa", "Mendoza Flores", NACIMIENTO, "F", 1)
+    assert datos.escrituras() == []
+
+
+def test_actualizar_un_paciente_inexistente_o_dado_de_baja(datos, ctrl):
+    datos["PacienteDAO"].bloquear.return_value = False
+    with pytest.raises(ReglaNegocioError, match="no existe o está dado de baja"):
+        ctrl.actualizar_datos(1, "Rosa", "Mendoza", NACIMIENTO, "F", 1)
+    assert datos.escrituras() == [] and datos.llamadas()[-1] == "rollback"
+
+
+def test_actualizar_con_datos_invalidos_no_escribe(datos, ctrl):
+    datos["PacienteDAO"].bloquear.return_value = True
+    datos["PacienteDAO"].buscar_por_id.return_value = rosa()
+    with pytest.raises(ValueError, match="sexo"):
+        ctrl.actualizar_datos(1, "Rosa", "Mendoza", NACIMIENTO, "X", 1)
+    assert datos.escrituras() == []
+
+
+def test_a_un_nn_no_se_le_pone_nombre_al_editarlo(datos, ctrl):
+    datos["PacienteDAO"].bloquear.return_value = True
+    datos["PacienteDAO"].buscar_por_id.return_value = nn()
+    with pytest.raises(ReglaNegocioError, match="al identificarlo"):
+        ctrl.actualizar_datos(5, "Juan", "Pérez", NACIMIENTO, "M", 4)
+    assert datos.escrituras() == []
+
+
+def test_si_el_dao_no_actualiza_se_deshace(datos, ctrl):
+    datos["PacienteDAO"].bloquear.return_value = True
+    datos["PacienteDAO"].buscar_por_id.return_value = rosa()
+    datos["PacienteDAO"].actualizar.return_value = False
+    with pytest.raises(ReglaNegocioError, match="Otro usuario"):
+        ctrl.actualizar_datos(1, "Rosa", "Mendoza", NACIMIENTO, "F", 1)
+    datos["AuditoriaDAO"].registrar.assert_not_called()
+    assert datos.llamadas()[-1] == "rollback"
+
+
+# ---- Baja y reactivación (ADMINISTRACION)
+
+@pytest.fixture
+def admin(sesion_de):
+    return PacienteController(sesion_de(Rol.ADMINISTRADOR, id_usuario=1, id_empleado=1))
+
+
+@pytest.mark.parametrize("metodo", ["dar_de_baja", "reactivar"])
+@pytest.mark.parametrize("rol", [Rol.ENFERMERO, Rol.MEDICO, Rol.JEFE_GUARDIA, Rol.LIMPIEZA])
+def test_solo_el_administrador_da_de_baja_o_reactiva(datos, sesion_de, metodo, rol):
+    with pytest.raises(UsuarioSinPermisoError):
+        getattr(PacienteController(sesion_de(rol)), metodo)(1)
+    assert datos.llamadas() == []
+
+
+def test_dar_de_baja_bloquea_comprueba_y_audita(datos, admin):  # RN-11
+    datos["PacienteDAO"].bloquear.return_value = True
+    datos["EpisodioDAO"].listar_por_paciente.return_value = [episodio(estado=EstadoEpisodio.ALTA)]
+    admin.dar_de_baja(1)
+    assert datos.llamadas()[:2] == ["inicio", "PacienteDAO.bloquear"]
+    assert datos.escrituras() == ["PacienteDAO.anular", "AuditoriaDAO.registrar"]
+    datos["PacienteDAO"].anular.assert_called_once_with(1)
+    assert datos.auditoria().args == (1, "paciente", AccionAuditoria.ANULAR, 1)
+
+
+def test_no_se_da_de_baja_a_un_paciente_en_emergencia(datos, admin):
+    datos["PacienteDAO"].bloquear.return_value = True
+    datos["EpisodioDAO"].listar_por_paciente.return_value = [episodio(estado=EstadoEpisodio.EN_ESPERA)]
+    with pytest.raises(ReglaNegocioError, match="episodio abierto"):
+        admin.dar_de_baja(1)
+    assert datos.escrituras() == []
+
+
+def test_no_se_da_de_baja_dos_veces(datos, admin):
+    datos["PacienteDAO"].bloquear.return_value = False
+    with pytest.raises(ReglaNegocioError, match="ya está dado de baja"):
+        admin.dar_de_baja(1)
+    assert datos.escrituras() == []
+
+
+def test_reactivar_un_paciente(datos, admin):
+    datos["PacienteDAO"].buscar_por_id.return_value = rosa(activo=False)
+    datos["PacienteDAO"].reactivar.return_value = True
+    assert admin.reactivar(1).activo
+    assert datos.escrituras() == ["PacienteDAO.reactivar", "AuditoriaDAO.registrar"]
+    assert datos.auditoria().args == (1, "paciente", AccionAuditoria.REACTIVAR, 1)
+
+
+@pytest.mark.parametrize("paciente, mensaje", [
+    (rosa(activo=True), "ya está activo"),
+    (Paciente(5, None, "NN", "NN", NACIMIENTO, "M", 4, activo=False), "sin identificar"),
+])
+def test_reactivar_lo_rechaza_el_modelo(datos, admin, paciente, mensaje):
+    datos["PacienteDAO"].buscar_por_id.return_value = paciente
+    with pytest.raises(ReglaNegocioError, match=mensaje):
+        admin.reactivar(paciente.id_paciente)
+    assert datos.escrituras() == []
+
+
+def test_reactivar_si_otro_usuario_llego_antes(datos, admin):
+    datos["PacienteDAO"].buscar_por_id.return_value = rosa(activo=False)
+    datos["PacienteDAO"].reactivar.return_value = False
+    with pytest.raises(ReglaNegocioError, match="Otro usuario"):
+        admin.reactivar(1)
+    datos["AuditoriaDAO"].registrar.assert_not_called()
+
