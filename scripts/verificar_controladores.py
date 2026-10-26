@@ -1,6 +1,7 @@
 """
-Verificación contra MySQL real de la Fase 4: los cinco controladores (admisión, triaje,
-camas, limpieza y reportes) y el SQL nuevo de los DAO (historial en bloque, FOR UPDATE, reportes).
+Verificación contra MySQL real de la Fase 4: los controladores (admisión, triaje, camas, limpieza,
+reportes y administración) y el SQL nuevo de los DAO (historial en bloque, FOR UPDATE, reportes,
+cuentas de usuario y bitácora), incluido el login real con una cuenta creada por el administrador.
 
 Crea la base sigtac_scratch_tmp, carga schema.sql y seed.sql, ejecuta el flujo completo y elimina
 la base al terminar. No toca sigtac_db. Se ejecuta con el .venv activado:
@@ -104,16 +105,21 @@ def main():
 
 
 def ejecutar_flujo(otra_pc):
-    from controllers.auth_controller import Sesion
+    from controllers.admin_controller import AdminController
+    from controllers.auth_controller import AuthController, Sesion
     from controllers.cama_controller import CamaController
     from controllers.paciente_controller import PacienteController
     from controllers.reporte_controller import ReporteController
     from controllers.triaje_controller import TriajeController
+    from dao.cama_dao import CamaDAO
     from dao.db_connection import ConexionBD
     from dao.episodio_dao import EpisodioDAO
+    from dao.usuario_dao import UsuarioDAO
     from models.estados import EstadoCama, EstadoEpisodio
     from models.estrategias import ReglaManchester
-    from models.excepciones import (CamaEstadoInvalidoError, ReglaNegocioError, UsuarioSinPermisoError)
+    from models.excepciones import (AutenticacionError, CamaEstadoInvalidoError, RegistroDuplicadoError,
+                                    ReglaNegocioError, UsuarioSinPermisoError)
+    from models.permisos import Rol
 
     # Usuarios del seed: 1 admin, 2 jefe de guardia (médico), 3 enfermero de triaje, 4 limpieza
     admin = Sesion(1, 1, "Administrador", "Admin", "Sistema")
@@ -359,6 +365,134 @@ def ejecutar_flujo(otra_pc):
               ind.espera_cama_min == round(float(valor(
                   "SELECT AVG(TIMESTAMPDIFF(MINUTE, ep.fecha_ingreso, a.fecha_asignacion)) FROM asignacion_cama a "
                   "JOIN episodio_emergencia ep ON a.id_episodio = ep.id_episodio WHERE a.estado_registro = TRUE")), 1))
+
+    # ------------------------------------------------------------------ Referir y fuga
+    print("\n--- Referir y registrar una fuga (cama_controller)")
+    comprobar("referir un episodio sin triaje se rechaza (nn3 espera triaje)",
+              "falta el triaje" in str(lanza(ReglaNegocioError, camas.referir,
+                                             EpisodioDAO.listar_por_paciente(nn3.id_paciente)[0].id_episodio)))
+    comprobar("referir sin cama: el NN reclasificado pasa a REFERIDO con fecha de egreso de MySQL",
+              camas.referir(ep_nn.id_episodio) is None and estado_ep(ep_nn.id_episodio) == "REFERIDO"
+              and valor("SELECT fecha_alta IS NOT NULL FROM episodio_emergencia WHERE id_episodio = %s",
+                        (ep_nn.id_episodio,)) == 1)
+    asig_ana = valor("SELECT id_asignacion FROM asignacion_cama WHERE id_episodio = %s AND fecha_liberacion IS NULL "
+                     "AND estado_registro = TRUE", (ep_ana.id_episodio,))
+    comprobar("fuga con cama reservada: FUGADO, la cama 7 vuelve a DISPONIBLE y la asignación se anula",
+              camas.registrar_fuga(ep_ana.id_episodio) is None and estado_ep(ep_ana.id_episodio) == "FUGADO / ABANDONO"
+              and estado_cama(7) == "DISPONIBLE"
+              and valor("SELECT estado_registro FROM asignacion_cama WHERE id_asignacion = %s", (asig_ana,)) == 0)
+    ep_otra = EpisodioDAO.listar_por_paciente(4)[0].id_episodio
+    triajes.registrar(ep_otra, SIGNOS, [7])
+    camas.asignar(ep_otra, 6)
+    camas.ocupar(6)
+    id_sol_ref = camas.referir(ep_otra)
+    comprobar("referir con cama ocupada: REFERIDO, cama 6 EN LIMPIEZA con su solicitud (RN-07)",
+              id_sol_ref and estado_ep(ep_otra) == "REFERIDO" and estado_cama(6) == "EN LIMPIEZA"
+              and valor("SELECT id_cama FROM solicitud_limpieza WHERE id_solicitud = %s", (id_sol_ref,)) == 6)
+    comprobar("los cierres quedan en la bitácora (UPDATE episodio_emergencia)",
+              all(bitacora("episodio_emergencia", "UPDATE", e) == 1 for e in (ep_nn.id_episodio, ep_ana.id_episodio)))
+    comprobar("un episodio referido no se vuelve a cerrar", lanza(ReglaNegocioError, camas.registrar_fuga, ep_otra))
+    ind = reportes.indicadores(hoy - timedelta(days=1), hoy)
+    estancia_altas = valor("SELECT AVG(TIMESTAMPDIFF(MINUTE, fecha_ingreso, fecha_alta)) FROM episodio_emergencia "
+                           "WHERE estado_registro = TRUE AND id_estado_ep = 4")
+    comprobar(f"la estancia promedio ({ind.estancia_min}) solo cuenta las altas médicas",
+              ind.estancia_min == round(float(estancia_altas), 1))
+
+    # ------------------------------------------------------------------ Fuera de servicio
+    print("\n--- Fuera de servicio")
+    comprobar("una cama con limpieza pendiente no sale de servicio",
+              "limpieza pendiente" in str(lanza(ReglaNegocioError, camas.poner_fuera_de_servicio, 6, "Colchón roto")))
+    con_paciente = valor("SELECT id_cama FROM asignacion_cama WHERE fecha_liberacion IS NULL AND estado_registro = TRUE "
+                         "ORDER BY id_cama LIMIT 1")
+    comprobar(f"una cama con paciente (cama {con_paciente}) no sale de servicio",
+              "paciente asignado" in str(lanza(ReglaNegocioError, camas.poner_fuera_de_servicio, con_paciente, "Falla")))
+    camas.poner_fuera_de_servicio(3, "Monitor de signos con falla")
+    comprobar("poner_fuera_de_servicio: cama 3 FUERA DE SERVICIO, motivo en la bitácora, ya no figura disponible",
+              estado_cama(3) == "FUERA DE SERVICIO"
+              and "Monitor de signos" in valor("SELECT CAST(detalles_json AS CHAR) FROM bitacora_auditoria WHERE "
+                                               "tabla_afectada = 'cama' AND id_registro_afectado = 3 "
+                                               "ORDER BY id_bitacora DESC LIMIT 1")
+              and 3 not in [c.id_cama for c in CamaDAO.listar_disponibles()])
+    comprobar("no se saca dos veces", lanza(ReglaNegocioError, camas.poner_fuera_de_servicio, 3, "Otra vez"))
+    camas.volver_a_servicio(3)
+    comprobar("volver_a_servicio: cama 3 DISPONIBLE", estado_cama(3) == "DISPONIBLE")
+    comprobar("una cama disponible no 'vuelve' a servicio", lanza(CamaEstadoInvalidoError, camas.volver_a_servicio, 3))
+
+    # ------------------------------------------------------------------ Editar, baja y reactivación
+    print("\n--- Editar, dar de baja y reactivar pacientes")
+    pacientes_admin = PacienteController(admin)
+    editado = pacientes.actualizar_datos(nuevo.id_paciente, "Ana", "Torres Vega de Ríos", date(1990, 4, 2), "F", 1)
+    comprobar("actualizar_datos guarda el cambio y audita solo los nombres de los campos",
+              editado.apellidos == "Torres Vega de Ríos"
+              and valor("SELECT apellidos FROM paciente WHERE id_paciente = %s", (nuevo.id_paciente,)) == "Torres Vega de Ríos"
+              and "Torres" not in valor("SELECT CAST(detalles_json AS CHAR) FROM bitacora_auditoria WHERE "
+                                        "tabla_afectada = 'paciente' AND accion = 'UPDATE' AND id_registro_afectado = %s",
+                                        (nuevo.id_paciente,)))
+    comprobar("un enfermero no da de baja pacientes", lanza(UsuarioSinPermisoError, pacientes.dar_de_baja, nuevo.id_paciente))
+    comprobar("no se da de baja a Rosa, que sigue en emergencia",
+              "episodio abierto" in str(lanza(ReglaNegocioError, pacientes_admin.dar_de_baja, 1)))
+    pacientes_admin.dar_de_baja(nuevo.id_paciente)  # su episodio terminó en fuga
+    comprobar("dar_de_baja: estado_registro = FALSE y ANULAR en la bitácora",
+              valor("SELECT estado_registro FROM paciente WHERE id_paciente = %s", (nuevo.id_paciente,)) == 0
+              and bitacora("paciente", "ANULAR", nuevo.id_paciente) == 1)
+    comprobar("un paciente dado de baja no se edita",
+              lanza(ReglaNegocioError, pacientes.actualizar_datos, nuevo.id_paciente, "Ana", "Torres", date(1990, 4, 2), "F", 1))
+    comprobar("registrar su documento otra vez pide la reactivación",
+              "reactivación" in str(lanza(ReglaNegocioError, pacientes.registrar, "DNI", "72345678", "Ana", "Torres",
+                                          date(1990, 4, 2), "F", 2)))
+    comprobar("reactivar: vuelve a estar activo, con REACTIVAR en la bitácora",
+              pacientes_admin.reactivar(nuevo.id_paciente).activo
+              and valor("SELECT estado_registro FROM paciente WHERE id_paciente = %s", (nuevo.id_paciente,)) == 1
+              and bitacora("paciente", "REACTIVAR", nuevo.id_paciente) == 1)
+    comprobar("un NN fusionado no se reactiva",
+              "sin identificar" in str(lanza(ReglaNegocioError, pacientes_admin.reactivar, nn2.id_paciente)))
+
+    # ------------------------------------------------------------------ Administración de cuentas
+    print("\n--- Cuentas de usuario y login real (admin_controller + auth_controller)")
+    cuentas, auth = AdminController(admin), AuthController()
+    CLAVE, CLAVE_NUEVA = "Guardia2026x", "Turno2026noche"
+    comprobar("un jefe de guardia no administra cuentas", lanza(UsuarioSinPermisoError, AdminController(jefe).listar_cuentas))
+    sin_cuenta = [e["id_empleado"] for e in cuentas.listar_empleados_sin_cuenta()]
+    comprobar(f"empleados sin cuenta: solo el 5, activo ({sin_cuenta})", sin_cuenta == [5])
+    comprobar("una clave débil no se acepta", lanza(ValueError, cuentas.crear_cuenta, 5, Rol.MEDICO, "12345678"))
+    nueva = cuentas.crear_cuenta(5, Rol.MEDICO, CLAVE)
+    comprobar("crear_cuenta: la BD guarda un hash bcrypt, no la clave",
+              nueva.rol is Rol.MEDICO and nueva.activo
+              and valor("SELECT hash_clave FROM usuario WHERE id_usuario = %s", (nueva.id_usuario,)).startswith("$2b$12$"))
+    comprobar("ni la clave ni el hash llegan a la bitácora",
+              valor("SELECT COUNT(*) FROM bitacora_auditoria WHERE tabla_afectada = 'usuario' AND "
+                    "(CAST(detalles_json AS CHAR) LIKE %s OR CAST(detalles_json AS CHAR) LIKE %s)",
+                    ("%" + CLAVE + "%", "%$2b$%")) == 0)
+    comprobar("una segunda cuenta para el mismo empleado se rechaza (UNIQUE)",
+              lanza(RegistroDuplicadoError, cuentas.crear_cuenta, 5, Rol.MEDICO, CLAVE))
+    sesion = auth.iniciar_sesion("DNI", "55555555", CLAVE)
+    comprobar("login real con la cuenta nueva: sesión de Médico con sus permisos",
+              sesion.nombre_rol == "Médico de Emergencia" and sesion.puede("gestion_camas") and not sesion.puede("reportes"))
+    cuentas.cambiar_rol(nueva.id_usuario, Rol.JEFE_GUARDIA)
+    comprobar("cambiar_rol: el siguiente login ya tiene el rol nuevo",
+              auth.iniciar_sesion("DNI", "55555555", CLAVE).nombre_rol == "Jefe de Guardia")
+    cuentas.desactivar(nueva.id_usuario)
+    comprobar("una cuenta desactivada no inicia sesión",
+              lanza(AutenticacionError, auth.iniciar_sesion, "DNI", "55555555", CLAVE))
+    cuentas.activar(nueva.id_usuario)
+    comprobar("al reactivarla vuelve a entrar", auth.iniciar_sesion("DNI", "55555555", CLAVE).activa)
+    for _ in range(5):
+        lanza(AutenticacionError, auth.iniciar_sesion, "DNI", "55555555", "ClaveEquivocada1")
+    comprobar("5 intentos fallidos bloquean la cuenta, incluso con la clave correcta",
+              UsuarioDAO.buscar_cuenta(nueva.id_usuario).bloqueada
+              and lanza(AutenticacionError, auth.iniciar_sesion, "DNI", "55555555", CLAVE))
+    cuentas.desbloquear(nueva.id_usuario)
+    comprobar("desbloquear: entra sin esperar los 15 minutos", auth.iniciar_sesion("DNI", "55555555", CLAVE).activa)
+    cuentas.restablecer_clave(nueva.id_usuario, CLAVE_NUEVA)
+    comprobar("restablecer_clave: la clave anterior deja de servir y la nueva funciona",
+              lanza(AutenticacionError, auth.iniciar_sesion, "DNI", "55555555", CLAVE)
+              and auth.iniciar_sesion("DNI", "55555555", CLAVE_NUEVA).activa)
+    comprobar("el administrador no puede desactivarse a sí mismo",
+              "otro administrador" in str(lanza(ReglaNegocioError, cuentas.desactivar, 1)))
+    registros = cuentas.bitacora(hoy, hoy, tabla="usuario")
+    comprobar(f"la bitácora del día muestra las {len(registros)} operaciones sobre cuentas, la más reciente primero",
+              len(registros) == 6 and registros[0]["detalles"] == {"clave_restablecida": True})
+    auth.cerrar_sesion()
 
     lector.close()
     ConexionBD().cerrar_conexion()
