@@ -27,11 +27,13 @@
   - poner y sacar camas de servicio;
   - editar, dar de baja y reactivar pacientes;
   - `admin_controller.py` (cuentas y bitácora).
-- Pruebas: **1349 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
+- **Fase 5 (utils) cerrada (2026-10-26):** `utils/pdf_generator.py` exporta a PDF los indicadores y el estado de la guardia (`ReporteController.exportar_pdf`).
+- Pruebas: **1397 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`.
 
 ### Tarea actual
 
-Ninguna en curso. Siguiente: la Fase 5 (`pdf_generator.py`) o la Fase 6 (vistas).
+Ninguna en curso. Siguiente: la Fase 6 (vistas con CustomTkinter).
+Falta que el usuario ejecute `scripts/verificar_controladores.py` para confirmar el PDF con datos reales.
 
 ---
 
@@ -44,7 +46,7 @@ Ninguna en curso. Siguiente: la Fase 5 (`pdf_generator.py`) o la Fase 6 (vistas)
 | Fase 2 — Models | Completada (2026-10-12) |
 | Fase 3 — DAO | Completada (2026-10-21) |
 | Fase 4 — Controllers | Completada (2026-10-22). Verificada en MySQL 8.0.46 |
-| Fase 5 — Utils | Parcial: `security.py` y `logging_config.py` hechos; falta `pdf_generator.py` |
+| Fase 5 — Utils | Completada (2026-10-26): `security.py`, `logging_config.py` y `pdf_generator.py` |
 | Fase 6 — Views | Pendiente (la carpeta `views/` aún no existe) |
 | Fase 7 — Integración y pruebas | Pendiente |
 
@@ -91,7 +93,7 @@ Ninguna en curso. Siguiente: la Fase 5 (`pdf_generator.py`) o la Fase 6 (vistas)
 | `controllers/paciente_controller.py` | Registro (con documento o NN), abrir episodio (uno abierto por paciente), identificar y fusionar NN | `test_paciente_controller.py` |
 | `controllers/triaje_controller.py` | Sugerencia de la estrategia, registro con reclasificación justificada, cola de triaje | `test_triaje_controller.py` (41) |
 | `controllers/cama_controller.py` | Mapa, cola de espera, camas compatibles, asignar, ocupar, cancelar, alta y limpieza | `test_cama_controller.py` |
-| `controllers/reporte_controller.py` | Estado actual de la guardia e indicadores de un período | `test_reporte_controller.py` (17) |
+| `controllers/reporte_controller.py` | Estado actual de la guardia, indicadores de un período y `exportar_pdf` | `test_reporte_controller.py` (25) |
 | `controllers/colas.py` | `EntradaCola` y `armar_cola` (cola por prioridad, en una transacción) | `test_colas.py` (3) |
 | `controllers/admin_controller.py` | Cuentas de usuario (crear, rol, activar, clave, desbloqueo) y consulta de la bitácora | `test_admin_controller.py` (86) |
 | `models/usuario.py` | `CuentaUsuario` y la política de claves (`validar_clave_nueva`) | `test_usuario.py` (27) |
@@ -99,6 +101,14 @@ Ninguna en curso. Siguiente: la Fase 5 (`pdf_generator.py`) o la Fase 6 (vistas)
 `cama_controller.py` también refiere, registra fugas y saca o devuelve camas al servicio (92 pruebas). `paciente_controller.py` también edita, da de baja y reactiva pacientes (78 pruebas).
 
 Todo el flujo, incluidas dos pruebas de concurrencia entre PCs, verificado en MySQL 8.0.46 con `scripts/verificar_controladores.py` (56 comprobaciones).
+
+### Fase 5 — Utils
+
+| Archivo | Contenido | Pruebas |
+|---|---|---|
+| `utils/security.py` | bcrypt y `simular_verificacion` (señuelo) | `test_security.py` |
+| `utils/logging_config.py` | `configurar_logging()` | — |
+| `utils/pdf_generator.py` | Reporte PDF (ReportLab): indicadores, gráfico de triajes por nivel, estado de la guardia; `ReporteError` si no se puede guardar | `test_pdf_generator.py` (39) |
 
 ---
 
@@ -151,7 +161,8 @@ Ninguno bloqueante. Las decisiones menores están en "Pendientes conocidos".
 ## Próximo trabajo previsto
 
 1. Validar con el equipo la matriz de permisos (`models/permisos.py`; ver CHANGELOG del 2026-10-21 y 2026-10-26).
-2. Fase 5: `utils/pdf_generator.py` (exportar los indicadores de `ReporteController`) o Fase 6: vistas con CustomTkinter, que ya pueden usar los controladores.
+2. Ejecutar `scripts/verificar_controladores.py` para confirmar la exportación a PDF con datos reales.
+3. Fase 6: vistas con CustomTkinter (`login_view.py` → `app_principal.py` → `dashboard_view.py` → `triage_view.py` → `pacientes_view.py`), que ya pueden usar todos los controladores.
 
 Respecto al plan original, `auditoria_dao.py` se hizo antes que `triaje_dao.py` y `asignacion_dao.py` porque es de una sola tabla y no depende de transacciones (ver `CHANGELOG.md` del 2026-10-12).
 

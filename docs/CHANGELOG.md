@@ -5,6 +5,61 @@
 
 ---
 
+## [2026-10-26] — Fase 5: reporte de indicadores en PDF (`utils/pdf_generator.py`)
+
+### Cambio
+- **Nuevo `utils/pdf_generator.py`** (ReportLab). Recibe `IndicadoresPeriodo` y `EstadoGuardia` ya calculados y arma un PDF A4 con:
+  - el período, la fecha de generación y quién lo generó;
+  - la tabla de indicadores del período y un gráfico de barras de los triajes por nivel, cada barra con el color de su nivel (el gráfico se omite si no hubo triajes);
+  - el estado de la guardia al generar el reporte (camas por estado, ocupación, pacientes en emergencia);
+  - notas con la definición de cada indicador y un pie de página con el aviso de prototipo académico y el número de página.
+- Funciones públicas:
+  - `filas_indicadores`, `filas_camas`, `filas_pacientes`, `formatear_minutos` y `formatear_porcentaje`: arman el texto de las tablas y se prueban sin abrir el PDF;
+  - `construir_reporte(...) -> bytes`: arma el PDF en memoria;
+  - `validar_ruta_pdf(ruta)`: exige la extensión `.pdf` (`ValueError`);
+  - `guardar_reporte(ruta, ...)`: escribe el archivo; si no puede (carpeta inexistente, sin permisos, PDF abierto en otro programa) lanza `ReporteError`.
+- **`ReporteController.exportar_pdf(desde, hasta, ruta)`** (permiso REPORTES): valida la ruta, obtiene `indicadores` y `estado_actual` y guarda el PDF. Devuelve la ruta.
+- Nuevos `ReporteError` (`models/excepciones.py`) y `COLOR_POR_NIVEL` (`models/triaje.py`: 1 Rojo … 5 Azul).
+- `scripts/verificar_controladores.py` exporta el PDF con los datos reales de la base temporal y comprueba que no escribe en la bitácora.
+- Pruebas: nuevo `tests/test_pdf_generator.py` (39); `test_reporte_controller.py` (+8: exportar) y `test_estados_vs_bd.py` (+1: `COLOR_POR_NIVEL` contra `nivel_triaje` del seed).
+
+### Archivos afectados
+- `utils/pdf_generator.py` (nuevo), `controllers/reporte_controller.py`, `models/excepciones.py`, `models/triaje.py`
+- `scripts/verificar_controladores.py`, `tests/test_pdf_generator.py` (nuevo), `tests/test_reporte_controller.py`, `tests/test_estados_vs_bd.py`
+- `docs/`, `CLAUDE.md`
+
+### Motivo
+Era lo único pendiente de la Fase 5. Además completa el punto "Reportes → indicadores/PDF" de la integración (Fase 7).
+
+### Impacto
+- Pruebas: **1397 pasan** (antes 1349).
+- Sin cambios de esquema ni de dependencias: `reportlab==5.0.1` ya estaba en `requirements.txt`.
+- La vista de reportes (Fase 6) solo tiene que pedir el período y la ruta (diálogo "Guardar como") y llamar a `exportar_pdf`.
+
+### Decisiones
+- **El generador solo presenta:**
+  - no consulta la BD, no comprueba permisos y no calcula indicadores;
+  - lo único que decide es el formato (minutos → "2 h 05 min", `None` → "Sin datos").
+- **La exportación es una operación del controlador** (`exportar_pdf`), no de la vista. El permiso y la obtención de los datos quedan en un solo lugar, y la vista no necesita conocer `pdf_generator`.
+- **Importación circular evitada con `TYPE_CHECKING`:**
+  - `reporte_controller` importa `pdf_generator`;
+  - el generador importa `EstadoGuardia` e `IndicadoresPeriodo` solo para las anotaciones de tipo;
+  - así no hay que mover esas clases de lugar.
+- **La ruta se valida antes de consultar la BD:** un error de la vista (extensión equivocada) no hace consultas inútiles. Es el mismo patrón que en el resto de controladores (validar → BD).
+- **El PDF se arma en memoria y luego se escribe:** si ReportLab falla, no queda un archivo a medias en el disco.
+- **`OSError` → `ReporteError`:** la vista captura `SigtacError` y muestra el mensaje. El caso típico en Windows es intentar sobrescribir un PDF que está abierto en el visor (`PermissionError`).
+- **Indicadores y estado actual en dos transacciones:** son dos lecturas independientes a segundos de distancia. Unirlas no cambiaría lo que el reporte muestra.
+- **Exportar no se audita:** la bitácora registra los cambios de datos, y exportar es una lectura. Queda un `logger.info` con el período, sin el nombre del usuario.
+- **El nombre de quien genera el reporte sí va en el PDF:** es un documento para imprimir y firmar, no un log. Se escapa con `xml.sax.saxutils.escape`, porque `Paragraph` interpreta `<` y `&` como marcado.
+- **Gráfico con ReportLab y no con matplotlib:** se dibuja como vectores dentro del PDF, sin imagen intermedia. matplotlib queda para el dashboard (Fase 6).
+- **`COLOR_POR_NIVEL` en `models/triaje.py`:** el color es un dato del dominio que también usarán las vistas. Los tonos RGB de las barras son presentación y viven en el generador.
+
+### Pendientes
+- Ejecutar `scripts/verificar_controladores.py` (lo hace el usuario con su cuenta de administrador) para confirmar la exportación con datos reales.
+- Vista de reportes (Fase 6): selector de período, diálogo "Guardar como" y botón "Exportar PDF".
+
+---
+
 ## [2026-10-26] — Pendientes de la Fase 4: referir, fuga, fuera de servicio, edición de pacientes y administración
 
 ### Cambio

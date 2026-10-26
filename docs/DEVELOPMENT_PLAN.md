@@ -306,9 +306,11 @@ Motivo del orden: ver `CHANGELOG.md` (2026-10-12).
 
 ### `pdf_generator.py`
 
-- [ ] Generar PDF con ReportLab.
-- [ ] Recibir datos preparados por los controladores.
-- [ ] No colocar reglas de negocio en el generador.
+**Estado:** completado y probado (`tests/test_pdf_generator.py`, 2026-10-26). Lo usa `ReporteController.exportar_pdf`.
+
+- [x] Generar PDF con ReportLab.
+- [x] Recibir datos preparados por los controladores (`IndicadoresPeriodo` y `EstadoGuardia`).
+- [x] No colocar reglas de negocio en el generador (solo formato y diseño).
 
 ---
 
@@ -365,7 +367,7 @@ En los controladores (sin interfaz), verificado en MySQL con `scripts/verificar_
 - [x] Asignación → estados de cama.
 - [x] Liberación → limpieza → disponibilidad.
 - [x] Operaciones sensibles → auditoría.
-- [ ] Reportes → indicadores/PDF (indicadores hechos; falta el PDF).
+- [x] Reportes → indicadores/PDF (`ReporteController.exportar_pdf`; incluido en `verificar_controladores.py`).
 
 ### Pruebas
 

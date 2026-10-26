@@ -46,14 +46,14 @@ dao/          Acceso a datos: db_connection.py (Singleton ConexionBD), base_dao.
               reporte_dao.py y un *_dao.py por entidad
 models/       Dominio: persona, documento, cama, triaje, asignacion, usuario (CuentaUsuario, política de claves),
               estrategias, permisos, estados y auditoria (Enum), excepciones
-utils/        security.py (bcrypt) y logging_config.py
+utils/        security.py (bcrypt), logging_config.py y pdf_generator.py (reporte PDF con ReportLab)
 db_scripts/   schema.sql, seed.sql, crear_usuario_app.sql y diagrama.png
 tests/        pytest: un test_*.py por módulo; conftest.py con los dobles de los controladores
 scripts/      verificar_controladores.py (flujo completo contra MySQL real en una base temporal)
 docs/         PROJECT_CONTEXT, DEVELOPMENT_PLAN, PROJECT_STATUS y CHANGELOG
 ```
 
-Pendientes por fase (ver `docs/DEVELOPMENT_PLAN.md`): `utils/pdf_generator.py` (Fase 5) y `views/` (Fase 6).
+Pendiente (ver `docs/DEVELOPMENT_PLAN.md`): `views/` (Fase 6).
 
 ## Arquitectura (capas)
 
