@@ -1,6 +1,6 @@
 """
 Verificación contra MySQL real de la Fase 4: los controladores (admisión, triaje, camas, limpieza,
-reportes y administración) y el SQL nuevo de los DAO (historial en bloque, FOR UPDATE, reportes,
+reportes con su PDF y administración) y el SQL nuevo de los DAO (historial en bloque, FOR UPDATE, reportes,
 cuentas de usuario y bitácora), incluido el login real con una cuenta creada por el administrador.
 
 Crea la base sigtac_scratch_tmp, carga schema.sql y seed.sql, ejecuta el flujo completo y elimina
@@ -18,6 +18,7 @@ import getpass
 import os
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from datetime import date, timedelta
@@ -397,6 +398,13 @@ def ejecutar_flujo(otra_pc):
                            "WHERE estado_registro = TRUE AND id_estado_ep = 4")
     comprobar(f"la estancia promedio ({ind.estancia_min}) solo cuenta las altas médicas",
               ind.estancia_min == round(float(estancia_altas), 1))
+    filas_bitacora = valor("SELECT COUNT(*) FROM bitacora_auditoria")
+    with tempfile.TemporaryDirectory() as carpeta:
+        pdf = reportes.exportar_pdf(hoy - timedelta(days=1), hoy, Path(carpeta) / "indicadores.pdf")
+        comprobar("exportar_pdf: guarda un PDF con los indicadores y el estado de la guardia",
+                  pdf.read_bytes().startswith(b"%PDF-") and pdf.stat().st_size > 1000)
+    comprobar("exportar_pdf solo lee: la bitácora no cambia",
+              valor("SELECT COUNT(*) FROM bitacora_auditoria") == filas_bitacora)
 
     # ------------------------------------------------------------------ Fuera de servicio
     print("\n--- Fuera de servicio")

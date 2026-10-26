@@ -11,6 +11,7 @@ from models.documento import TipoDocumento
 from models.estados import EstadoCama, EstadoEpisodio
 from models.permisos import Rol
 from models.persona import Paciente, PersonalLimpieza
+from models.triaje import COLOR_POR_NIVEL
 
 DB_SCRIPTS = Path(__file__).resolve().parent.parent / "db_scripts"
 SEED = (DB_SCRIPTS / "seed.sql").read_text(encoding="utf-8")
@@ -56,6 +57,13 @@ def test_los_niveles_de_triaje_del_seed_son_los_del_modelo():
     bloque = re.search(r"INSERT INTO nivel_triaje \(.*?\) VALUES(.*?);", SEED, re.S).group(1)
     numeros = {int(n) for n in re.findall(r"\(\d+, (\d+), '[^']+', \d+\)", bloque)}
     assert numeros == set(range(1, 6))
+
+
+def test_los_colores_de_los_niveles_coinciden_con_el_seed():
+    # El reporte PDF y las vistas muestran el color de cada nivel con COLOR_POR_NIVEL.
+    bloque = re.search(r"INSERT INTO nivel_triaje \(.*?\) VALUES(.*?);", SEED, re.S).group(1)
+    colores = {int(n): color for n, color in re.findall(r"\(\d+, (\d+), '([^']+)', \d+\)", bloque)}
+    assert COLOR_POR_NIVEL == colores
 
 
 def test_las_tablas_auditables_son_todas_las_del_esquema_salvo_la_bitacora():

@@ -5,7 +5,7 @@ import pytest
 from controllers import reporte_controller
 from controllers.reporte_controller import ReporteController
 from models.estados import EstadoCama, EstadoEpisodio
-from models.excepciones import UsuarioSinPermisoError
+from models.excepciones import ReporteError, UsuarioSinPermisoError
 from models.permisos import Rol
 
 C, E = EstadoCama, EstadoEpisodio
@@ -100,3 +100,62 @@ def test_periodo_invalido_no_consulta(datos, ctrl, desde, hasta, mensaje):
     with pytest.raises(ValueError, match=mensaje):
         ctrl.indicadores(desde, hasta)
     assert datos.llamadas() == []
+
+
+# ---- Exportar a PDF
+
+def preparar_estado(datos):
+    datos["ReporteDAO"].contar_camas_por_estado.return_value = {C.DISPONIBLE: 3, C.OCUPADA: 1}
+    datos["ReporteDAO"].contar_episodios_por_estado.return_value = {E.EN_ESPERA: 2}
+
+
+def test_exportar_pdf(datos, ctrl, tmp_path):
+    preparar(datos)
+    preparar_estado(datos)
+    ruta = ctrl.exportar_pdf(date(2026, 10, 1), date(2026, 10, 31), tmp_path / "octubre.pdf")
+    assert ruta == tmp_path / "octubre.pdf"
+    assert ruta.read_bytes().startswith(b"%PDF-")
+    # dos lecturas (indicadores y estado actual), cada una en su transacción
+    assert datos.llamadas().count("inicio") == 2 and datos.llamadas().count("commit") == 2
+
+
+def test_exportar_pdf_entrega_los_datos_y_quien_lo_genera(datos, ctrl, monkeypatch, tmp_path):
+    preparar(datos)
+    preparar_estado(datos)
+    recibido = {}
+    monkeypatch.setattr(reporte_controller.pdf_generator, "guardar_reporte",
+                        lambda ruta, ind, est, en, por: recibido.update(ind=ind, est=est, en=en, por=por) or ruta)
+    ctrl.exportar_pdf(date(2026, 10, 1), date(2026, 10, 31), tmp_path / "octubre.pdf")
+    assert recibido["ind"].ingresos == 10 and recibido["ind"].desde == date(2026, 10, 1)
+    assert recibido["est"].porcentaje_ocupacion == 25.0
+    assert recibido["por"] == f"Luis Ramos ({Rol.JEFE_GUARDIA})"
+    assert isinstance(recibido["en"], datetime)
+
+
+@pytest.mark.parametrize("rol", [Rol.MEDICO, Rol.ENFERMERO, Rol.LIMPIEZA])
+def test_exportar_pdf_sin_permiso(datos, sesion_de, tmp_path, rol):
+    with pytest.raises(UsuarioSinPermisoError):
+        ReporteController(sesion_de(rol)).exportar_pdf(date(2026, 10, 1), date(2026, 10, 31),
+                                                       tmp_path / "octubre.pdf")
+    assert datos.llamadas() == []
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_exportar_pdf_con_ruta_invalida_no_consulta(datos, ctrl, tmp_path):
+    with pytest.raises(ValueError, match=".pdf"):
+        ctrl.exportar_pdf(date(2026, 10, 1), date(2026, 10, 31), tmp_path / "octubre.txt")
+    assert datos.llamadas() == []
+
+
+def test_exportar_pdf_con_periodo_invalido_no_consulta(datos, ctrl, tmp_path):
+    with pytest.raises(ValueError, match="posterior"):
+        ctrl.exportar_pdf(date(2026, 10, 31), date(2026, 10, 1), tmp_path / "octubre.pdf")
+    assert datos.llamadas() == []
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_exportar_pdf_si_no_se_puede_escribir(datos, ctrl, tmp_path):
+    preparar(datos)
+    preparar_estado(datos)
+    with pytest.raises(ReporteError):
+        ctrl.exportar_pdf(date(2026, 10, 1), date(2026, 10, 31), tmp_path / "no_existe" / "octubre.pdf")

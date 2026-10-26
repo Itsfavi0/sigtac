@@ -4,6 +4,9 @@ from datetime import datetime
 from models.estados import EstadoEpisodio
 from models.excepciones import NivelTriajeInvalidoError, ReglaNegocioError
 
+# Color de cada nivel de triaje (1 = el más urgente). Coincide con la tabla nivel_triaje de seed.sql.
+COLOR_POR_NIVEL = {1: "Rojo", 2: "Naranja", 3: "Amarillo", 4: "Verde", 5: "Azul"}
+
 
 def _es_nivel_valido(nivel) -> bool:
     # Solo enteros del 1 al 5: True (que vale 1) o 2.0 también pasarían un simple "in range(1, 6)".

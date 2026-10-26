@@ -43,6 +43,10 @@ class SignosVitalesIncompletosError(SigtacError):
     """Se lanza cuando falta un signo vital que el algoritmo de triaje necesita para clasificar."""
     pass
 
+class ReporteError(SigtacError):
+    """Se lanza cuando no se pudo guardar un reporte (p. ej. el PDF está abierto en otro programa)."""
+    pass
+
 class PersistenciaError(SigtacError):
     """Se lanza cuando una operación sobre la base de datos no se pudo completar."""
     pass

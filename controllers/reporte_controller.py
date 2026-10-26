@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
+from pathlib import Path
 
 from controllers.auth_controller import Sesion, exigir_permiso
 from dao.reporte_dao import ReporteDAO
@@ -7,6 +8,7 @@ from dao.transaccion import transaccion
 from models.estados import EstadoCama, EstadoEpisodio
 from models.permisos import Permiso
 from models.triaje import EpisodioEmergencia
+from utils import pdf_generator
 
 
 @dataclass(frozen=True)
@@ -88,3 +90,15 @@ class ReporteController:
             estancia = ReporteDAO.promedio_estancia_min(inicio, fin)
         return IndicadoresPeriodo(desde, hasta, ingresos, por_nivel, _porcentaje(reclasificados, total),
                                   _redondear(espera_triaje), _redondear(espera_cama), _redondear(estancia))
+
+    def exportar_pdf(self, desde: date, hasta: date, ruta: str | Path) -> Path:
+        """
+        Guarda en `ruta` un PDF con los indicadores del período y el estado actual de la guardia.
+        Devuelve la ruta del archivo. Lanza ReporteError si no se puede escribir el archivo.
+        """
+        sesion = exigir_permiso(self._sesion, Permiso.REPORTES)
+        ruta = pdf_generator.validar_ruta_pdf(ruta)  # antes de consultar: un error de la vista no toca la BD
+        indicadores = self.indicadores(desde, hasta)
+        estado = self.estado_actual()
+        generado_por = f"{sesion.nombre_completo} ({sesion.nombre_rol})"
+        return pdf_generator.guardar_reporte(ruta, indicadores, estado, datetime.now(), generado_por)
