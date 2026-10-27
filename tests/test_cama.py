@@ -130,3 +130,14 @@ def test_el_estado_sigue_comparandose_con_texto():
     # EstadoCama es un StrEnum: los valores coinciden con los de la BD
     assert nueva_cama().estado == "DISPONIBLE"
     assert str(nueva_cama(Cama.ESTADO_EN_LIMPIEZA).estado) == "EN LIMPIEZA"
+
+
+def test_cada_tipo_de_cama_declara_su_nombre():
+    # El DAO arma su fábrica con NOMBRE_TIPO y las vistas lo muestran como título de cada grupo del mapa
+    from models.cama import Cama
+    subclases = Cama.__subclasses__()
+    assert len(subclases) == 4
+    nombres = [clase.NOMBRE_TIPO for clase in subclases]
+    assert all(isinstance(n, str) and n for n in nombres) and len(set(nombres)) == len(nombres)
+    cortos = [clase.NOMBRE_CORTO for clase in subclases]
+    assert all(isinstance(c, str) and 0 < len(c) <= 16 for c in cortos) and len(set(cortos)) == len(cortos)

@@ -21,12 +21,9 @@ class CamaDAO(BaseDAO):
     # Fábrica: nombre del tipo en la tabla tipo_cama → subclase. Se usa el nombre (UNIQUE)
     # y no el id, porque los ids dependen del orden de inserción del seed.
     # tests/test_estados_vs_bd.py comprueba que coincida con seed.sql.
-    CLASES_POR_TIPO = {
-        "Cama de Trauma Shock": CamaTraumaShock,
-        "Cama UCI con Ventilador": CamaUCI,
-        "Cama de Observación con Monitor": CamaObservacion,
-        "Cama de Hospitalización General": CamaHospitalizacion,
-    }
+    # El nombre lo declara cada subclase (NOMBRE_TIPO), que también lo usan las vistas.
+    CLASES_POR_TIPO = {clase.NOMBRE_TIPO: clase
+                       for clase in (CamaTraumaShock, CamaUCI, CamaObservacion, CamaHospitalizacion)}
 
     _SELECT = """
         SELECT c.id_cama, c.codigo, a.nombre_area, t.nombre_tipo_cama, e.nombre_estado_cama

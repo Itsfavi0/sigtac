@@ -78,6 +78,9 @@ class SignosVitales:
 
 # TRANSACCIÓN: TRIAJE
 class Triaje:
+    # RN-10: caracteres mínimos de la justificación al reclasificar (el CHECK CH_triaje_rn10 exige lo mismo)
+    MIN_JUSTIFICACION = 10
+
     def __init__(self, id_triaje: int, nivel_sugerido: int, id_empleado: int, fecha_hora: datetime):
         if not _es_nivel_valido(nivel_sugerido):
             raise NivelTriajeInvalidoError("El nivel sugerido debe estar entre 1 (Rojo) y 5 (Azul).")
@@ -144,8 +147,9 @@ class Triaje:
         """
         if not _es_nivel_valido(nuevo_nivel):
             raise NivelTriajeInvalidoError("El nivel de triaje debe estar entre 1 (Rojo) y 5 (Azul).")
-        if not justificacion or len(justificacion.strip()) < 10:
-            raise ValueError("Debe proporcionar una justificación médica válida (mínimo 10 caracteres).")
+        if not justificacion or len(justificacion.strip()) < self.MIN_JUSTIFICACION:
+            raise ValueError("Debe proporcionar una justificación médica válida "
+                             f"(mínimo {self.MIN_JUSTIFICACION} caracteres).")
 
         self._nivel_final = nuevo_nivel
         self._justificacion = justificacion

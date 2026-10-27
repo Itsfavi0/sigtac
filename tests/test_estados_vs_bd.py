@@ -11,7 +11,7 @@ from models.documento import TipoDocumento
 from models.estados import EstadoCama, EstadoEpisodio
 from models.permisos import Rol
 from models.persona import Paciente, PersonalLimpieza
-from models.triaje import COLOR_POR_NIVEL
+from models.triaje import COLOR_POR_NIVEL, Triaje
 
 DB_SCRIPTS = Path(__file__).resolve().parent.parent / "db_scripts"
 SEED = (DB_SCRIPTS / "seed.sql").read_text(encoding="utf-8")
@@ -64,6 +64,12 @@ def test_los_colores_de_los_niveles_coinciden_con_el_seed():
     bloque = re.search(r"INSERT INTO nivel_triaje \(.*?\) VALUES(.*?);", SEED, re.S).group(1)
     colores = {int(n): color for n, color in re.findall(r"\(\d+, (\d+), '([^']+)', \d+\)", bloque)}
     assert COLOR_POR_NIVEL == colores
+
+
+def test_el_minimo_de_la_justificacion_coincide_con_el_check():
+    # RN-10: la vista muestra el mínimo con Triaje.MIN_JUSTIFICACION; la BD lo exige con CH_triaje_rn10.
+    check = re.search(r"CONSTRAINT CH_triaje_rn10 CHECK (.*)", SCHEMA).group(1)
+    assert int(re.search(r"CHAR_LENGTH\(TRIM\(justificacion\)\) >= (\d+)", check).group(1)) == Triaje.MIN_JUSTIFICACION
 
 
 def test_las_tablas_auditables_son_todas_las_del_esquema_salvo_la_bitacora():

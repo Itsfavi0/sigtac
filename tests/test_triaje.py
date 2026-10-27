@@ -43,6 +43,17 @@ def test_reclasificar_exige_justificacion_valida(justificacion):  # RN-10
     assert triaje.nivel_final == 3  # no cambió nada
 
 
+def test_justificacion_en_el_limite_minimo():  # RN-10
+    minimo = Triaje.MIN_JUSTIFICACION
+    with pytest.raises(ValueError, match=f"mínimo {minimo} caracteres"):
+        nuevo_triaje(3).reclasificar(2, "x" * (minimo - 1))
+    with pytest.raises(ValueError):  # los espacios de los extremos no cuentan
+        nuevo_triaje(3).reclasificar(2, "  " + "x" * (minimo - 1) + "  ")
+    triaje = nuevo_triaje(3)
+    triaje.reclasificar(2, "x" * minimo)
+    assert triaje.nivel_final == 2
+
+
 def test_reclasificar_rechaza_nivel_invalido():
     with pytest.raises(NivelTriajeInvalidoError):
         nuevo_triaje(3).reclasificar(9, "Justificación suficientemente larga.")

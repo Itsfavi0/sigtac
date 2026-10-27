@@ -88,6 +88,8 @@ class Cama(ABC):
 #SUBCLASES DE CAMA
 class CamaTraumaShock(Cama):
     """Cama de reanimación inmediata: solo para el nivel más crítico (Nivel I)."""
+    NOMBRE_TIPO = "Cama de Trauma Shock"  # tipo_cama.nombre_tipo_cama en la BD
+    NOMBRE_CORTO = "Trauma shock"         # título de su grupo en el mapa de camas
 
     def __init__(self, id_cama: int, codigo: str, area: str, estado: str, equipo_reanimacion: bool = True):
         super().__init__(id_cama, codigo, area, estado)
@@ -99,6 +101,9 @@ class CamaTraumaShock(Cama):
 
 
 class CamaUCI(Cama):
+    NOMBRE_TIPO = "Cama UCI con Ventilador"
+    NOMBRE_CORTO = "UCI"
+
     def __init__(self, id_cama: int, codigo: str, area: str, estado: str, ventilador: bool = True):
         super().__init__(id_cama, codigo, area, estado)
         self._ventilador = ventilador # Atributo específico definido en el UML
@@ -109,6 +114,9 @@ class CamaUCI(Cama):
 
 
 class CamaObservacion(Cama):
+    NOMBRE_TIPO = "Cama de Observación con Monitor"
+    NOMBRE_CORTO = "Observación"
+
     def __init__(self, id_cama: int, codigo: str, area: str, estado: str, monitor: bool = True):
         super().__init__(id_cama, codigo, area, estado)
         self._monitor = monitor
@@ -119,6 +127,9 @@ class CamaObservacion(Cama):
 
 
 class CamaHospitalizacion(Cama):
+    NOMBRE_TIPO = "Cama de Hospitalización General"
+    NOMBRE_CORTO = "Hospitalización"
+
     def __init__(self, id_cama: int, codigo: str, area: str, estado: str, aislamiento: bool = False):
         super().__init__(id_cama, codigo, area, estado)
         self._aislamiento = aislamiento
