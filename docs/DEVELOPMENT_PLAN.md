@@ -325,14 +325,25 @@ Las vistas:
 - no contienen reglas clínicas;
 - se encargan de visualización, eventos y navegación.
 
+### Alcance acordado (2026-10-26)
+
+- Las 5 pantallas de esta lista. Gestión de camas (asignar, alta, fuera de servicio), limpieza, reportes con PDF y administración (cuentas, bitácora, baja y reactivación de pacientes) quedan para después; sus controladores ya existen.
+- Piezas compartidas en `views/componentes/`, antes de las pantallas.
+- Las vistas reciben sus controladores en el constructor (se prueban con controladores falsos, sin MySQL) y solo capturan `SigtacError` y `ValueError`, que muestran con `mostrar_error`.
+
 ### Archivos
 
+- [x] `main.py` (punto de entrada: una sola ventana que cambia entre el login y la aplicación). Se ejecuta cuando existan `login_view.py` y `app_principal.py`.
+- [x] `views/tema.py`: colores, fuentes, espaciado en base 8 y `color_texto_sobre`. Ninguna vista escribe un valor a mano.
+- [x] `utils/colores.py`: tonos de los niveles de triaje y de los estados de cama, compartidos con el PDF.
+- [x] `views/componentes/`: `mostrar_error`/`mostrar_info`/`confirmar`, `TablaDatos`, `InsigniaNivel`, `TarjetaKPI`, `TarjetaCama`, `CamposDocumento`, `MatrizCamas` y `marcar_foco`/`marcar_error`.
+- [x] Diseño (2026-10-27): `PRODUCT.md`, `docs/diseno/` (brief, crítica, láminas, tablero aprobado) y tema con pares claro/oscuro e Inter (`views/assets/fonts/`).
 - [ ] `login_view.py`
 - [ ] `app_principal.py`
 - [ ] `dashboard_view.py`
 - [ ] `triage_view.py`
 - [ ] `pacientes_view.py`
-- [ ] `assets/`
+- [ ] `assets/` (por ahora no hace falta: la interfaz no usa imágenes)
 
 ### Dashboard
 

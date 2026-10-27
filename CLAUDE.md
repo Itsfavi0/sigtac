@@ -36,7 +36,8 @@ python scripts/verificar_controladores.py
 - Usa `python -m pip` y `python -m pytest` (con el `.venv` activado): garantiza que se use el intérprete del entorno.
   No copiar ni mover la carpeta `.venv`; los entornos virtuales guardan rutas absolutas. Para recrearlo:
   `rm -rf .venv && python -m venv .venv && python -m pip install -r requirements-dev.txt`.
-- Aún no existe `main.py` ni linter configurado. Si se añaden, documentar aquí su comando.
+- `python main.py` abre la aplicación cuando existan `views/login_view.py` y `views/app_principal.py` (Fase 6).
+  Aún no hay linter configurado; si se añade, documentar aquí su comando.
 
 ## Estructura
 
@@ -46,14 +47,19 @@ dao/          Acceso a datos: db_connection.py (Singleton ConexionBD), base_dao.
               reporte_dao.py y un *_dao.py por entidad
 models/       Dominio: persona, documento, cama, triaje, asignacion, usuario (CuentaUsuario, política de claves),
               estrategias, permisos, estados y auditoria (Enum), excepciones
-utils/        security.py (bcrypt), logging_config.py y pdf_generator.py (reporte PDF con ReportLab)
+utils/        security.py (bcrypt), logging_config.py, pdf_generator.py (reporte PDF con ReportLab) y colores.py
+              (colores de niveles de triaje y estados de cama, compartidos por las vistas y el PDF)
+views/        CustomTkinter: tema.py (único lugar de colores —pares claro/oscuro—, fuentes y espacios); componentes/;
+              assets/fonts (Inter, OFL) y las pantallas (Fase 6). Diseño aprobado en docs/diseno/ y PRODUCT.md
+main.py       Punto de entrada: una sola ventana que cambia entre el login y la aplicación
 db_scripts/   schema.sql, seed.sql, crear_usuario_app.sql y diagrama.png
 tests/        pytest: un test_*.py por módulo; conftest.py con los dobles de los controladores
 scripts/      verificar_controladores.py (flujo completo contra MySQL real en una base temporal)
-docs/         PROJECT_CONTEXT, DEVELOPMENT_PLAN, PROJECT_STATUS y CHANGELOG
+docs/         PROJECT_CONTEXT, DEVELOPMENT_PLAN, PROJECT_STATUS, CHANGELOG y diseno/ (brief, crítica, capturas)
+.impeccable/ Archivos de la skill de diseño impeccable: críticas y el contrato de dirección del tablero
 ```
 
-Pendiente (ver `docs/DEVELOPMENT_PLAN.md`): `views/` (Fase 6).
+En curso (ver `docs/DEVELOPMENT_PLAN.md`): las pantallas de `views/` (Fase 6).
 
 ## Arquitectura (capas)
 
@@ -84,6 +90,9 @@ views → controllers → models (dominio) → dao → MySQL
   deben coincidir con los catálogos de `seed.sql` (hay un test que lo comprueba).
 - Errores: `ValueError` para datos de entrada inválidos; excepciones de `models/excepciones.py`
   (`SigtacError`) para reglas de negocio violadas. Capturar excepciones específicas, nunca `except Exception`.
+- Interfaz: colores, fuentes y medidas solo desde `views/tema.py` (cada color es un par claro/oscuro); ninguna vista
+  escribe un literal. Letra de 12 px como mínimo y contraste comprobado en `tests/test_tema.py`. El diseño aprobado
+  (Figma del equipo, corregido) está en `docs/diseno/`; las pantallas reutilizan `views/componentes/`.
 - Logging con `logging` y formato diferido (`logger.info("... %s", x)`); nada de `print` ni f-strings en logs.
   `configurar_logging()` se llama una sola vez desde el punto de entrada.
 - Los comentarios explican qué hace el código. **El historial de cambios no va en docstrings ni comentarios:
@@ -151,6 +160,9 @@ RN-10: reclasificar exige justificación escrita (≥ 10 caracteres) · RN-11: b
   administrador. El script pide la clave con `getpass` y lo ejecuta el usuario; Claude nunca escribe ni guarda esa clave.
 - Los valores fijos de Python que reflejan catálogos o `CHECK` de la BD (Enum, tipos de cama, sexo, turno) se
   comparan con `seed.sql`/`schema.sql` en `tests/test_estados_vs_bd.py`.
+- Las vistas se prueban con controladores falsos (`MagicMock`) y la ventana oculta `raiz_tk` (`tests/conftest.py`):
+  una sola ventana Tk por sesión, porque crear una por prueba falla de forma intermitente.
+  `tests/test_capas.py` impide que `views/` o `main.py` importen `dao` o `mysql`.
 
 ## Git
 

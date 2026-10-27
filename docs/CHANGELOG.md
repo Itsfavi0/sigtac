@@ -5,6 +5,191 @@
 
 ---
 
+## [2026-10-27] — Diseño de la interfaz: del Figma del equipo al tema y los componentes
+
+### Cambio
+- **Proceso de diseño** (skills impeccable, ui-ux-pro-max, frontend-design y emil-design-eng):
+  - `PRODUCT.md` (contexto del producto, entrevista con el usuario);
+  - `docs/diseno/BRIEF.md` (qué hace cada pantalla);
+  - `docs/diseno/CRITICA.md` (crítica del primer diseño en Figma Make: 18/40, 1 P0 y 4 P1);
+  - láminas y tablero aprobado en `docs/diseno/`;
+  - contrato de dirección en `.impeccable/surfaces/views-dashboard-view-py.md`.
+- **Decisiones del equipo:**
+  - modo claro por defecto y el oscuro del Figma como opcional;
+  - flujo de triaje unificado;
+  - tablero pensado para 30–40 camas;
+  - solo la marca SIGTAC;
+  - **conservar el lenguaje y la distribución del Figma**, corrigiendo solo lo que señaló la crítica;
+  - ampliar la estrategia de triaje para que devuelva los criterios de la sugerencia (pendiente).
+- **`views/tema.py` reescrito.**
+  - Cada color es un par (claro, oscuro): `COLOR_FONDO`, `COLOR_SUPERFICIE`, `COLOR_TEXTO`, `COLOR_PRIMARIO`…
+  - Las medidas del tablero aprobado: `ANCHO_BARRA` 200, `ALTO_ENCABEZADO` 72, `ALTO_CONTROL` 36, radios 6/8.
+  - Funciones nuevas: `color_actual`, `texto_sobre`, `modo_oscuro` y `cargar_fuentes`.
+- **Fuente Inter** (v4.1, licencia OFL), descargada del repositorio oficial `rsms/inter`, en `views/assets/fonts/`: Regular, Medium, SemiBold y Bold, más la licencia.
+  - Cada peso es una familia aparte («Inter SemiBold»), así que se pueden usar pesos intermedios aunque Tk solo tenga normal y negrita.
+  - Si faltan los archivos, el tema usa Segoe UI.
+- **`utils/colores.py`:** `NIVEL` y `ESTADO_CAMA` como pares; el PDF usa el tono claro.
+- **Componentes:**
+  - `InsigniaNivel` pasa a ser el cuadro relleno con el número;
+  - `TarjetaKPI` sigue el estilo del Figma: marcador, título, valor y nota;
+  - `TarjetaCama` es la casilla con borde del color del estado, el estado escrito y el código tachado si está fuera de servicio;
+  - `TablaDatos` toma los tonos del modo activo y se vuelve a pintar al cambiarlo;
+  - `CamposDocumento` usa los colores nuevos y muestra el foco.
+- **Nuevos:**
+  - `MatrizCamas`: una columna por tipo de cama. `distribuir()` busca el menor número de filas en el que caben todas, y la matriz **se desplaza por dentro solo si no alcanza el alto**: es el caso de 1093×614;
+  - `marcar_foco` y `marcar_error`: borde de 2 px al enfocar y en error.
+- **`Cama.NOMBRE_CORTO`** («Trauma shock», «UCI»…): el título de cada columna de la matriz.
+
+### Archivos afectados
+- `PRODUCT.md`, `docs/diseno/` (nuevos), `.impeccable/` (crítica y contrato de dirección)
+- `views/tema.py`, `views/componentes/` (nuevos `matriz.py` y `foco.py`), `views/assets/fonts/` (nuevo)
+- `utils/colores.py`, `utils/pdf_generator.py`, `models/cama.py`
+- `tests/test_tema.py`, `tests/test_componentes.py`, `tests/test_matriz.py` (nuevo), `tests/test_cama.py`
+- `docs/`, `CLAUDE.md`
+
+### Motivo
+El tema y las piezas del 2026-10-26 se hicieron sin conocer el diseño del equipo. La crítica mostró que ese diseño tenía una buena base y problemas puntuales:
+- letra de 7–10 px;
+- contrastes bajos;
+- colores con dos significados;
+- solo modo oscuro;
+- se rompía en pantallas chicas.
+
+El equipo rechazó una dirección nueva («señalética») y prefirió conservar su lenguaje visual corregido.
+
+### Impacto
+- Pruebas: **1586 pasan** (antes 1478). `test_tema.py` comprueba **en los dos modos** todos los contrastes:
+  - texto: 4.5:1;
+  - bordes de campo y de cama: 3:1;
+  - el número sobre cada nivel.
+- Verificado con capturas de los componentes reales en 1280×800 (claro y oscuro) y en 1093×614 (la matriz muestra su barra y se desplaza).
+- Sin cambios de esquema.
+
+### Decisiones
+- **El rojo no es el color de marca:** significa nivel 1 y cama ocupada. El azul (#0A6CDE) queda solo para la acción principal.
+- **«Reservada» pasa de azul a violeta,** para no confundirse con la acción principal.
+- **Los niveles son cuadros rellenos con número; las camas, casillas con borde.** El verde y el rojo aparecen en las dos cosas, como en el Figma, pero la forma distingue qué es cada una y el texto siempre va escrito.
+- **Tonos corregidos para cumplir el contraste en los dos modos:**
+  - secundario #888 → #A3A3A3;
+  - azul #007AFF → #0A6CDE;
+  - placeholder oscuro #959595;
+  - verde del nivel 4 en modo claro #188038.
+- **El mapa agrupa por tipo de cama, no por área:** los nombres de área del seed («Unidad de Cuidados Intensivos (UCI)») no caben en una columna angosta.
+- **«F. de servicio» dentro de la casilla:** «Fuera de servicio» no cabe en el ancho mínimo (100 px); la leyenda lleva el término completo.
+- **Desplazamiento interno en lugar de achicar la letra:** en 1093×614, Observación necesita 8 filas. Achicar las casillas habría vuelto a la letra ilegible del Figma.
+- **`ttk` con el tema «clam»:** es el que permite pintar el encabezado de la tabla; el tema predeterminado de Windows lo ignora.
+- **Foco visible a mano:** CustomTkinter no dibuja un anillo de foco. Las pruebas llaman directamente a `al_entrar`/`al_salir`, porque Tk no entrega eventos de foco sintéticos a una ventana oculta.
+
+### Pendientes
+- Íconos de KPIs, logo y menú (descarga pendiente).
+- Ampliar la estrategia de triaje para que devuelva los criterios, antes de la pantalla de triaje.
+- D5: prototipo de las 5 pantallas sobre este tema. D6: revisión independiente. D7: Figma para el equipo. D8: `DESIGN.md`.
+
+---
+
+## [2026-10-26] — Fase 6: piezas compartidas de la interfaz (`views/componentes/`)
+
+### Cambio
+- **`views/componentes/`**: las piezas que usarán las pantallas.
+  - `errores.py`: `mostrar_error(ventana, error)`, `mostrar_info` y `confirmar` (diálogos de `tkinter.messagebox` con el título «SIGTAC»).
+  - `documento.py`: `CamposDocumento`, el tipo (lista) y el número del documento. Tiene `valores()`, `fijar()`, `limpiar()` y `bloquear()`, y no valida.
+  - `nivel.py`: `texto_nivel(n)` («3 · Amarillo», «Sin triaje») e `InsigniaNivel`, el nivel sobre su color.
+  - `tarjetas.py`: `TarjetaKPI` (título y valor, «—» sin dato) y `TarjetaCama` (código y estado sobre el color del estado; 120 × 72 px).
+  - `tabla.py`: `TablaDatos`, un `ttk.Treeview` con el estilo del tema y una barra de desplazamiento. Cada fila tiene un id oculto (`seleccionado()`, `seleccionar(id)`, callback `al_seleccionar`) y, si no hay filas, muestra un texto.
+- **`Cama.NOMBRE_TIPO`** (`models/cama.py`): cada subclase declara el nombre de su tipo (el de `tipo_cama`). `CamaDAO.CLASES_POR_TIPO` se arma a partir de ellas, y el mapa de camas lo usará como título de cada grupo.
+- **Tema**:
+  - nuevas entradas `COLOR_SIN_DATO`, `COLOR_SUPERFICIE` y la fuente `"cifra"`;
+  - `escala(widget)`, `fuente_ttk(uso, widget)` y `color_acento()`.
+- Pruebas:
+  - `tests/test_componentes.py` (36);
+  - `test_tema.py` (+4);
+  - `test_cama.py` (+1: `NOMBRE_TIPO`);
+  - `test_capas.py` cubre los archivos nuevos.
+
+### Archivos afectados
+- `views/componentes/` (nuevo: `__init__.py`, `errores.py`, `documento.py`, `nivel.py`, `tarjetas.py`, `tabla.py`)
+- `views/tema.py`, `models/cama.py`, `dao/cama_dao.py`
+- `tests/test_componentes.py` (nuevo), `tests/test_tema.py`, `tests/test_cama.py`
+- `docs/`
+
+### Motivo
+Las 5 pantallas repiten tablas, el nivel de triaje, tarjetas, el documento y el manejo de errores. Con una pieza por cosa, cada una se escribe y se prueba una sola vez, y todas las pantallas se ven y se comportan igual (acordado en el plan de la Fase 6).
+
+### Impacto
+- Pruebas: **1478 pasan** (antes 1431).
+- Sin cambios de esquema. `CLASES_POR_TIPO` tiene las mismas claves que antes, y `test_estados_vs_bd.py` lo sigue comparando con `seed.sql`.
+
+### Decisiones
+- **La tabla escala su letra a mano.** CustomTkinter mide sus fuentes en píxeles y las multiplica por el zoom de Windows. Un widget `ttk` recibe la misma fuente pero interpreta el 13 como puntos, así que en la primera captura la tabla se veía más grande que el resto. Ahora `fuente_ttk` la pasa en píxeles escalados, y el alto de fila y el ancho de columna también se multiplican por la escala.
+- **Las piezas se revisaron en una captura** (ventana de muestra con controladores falsos). Así aparecieron:
+  - la letra grande de la tabla;
+  - el fondo gris del texto de tabla vacía, que ahora usa `COLOR_SUPERFICIE`;
+  - el texto de tabla vacía que tapaba el encabezado, que ahora se centra en la zona de filas.
+- **`CamposDocumento` no valida.** El formato del DNI lo valida solo `DocumentoIdentidad`, y su `ValueError` vuelve por `mostrar_error`; si la vista lo validara también, la regla quedaría en dos capas. `fijar()` funciona aun con los campos bloqueados (al editar un paciente).
+- **El tipo de cama va en el título del grupo, no en cada tarjeta.** El plan decía «código, tipo y estado», pero repetir «Cama UCI con Ventilador» en cada casilla no cabe en 120 px y no aporta nada si el mapa ya agrupa por tipo.
+- **`NOMBRE_TIPO` en el modelo, no en la vista.** La vista no puede leer `CamaDAO.CLASES_POR_TIPO` (regla de capas). Un diccionario clase → nombre en la vista repetiría lo que ya sabe el DAO. Con el atributo, cada clase dice su nombre (polimorfismo) y el DAO lo reutiliza.
+- **`confirmar()` se sumó a `errores.py`.** Pacientes la necesita para fusionar, y así todos los diálogos salen del mismo lugar.
+- **La fila elegida de la tabla usa el color de los botones** (`color_acento()`, leído del tema de CustomTkinter), con el texto oscuro: contraste de 4.57:1.
+
+### Pendientes
+- Las 5 pantallas, empezando por `login_view.py`, que pasa a ser la referencia y con la que se calibra la revisión.
+
+---
+
+## [2026-10-26] — Fase 6 (inicio): plan de las vistas, tema y punto de entrada
+
+### Cambio
+- **Plan de la Fase 6 acordado.**
+  - Alcance: las 5 pantallas del plan (login, ventana principal, dashboard, triaje y pacientes).
+  - Piezas compartidas en `views/componentes/`.
+  - Detalle en `docs/DEVELOPMENT_PLAN.md`.
+- **`views/tema.py`:** único lugar de los valores de la interfaz:
+  - modo claro y tema "blue" de CustomTkinter;
+  - espaciado en base 8 (`ESPACIO`, `ESPACIO_2`, `ESPACIO_3`);
+  - colores de nivel, de estado de cama, de error y de texto secundario;
+  - `fuente(uso)` para título, subtítulo, normal y pequeña;
+  - `color_texto_sobre(fondo)`: elige texto claro u oscuro según el contraste (fórmula de luminancia de WCAG).
+- **`utils/colores.py`:** tonos de los niveles de triaje y de los estados de cama.
+  - El PDF ya no tiene su propia copia (`_RGB_POR_NIVEL`): usa `HEX_POR_NIVEL`, igual que las vistas.
+- **`main.py`:** punto de entrada (`python main.py`).
+  - La clase `Aplicacion` maneja una sola ventana y cambia entre `LoginView` y `AppPrincipal`. Las dos pantallas reciben callbacks (`al_iniciar`, `al_cerrar`) y no se conocen entre sí.
+  - Al cerrar la ventana, también se cierra la sesión.
+- **`Triaje.MIN_JUSTIFICACION = 10`** (`models/triaje.py`): reemplaza el 10 escrito a mano en `reclasificar`. La vista de triaje mostrará el mínimo leyéndolo de aquí.
+- Pruebas:
+  - `tests/test_tema.py` (28);
+  - `tests/test_capas.py` (4): ningún archivo de `views/` ni `main.py` importa `dao` o `mysql`;
+  - el límite de la justificación en `test_triaje.py`;
+  - `MIN_JUSTIFICACION` contra el `CHECK CH_triaje_rn10` en `test_estados_vs_bd.py`;
+  - nuevo fixture `raiz_tk` en `conftest.py`.
+
+### Archivos afectados
+- `main.py`, `views/__init__.py`, `views/tema.py`, `utils/colores.py` (nuevos)
+- `utils/pdf_generator.py`, `models/triaje.py`
+- `tests/conftest.py`, `tests/test_tema.py` y `tests/test_capas.py` (nuevos), `tests/test_triaje.py`, `tests/test_estados_vs_bd.py`
+- `docs/`, `CLAUDE.md`
+
+### Motivo
+Es la base que necesitan todas las pantallas de la Fase 6. Si cada vista escribiera sus propios colores y tamaños, se verían distintas y un cambio de diseño habría que repetirlo en cada archivo.
+
+### Impacto
+- Pruebas: **1431 pasan** (antes 1397).
+- `main.py` todavía no se puede ejecutar: importa `views/login_view.py` y `views/app_principal.py`, que son las próximas tareas.
+- Sin cambios de esquema.
+
+### Decisiones
+- **Una sola ventana** (`ctk.CTk`) cuyo contenido se reemplaza, en lugar de abrir una ventana por pantalla. Es más simple de cerrar (una sola sesión) y no deja ventanas huérfanas.
+- **`fuente(uso)` es una función, no una constante:** Tk solo crea fuentes cuando la ventana ya existe; una constante `CTkFont` al importar el módulo fallaría.
+- **`color_texto_sobre`** calcula el contraste en lugar de fijar a mano qué texto va sobre cada color. Por ejemplo, el ámbar (reservada, nivel 3) necesita texto oscuro y el rojo, blanco. Una prueba comprueba que todos los colores del tema queden con un contraste de al menos 4.5:1.
+- **Tonos (hex) en `utils/` y nombres de color en `models/`:** «Rojo» es un dato del dominio (está en el catálogo `nivel_triaje`); `#C62828` es solo cómo se dibuja.
+- **Una ventana Tk por sesión de pruebas:** crear y destruir una por prueba fallaba de forma intermitente (Tcl no terminaba de iniciarse: `init.tcl`, `tk.tcl`, `tcl_findLibrary`). Con una sola ventana, ocho corridas seguidas pasaron sin fallos. Cada prueba destruye al terminar los widgets que creó.
+- **`test_capas.py`** convierte en prueba la regla «las vistas nunca acceden a la BD».
+
+### Pendientes
+- `views/componentes/` y las 5 pantallas.
+- Probar `python main.py` contra `sigtac_db` cuando existan el login y la ventana principal (lo hace el usuario).
+
+---
+
 ## [2026-10-26] — Fase 5: reporte de indicadores en PDF (`utils/pdf_generator.py`)
 
 ### Cambio
