@@ -24,6 +24,7 @@ from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Space
 from models.estados import EstadoCama, EstadoEpisodio
 from models.excepciones import ReporteError
 from models.triaje import COLOR_POR_NIVEL, EpisodioEmergencia
+from utils.colores import NIVEL
 
 if TYPE_CHECKING:
     # Solo para las anotaciones: reporte_controller importa este módulo, y una importación real sería circular.
@@ -34,8 +35,6 @@ logger = logging.getLogger(__name__)
 SIN_DATOS = "Sin datos"
 NIVELES = tuple(sorted(COLOR_POR_NIVEL))
 
-# Color de las barras de cada nivel (solo presentación; el nombre del color viene de COLOR_POR_NIVEL)
-_RGB_POR_NIVEL = {1: "#C62828", 2: "#EF6C00", 3: "#F9A825", 4: "#2E7D32", 5: "#1565C0"}
 _COLOR_ENCABEZADO = colors.HexColor("#1F3A5F")
 _COLOR_FILA_TOTAL = colors.HexColor("#E8EEF5")
 
@@ -144,7 +143,7 @@ def _grafico_triajes(indicadores: "IndicadoresPeriodo") -> Drawing:
     for etiquetas in (grafico.categoryAxis.labels, grafico.valueAxis.labels, grafico.barLabels):
         etiquetas.fontName, etiquetas.fontSize = "Helvetica", 8  # la misma letra que el resto del reporte
     for i, n in enumerate(NIVELES):
-        grafico.bars[(0, i)].fillColor = colors.HexColor(_RGB_POR_NIVEL[n])
+        grafico.bars[(0, i)].fillColor = colors.HexColor(NIVEL[n][0])  # [0]: tono claro, el PDF es blanco
 
     dibujo = Drawing(16 * cm, 6 * cm)
     dibujo.add(grafico)

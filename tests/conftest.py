@@ -1,4 +1,4 @@
-"""Dobles de prueba compartidos por las pruebas de los controladores."""
+"""Dobles de prueba compartidos: los de los controladores y la ventana Tk oculta de las vistas."""
 from contextlib import contextmanager
 from unittest.mock import MagicMock
 
@@ -62,3 +62,35 @@ def crear_sesion(rol=Rol.MEDICO, id_usuario=10, id_empleado=20) -> Sesion:
 def sesion_de():
     """Fábrica: sesion_de(Rol.ENFERMERO) crea una sesión activa de ese rol."""
     return crear_sesion
+
+
+@pytest.fixture(scope="session")
+def _ventana_tk():
+    """
+    Una sola ventana de CustomTkinter, oculta, para toda la sesión de pruebas. Crear y destruir una
+    ventana Tk por prueba falla de forma intermitente (Tcl no termina de iniciarse); una por sesión no.
+    Si no hay entorno gráfico (p. ej. un servidor sin pantalla), las pruebas que la usan se omiten.
+    """
+    import tkinter
+
+    import customtkinter as ctk
+
+    try:
+        raiz = ctk.CTk()
+    except tkinter.TclError as error:
+        pytest.skip(f"Sin entorno gráfico: {error}")
+    raiz.withdraw()
+    yield raiz
+    # CustomTkinter deja tareas after() programadas (icono, redibujo): se cancelan para que no se
+    # ejecuten sobre una ventana ya destruida y ensucien la salida con "invalid command name".
+    for tarea in raiz.tk.call("after", "info"):
+        raiz.after_cancel(tarea)
+    raiz.destroy()
+
+
+@pytest.fixture
+def raiz_tk(_ventana_tk):
+    """La ventana de pruebas; al terminar cada prueba se destruyen los widgets que creó."""
+    yield _ventana_tk
+    for widget in _ventana_tk.winfo_children():
+        widget.destroy()
