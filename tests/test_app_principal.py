@@ -149,7 +149,8 @@ def test_informar_actualizacion_correcta_y_sin_conexion(raiz_tk, sesion_de):
 # ---- Pantallas registradas
 
 def test_las_pantallas_hechas_estan_registradas():
-    assert PANTALLAS == {"tablero": crear_tablero, "triaje": app_principal.crear_triaje}
+    assert PANTALLAS == {"tablero": crear_tablero, "triaje": app_principal.crear_triaje,
+                         "pacientes": app_principal.crear_pacientes}
 
 
 def test_crear_tablero_usa_los_controladores_de_la_sesion(raiz_tk, sesion_de, monkeypatch):

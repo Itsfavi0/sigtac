@@ -23,6 +23,7 @@ from views import formato, tema
 from views.componentes import BotonSecundario, Marca
 from views.componentes.foco import GROSOR_FOCO, fijar_borde, marcar_foco_control
 from views.dashboard_view import DashboardView
+from views.pacientes_view import PacientesView
 from views.triage_view import TriageView
 
 
@@ -55,8 +56,23 @@ def crear_triaje(padre, sesion: Sesion, principal: "AppPrincipal", pacientes=Non
     return TriageView(padre, pacientes or PacienteController(sesion), triaje or TriajeController(sesion))
 
 
+def crear_pacientes(padre, sesion: Sesion, principal: "AppPrincipal", pacientes=None):
+    """
+    Pacientes con el controlador real; el prototipo pasa el de demostración. «Registrarlo en Triaje» abre Triaje
+    con el documento ya buscado, si el rol lo tiene en el menú.
+    """
+    def registrar_en_triaje(tipo, numero):
+        principal.mostrar("triaje")
+        pantalla = principal.pantalla_actual
+        if isinstance(pantalla, TriageView):  # sin pantalla registrada, Triaje muestra solo su aviso
+            pantalla.buscar_documento(tipo, numero)
+
+    return PacientesView(padre, pacientes or PacienteController(sesion),
+                         registrar_en_triaje if "triaje" in principal.modulos_visibles else None)
+
+
 # clave del módulo → crear(padre, sesion, principal). Cada pantalla de la Fase 6 se agrega aquí al crearse.
-PANTALLAS: dict[str, Callable] = {"tablero": crear_tablero, "triaje": crear_triaje}
+PANTALLAS: dict[str, Callable] = {"tablero": crear_tablero, "triaje": crear_triaje, "pacientes": crear_pacientes}
 
 PUNTO = "●"  # delante de «Actualizado», como en el tablero aprobado
 SIN_CONEXION = "Sin conexión"
@@ -273,6 +289,11 @@ class AppPrincipal(ctk.CTkFrame):
     @property
     def modulo_actual(self) -> str | None:
         return self._actual
+
+    @property
+    def pantalla_actual(self):
+        """La pantalla que se muestra (para pasarle algo al abrirla desde otra, p. ej. un documento ya buscado)."""
+        return self._pantalla
 
     @property
     def modulos_visibles(self) -> list[str]:
