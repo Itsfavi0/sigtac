@@ -88,6 +88,8 @@ views → controllers → models (dominio) → dao → MySQL
 - Las dependencias van solo hacia abajo. No duplicar una regla en dos capas: una regla, un dueño.
 - Patrones del proyecto: **DAO**, **Strategy** (`EstrategiaTriaje` → `ReglaManchester`/`ReglaMINSA`),
   **Singleton** (`ConexionBD`). Para un algoritmo nuevo de triaje, crear otra estrategia; no tocar las existentes.
+  Una estrategia implementa `evaluar()` (nivel y criterios, con `condicion()` y `_decidir()`) y `justificar()`;
+  `clasificar()` lo da la clase base.
 
 ## Reglas de código
 

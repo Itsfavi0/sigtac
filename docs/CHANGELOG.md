@@ -5,6 +5,46 @@
 
 ---
 
+## [2026-10-30] — Criterios de la sugerencia de triaje
+
+### Cambio
+- **`models/estrategias.py`:**
+  - `evaluar(signos, sintomas) -> Clasificacion(nivel, criterios)` es el nuevo método abstracto. Los criterios son las condiciones cumplidas en el nivel elegido, por ejemplo «SatO₂ 89 % < 90 %» o «Peso de los síntomas 8.5 ≥ 7». En el nivel 5 hay uno solo: «Ningún criterio de los niveles 1 a 4».
+  - `clasificar()` pasa a la clase base y devuelve `evaluar(...).nivel`.
+  - `condicion(etiqueta, valor, símbolo, umbral, unidad)` arma cada condición: si se cumple y su texto.
+  - `_decidir(...)` recorre los niveles del más urgente al menos urgente.
+  - `ReglaManchester` y `ReglaMINSA` se reescriben con estas piezas, **con los mismos umbrales**.
+- **`TriajeController.sugerir()`:** `Sugerencia` lleva `criterios` además del nivel y el protocolo.
+- **`scripts/verificar_controladores.py`:** comprueba el criterio de la sugerencia con el catálogo real de síntomas.
+- **Pruebas:** `test_estrategias.py`, con los criterios de cada nivel y sus límites, varias condiciones a la vez, Decimal y el contrato de la clase base; `test_triaje_controller.py`, donde el doble `EstrategiaFija` implementa `evaluar`.
+
+### Archivos afectados
+- `models/estrategias.py` y `controllers/triaje_controller.py`
+- `tests/test_estrategias.py` y `tests/test_triaje_controller.py`
+- `scripts/verificar_controladores.py`
+- `CLAUDE.md` y `docs/`
+
+### Motivo
+Lo decidió el equipo el 2026-10-27 (`docs/diseno/BRIEF.md`). El panel de clasificación de la pantalla de triaje muestra por qué el sistema sugiere un nivel: el profesional decide si lo confirma o lo reclasifica, y para eso necesita ver los motivos. Va antes de la pantalla para que la vista no tenga que deducir los criterios: esa regla pertenece al modelo.
+
+### Impacto
+- Pruebas: **1751 pasan** (antes 1707). Las pruebas anteriores de `clasificar()` pasan sin cambios: los niveles son los mismos.
+- Sin cambios de esquema. `registrar()` y la auditoría no cambian: los criterios no se guardan, porque se pueden recalcular a partir de los signos y los síntomas.
+
+### Decisiones
+- **Template Method dentro del Strategy.** Cada estrategia implementa solo `evaluar()`, y `clasificar()` se deriva de él en la clase base. Si `clasificar()` y unos «criterios» aparte fueran dos métodos, cada umbral se escribiría dos veces y podrían quedar distintos.
+- **El umbral se escribe una sola vez.** La misma llamada a `condicion()` decide y arma el texto, así que el texto que ve el profesional no puede contradecir la regla.
+- **Solo los criterios del nivel elegido.** Con SatO₂ 88 % y síntomas de peso 8.5, el nivel es 1 y se muestra solo «SatO₂ 88 % < 90 %». El peso 8.5 también cumple el nivel 2, pero no fue lo que decidió.
+- **Se tocaron las estrategias existentes**, aunque la regla es crear una nueva para un algoritmo nuevo. Aquí el algoritmo no cambia, cambia el contrato. Las pruebas de límites de antes lo demuestran.
+- **Los números van sin ceros de sobra** (`float(...)` con formato `g`): «5», no «5.00», aunque el valor llegue como Decimal.
+
+### Pendientes
+- `triage_view.py`: el panel de clasificación muestra `Sugerencia.criterios` bajo el nivel.
+- `TriajeDemo.sugerir` para el prototipo.
+- Ejecutar `scripts/verificar_controladores.py` (lo hace el usuario con su cuenta de administrador).
+
+---
+
 ## [2026-10-30] — Fase 6: tablero de camas en la ventana principal
 
 ### Cambio

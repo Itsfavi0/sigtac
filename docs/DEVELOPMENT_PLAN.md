@@ -118,6 +118,7 @@
 - [x] `ReglaManchester`
 - [x] `ReglaMINSA`
 - [x] Aplicación del patrón Strategy
+- [x] Criterios de la sugerencia (2026-10-30): `evaluar()` devuelve `Clasificacion(nivel, criterios)`; `clasificar()` lo da la clase base
 
 ### `triaje.py`
 
