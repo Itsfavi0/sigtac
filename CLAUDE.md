@@ -36,7 +36,8 @@ python scripts/verificar_controladores.py
 - Usa `python -m pip` y `python -m pytest` (con el `.venv` activado): garantiza que se use el intérprete del entorno.
   No copiar ni mover la carpeta `.venv`; los entornos virtuales guardan rutas absolutas. Para recrearlo:
   `rm -rf .venv && python -m venv .venv && python -m pip install -r requirements-dev.txt`.
-- `python main.py` abre la aplicación cuando existan `views/login_view.py` y `views/app_principal.py` (Fase 6).
+- `python main.py` abre la aplicación (login → ventana principal); necesita el `.env` y MySQL. Cada pantalla nueva se
+  registra en `PANTALLAS` de `views/app_principal.py`.
   Aún no hay linter configurado; si se añade, documentar aquí su comando.
 
 ## Estructura
@@ -106,7 +107,8 @@ views → controllers → models (dominio) → dao → MySQL
 - Cada DAO nuevo hereda de `BaseDAO` (`dao/base_dao.py`) y usa `_consultar_uno`, `_consultar_varios`, `_insertar`,
   `_ejecutar` y `_validar_id` (ids recibidos como parámetro): ahí se cierran los cursores y los errores de MySQL se traducen a `PersistenciaError`
   (o `RegistroDuplicadoError`, o `ConexionBDError`). `None`/lista vacía = no encontrado; un fallo lanza excepción.
-  Excepción: `UsuarioDAO.autenticar` devuelve `None` ante todo fallo, para no revelar la causa.
+  Excepción: `UsuarioDAO.autenticar` devuelve `None` ante todo fallo, para no revelar la causa (salvo
+  `ConexionBDError`, que no dice nada de la cuenta y sube con un mensaje para el usuario).
 - Cada DAO tiene un método `_a_<entidad>(fila)` que es el único punto que convierte una fila en un objeto; las
   validaciones las hace el constructor del modelo, no el DAO. `estado_registro` llega como 0/1: convertir con `bool()`.
 - `ConexionBD` usa `autocommit=True` y `FOUND_ROWS`: el `rowcount` de un `UPDATE` cuenta las filas *encontradas*
@@ -141,7 +143,8 @@ RN-10: reclasificar exige justificación escrita (≥ 10 caracteres) · RN-11: b
   obligatorias (sin valores por defecto). Usar un usuario de BD con `SELECT, INSERT, UPDATE`, no `root`.
 - Contraseñas solo con bcrypt (`utils/security.py`); nunca registrar claves, hashes, números de documento ni nombres en logs
   ni en la bitácora. Una clave nueva pasa por `validar_clave_nueva` (`models/usuario.py`) y el hash lo calcula el controlador.
-- `UsuarioDAO.autenticar` devuelve siempre `None` ante cualquier fallo (sin revelar la causa), valida el documento
+- `UsuarioDAO.autenticar` devuelve `None` ante cualquier fallo (sin revelar la causa) salvo la falta de conexión
+  (`ConexionBDError` con `MENSAJE_SIN_CONEXION`, sin el detalle técnico), valida el documento
   con `DocumentoIdentidad`, usa `simular_verificacion` en las salidas tempranas y bloquea 5 intentos fallidos durante 15 min.
 - Las claves del seed son solo de desarrollo; nunca usarlas fuera de local.
 

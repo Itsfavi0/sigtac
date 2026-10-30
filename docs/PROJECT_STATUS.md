@@ -2,7 +2,7 @@
 
 > Estado de trabajo actual del proyecto.
 > Este archivo debe mantenerse pequeño y actualizado después de cada sesión importante.
-> Última actualización: 2026-10-26.
+> Última actualización: 2026-10-29.
 
 ---
 
@@ -30,11 +30,12 @@
 - **Fase 5 (utils) cerrada (2026-10-26):** `utils/pdf_generator.py` exporta a PDF los indicadores y el estado de la guardia (`ReporteController.exportar_pdf`).
 - **Fase 6 (views) iniciada (2026-10-26):** base hecha (`main.py`, `views/tema.py`, `utils/colores.py`, `Triaje.MIN_JUSTIFICACION`) y piezas compartidas de `views/componentes/`.
 - **Diseño de la interfaz (2026-10-27):** contexto en `PRODUCT.md`; brief, crítica, láminas y tablero aprobado en `docs/diseno/`. El tema y los componentes siguen el Figma del equipo, corregido (claro por defecto, oscuro opcional, Inter).
-- Pruebas: **1586 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`. Las de las vistas usan una ventana Tk oculta.
+- **Login y ventana principal (2026-10-29):** `python main.py` ya abre la aplicación. Piezas nuevas: botones, marca y campo de texto. El login distingue «sin conexión» de «datos incorrectos».
+- Pruebas: **1646 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`. Las de las vistas usan una ventana Tk oculta.
 
 ### Tarea actual
 
-Fase 6: siguiente paso, el prototipo de las pantallas sobre el diseño aprobado (D5): tablero, login, ventana principal, triaje y pacientes.
+Fase 6: siguen el tablero (`dashboard_view.py`), el triaje y los pacientes. Cada pantalla se registra en `views/app_principal.py` (`PANTALLAS`).
 Antes del triaje: ampliar la estrategia de triaje para que devuelva los criterios de la sugerencia (decisión del 2026-10-27).
 Falta que el usuario ejecute `scripts/verificar_controladores.py` para confirmar el PDF con datos reales.
 
@@ -50,7 +51,7 @@ Falta que el usuario ejecute `scripts/verificar_controladores.py` para confirmar
 | Fase 3 — DAO | Completada (2026-10-21) |
 | Fase 4 — Controllers | Completada (2026-10-22). Verificada en MySQL 8.0.46 |
 | Fase 5 — Utils | Completada (2026-10-26): `security.py`, `logging_config.py` y `pdf_generator.py` |
-| Fase 6 — Views | En curso: diseño aprobado; base, tema y componentes hechos; faltan las 5 pantallas |
+| Fase 6 — Views | En curso: diseño aprobado; tema, componentes, login y ventana principal hechos; faltan tablero, triaje y pacientes |
 | Fase 7 — Integración y pruebas | Pendiente |
 
 ---
@@ -165,7 +166,7 @@ Ninguno bloqueante. Las decisiones menores están en "Pendientes conocidos".
 
 1. Validar con el equipo la matriz de permisos (`models/permisos.py`; ver CHANGELOG del 2026-10-21 y 2026-10-26).
 2. Ejecutar `scripts/verificar_controladores.py` para confirmar la exportación a PDF con datos reales.
-3. Fase 6: vistas con CustomTkinter (`login_view.py` → `app_principal.py` → `dashboard_view.py` → `triage_view.py` → `pacientes_view.py`), que ya pueden usar todos los controladores.
+3. Fase 6: `dashboard_view.py` → (criterios de la estrategia) → `triage_view.py` → `pacientes_view.py`. El login y la ventana principal ya están hechos.
 
 Respecto al plan original, `auditoria_dao.py` se hizo antes que `triaje_dao.py` y `asignacion_dao.py` porque es de una sola tabla y no depende de transacciones (ver `CHANGELOG.md` del 2026-10-12).
 

@@ -338,8 +338,9 @@ Las vistas:
 - [x] `utils/colores.py`: tonos de los niveles de triaje y de los estados de cama, compartidos con el PDF.
 - [x] `views/componentes/`: `mostrar_error`/`mostrar_info`/`confirmar`, `TablaDatos`, `InsigniaNivel`, `TarjetaKPI`, `TarjetaCama`, `CamposDocumento`, `MatrizCamas` y `marcar_foco`/`marcar_error`.
 - [x] Diseño (2026-10-27): `PRODUCT.md`, `docs/diseno/` (brief, crítica, láminas, tablero aprobado) y tema con pares claro/oscuro e Inter (`views/assets/fonts/`).
-- [ ] `login_view.py`
-- [ ] `app_principal.py`
+- [x] `login_view.py` (2026-10-29)
+- [x] `app_principal.py` (2026-10-29): las pantallas se registran en `PANTALLAS`
+- [x] Piezas para las pantallas (2026-10-29): `BotonPrimario`/`BotonSecundario`, `Marca`, `campo_texto`/`etiqueta_campo`
 - [ ] `dashboard_view.py`
 - [ ] `triage_view.py`
 - [ ] `pacientes_view.py`

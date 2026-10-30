@@ -5,6 +5,83 @@
 
 ---
 
+## [2026-10-29] — Fase 6: inicio de sesión y ventana principal
+
+### Cambio
+- **`views/login_view.py`** (`LoginView`): una tarjeta centrada con:
+  - la marca;
+  - el documento (`CamposDocumento`) y la contraseña;
+  - el botón «Ingresar»;
+  - el aviso «Prototipo académico — no validado clínicamente».
+
+  Funciona así:
+  - Enter ingresa desde cualquiera de los dos campos;
+  - mientras bcrypt verifica, el botón se deshabilita y dice «Verificando…»;
+  - si los datos son incorrectos, se muestra el mensaje genérico, se borra la contraseña y el foco vuelve a ella;
+  - si no hay conexión, se muestra un mensaje propio y se conservan los datos.
+- **`views/app_principal.py`** (`AppPrincipal`): el marco de la aplicación, como en el tablero aprobado.
+  - **Barra lateral:**
+    - la marca;
+    - el menú, con los módulos que el rol puede usar (`sesion.puede`);
+    - al pie: el usuario (iniciales, nombre y rol), el interruptor «Modo oscuro» y «Cerrar sesión».
+  - **Encabezado:** el título y la descripción del módulo, «Actualizado HH:MM», la fecha y el reloj.
+  - **Módulos:** cada pantalla se registra en `PANTALLAS` con `crear(padre, sesion, principal)`. Un módulo que todavía no tiene pantalla muestra un aviso.
+- **Piezas nuevas en `views/componentes/`** (aprobadas por el usuario):
+  - `botones.py`: `BotonPrimario` y `BotonSecundario`;
+  - `marca.py`: `Marca`;
+  - `campos.py`: `campo_texto` y `etiqueta_campo`. `CamposDocumento` ahora los usa y expone `campo_numero`.
+- **Teclado** (`views/componentes/foco.py`): `marcar_foco_control`, `activar` y `fijar_borde`. Los botones y el interruptor de CustomTkinter son un lienzo que Tab salta. Con estas funciones:
+  - aceptan el foco y lo muestran con un borde de 2 px;
+  - se activan con Enter o con espacio.
+
+  Las usan los dos botones, los ítems del menú y el interruptor. Tab recorre las pantallas en el orden de lectura (comprobado con `tk_focusNext`).
+- **Tipo de documento con teclado** (`CamposDocumento`): la lista muestra el foco, ↑/↓ cambian el tipo (`cambiar_tipo`) y espacio o Alt+↓ la abren. Antes, sin mouse no se podía elegir CE, pasaporte ni CPP.
+- **`UsuarioDAO.autenticar`** deja pasar `ConexionBDError` con `MENSAJE_SIN_CONEXION`. Cualquier otro fallo sigue devolviendo `None`.
+- `python main.py` ya abre la aplicación.
+
+### Archivos afectados
+- `views/login_view.py` y `views/app_principal.py` (nuevos)
+- `views/componentes/` (nuevos: `botones.py`, `marca.py` y `campos.py`; cambian `documento.py` y `__init__.py`)
+- `dao/usuario_dao.py`
+- Pruebas:
+  - nuevos: `tests/test_login_view.py` y `tests/test_app_principal.py`;
+  - cambian: `tests/test_componentes.py`, `tests/test_usuario_dao.py` y `tests/test_auth_controller.py`.
+- `CLAUDE.md` y `docs/`
+
+### Motivo
+El login y la ventana principal son la entrada a las demás pantallas de la Fase 6. Con ellos, cada pantalla nueva se prueba en la ventana real.
+
+Los botones, la marca y el campo de texto se repiten en las dos pantallas y en las que vienen. Por eso se escriben una sola vez.
+
+### Impacto
+- Pruebas: **1646 pasan** (antes 1586).
+- Las pantallas se revisaron con capturas en 1280×800 y 1093×614, en claro y en oscuro.
+- Las revisó contra la lista de comprobación un agente que no las escribió. Antes, ese tipo de revisión se calibró con un error plantado a propósito, y lo encontró.
+- Sin cambios de esquema.
+
+### Decisiones
+- **Sin conexión no es lo mismo que una clave incorrecta.** Que la BD no responda no dice nada de la cuenta: no revela si el documento existe ni si la clave es correcta. Avisarlo no rompe la regla de no revelar la causa de un rechazo.
+  - El mensaje no incluye el detalle técnico (servidor y usuario de la BD), que va solo al log.
+  - Cuando el problema es la conexión, el login conserva lo escrito para que se pueda reintentar.
+- **Teclas en cola durante la verificación.** Mientras bcrypt verifica, Tk no atiende el teclado. Un Enter pulsado entonces queda en cola, así que se atiende antes de volver a habilitar el botón. Si no, iniciaría otro intento con la contraseña ya borrada y sumaría un fallo al bloqueo.
+- **Campo de contraseña sin placeholder.** `campo_texto` pasa `placeholder_text=None`, no `""`: mientras CustomTkinter muestra un placeholder, aunque sea vacío, quita el `show` y la contraseña se vería.
+- **Líneas divisorias con `tkinter.Frame`.** CustomTkinter no dibuja un `CTkFrame` de 1 px (comprobado en las capturas). Se repintan al cambiar de modo, como el lienzo de `MatrizCamas`.
+- **La barra se crea en el orden de lectura y se coloca en otro.** Tk tabula en el orden de creación, así que el menú va antes que el pie. Pero el pie se coloca primero: en una ventana baja se recorta el menú y «Cerrar sesión» siempre queda a la vista.
+- **El foco del botón principal se marca con el color del texto:** un borde azul no se vería sobre el azul.
+- **Una línea separa el pie del menú.** Ocupa el lugar de la tarjeta «Conectado».
+- **El círculo del interruptor cambia de color con su estado:** blanco sobre el azul cuando está encendido, y gris oscuro (`COLOR_TEXTO_SECUNDARIO`) cuando está apagado. Blanco se perdería contra la barra blanca.
+- **El bloque del usuario repite la forma de la marca** (un círculo y dos líneas) con las mismas medidas de `Marca`, sin copiarlas.
+- **No se copia del diseño la tarjeta «Conectado · se actualiza cada 30 s».** Hoy nada informa el estado de la conexión, y el refresco es del tablero. Va con `dashboard_view.py`.
+- **Cerrar sesión no pide confirmación:** no se pierde nada.
+
+### Pendientes
+- `dashboard_view.py`, `triage_view.py` y `pacientes_view.py`, que se registran en `PANTALLAS`.
+- Decidir si las medidas propias de un componente (`Marca.LADO_LOGO`, `TarjetaCama.ALTO`, `AppPrincipal.LADO_AVATAR`) se quedan en su clase o pasan a `tema.py`.
+- Literales anteriores a este trabajo: `width=200` del tipo de documento en `documento.py`.
+- El comentario de `tema.ESPACIO` dice que es la separación entre una etiqueta y su campo, pero los campos usan `ESPACIO_MINIMO`. Hay que alinear el comentario o el código.
+
+---
+
 ## [2026-10-27] — Diseño de la interfaz: del Figma del equipo al tema y los componentes
 
 ### Cambio
