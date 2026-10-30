@@ -68,9 +68,20 @@ def fijar_borde(control, ancho: int, color):
 
 
 def marcar_error(campo, con_error: bool = True):
-    """Borde de error (2 px, color de error) en un campo; con False vuelve al borde normal."""
+    """
+    Borde de error (2 px, color de error) en un campo; con False vuelve al borde normal, o al de foco si el campo
+    lo tiene (se corrige mientras se escribe: el foco no debe desaparecer).
+    """
     campo._sigtac_error = con_error
     if con_error:
         campo.configure(border_width=GROSOR_FOCO, border_color=tema.COLOR_ERROR)
+    elif _tiene_foco(campo):
+        al_entrar(campo)
     else:
         campo.configure(border_width=1, border_color=tema.COLOR_BORDE_CAMPO)
+
+
+def _tiene_foco(campo) -> bool:
+    # El foco lo tiene la caja de Tk que el campo de CustomTkinter lleva dentro (_entry o _textbox)
+    enfocado = campo.focus_get()
+    return enfocado is not None and enfocado in (campo, getattr(campo, "_entry", None), getattr(campo, "_textbox", None))

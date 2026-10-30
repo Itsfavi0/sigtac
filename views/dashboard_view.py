@@ -15,7 +15,7 @@ from models.excepciones import SigtacError
 from models.permisos import Permiso
 from models.triaje import excede_plazo
 from views import formato, tema
-from views.componentes import InsigniaNivel, MatrizCamas, TarjetaKPI, mostrar_error
+from views.componentes import InsigniaNivel, MatrizCamas, Tarjeta, TarjetaKPI, mostrar_error
 
 logger = logging.getLogger(__name__)
 
@@ -76,18 +76,9 @@ class DashboardView(ctk.CTkFrame):
         self.matriz.pack(fill="both", expand=True, padx=2, pady=(0, 2))
 
     def _tarjeta(self, padre, titulo, subtitulo, leyenda=False):
-        tarjeta = ctk.CTkFrame(padre, fg_color=tema.COLOR_SUPERFICIE, corner_radius=tema.RADIO_TARJETA,
-                               border_width=1, border_color=tema.COLOR_BORDE)
-        cabecera = ctk.CTkFrame(tarjeta, fg_color="transparent")
-        cabecera.pack(fill="x", padx=tema.ESPACIO_2, pady=(tema.ESPACIO_MEDIO - 2, tema.ESPACIO))
-        textos = ctk.CTkFrame(cabecera, fg_color="transparent")
-        textos.pack(side="left")
-        ctk.CTkLabel(textos, text=titulo, font=tema.fuente("subtitulo"), text_color=tema.COLOR_TEXTO,
-                     height=20).pack(anchor="w")
-        ctk.CTkLabel(textos, text=subtitulo, font=tema.fuente("pequena"), text_color=tema.COLOR_TEXTO_SECUNDARIO,
-                     height=16).pack(anchor="w")
+        tarjeta = Tarjeta(padre, titulo, subtitulo)
         if leyenda:
-            caja = ctk.CTkFrame(cabecera, fg_color="transparent")
+            caja = ctk.CTkFrame(tarjeta.cabecera, fg_color="transparent")
             caja.pack(side="right")
             for estado in EstadoCama:
                 ctk.CTkFrame(caja, width=14, height=10, corner_radius=3, fg_color="transparent", border_width=1,

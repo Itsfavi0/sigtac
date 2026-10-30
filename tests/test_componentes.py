@@ -6,9 +6,10 @@ from models.documento import TipoDocumento
 from models.estados import EstadoCama
 from models.excepciones import ReglaNegocioError
 from views import tema
-from views.componentes import (BotonPrimario, BotonSecundario, CamposDocumento, InsigniaNivel, Marca, TablaDatos,
-                               TarjetaCama, TarjetaKPI, campo_texto, confirmar, errores, etiqueta_campo, marcar_error,
-                               marcar_foco, mostrar_error, mostrar_info, texto_nivel)
+from views.componentes import (BotonPrimario, BotonSecundario, CamposDocumento, InsigniaNivel, Marca, Selector,
+                               TablaDatos, Tarjeta, TarjetaCama, TarjetaKPI, campo_texto, casilla, confirmar, errores,
+                               etiqueta_campo, lista_opciones, marcar_error, marcar_foco, mostrar_error, mostrar_info,
+                               texto_nivel)
 from views.componentes.documento import ETIQUETAS
 
 
@@ -382,3 +383,126 @@ def test_el_tipo_de_documento_muestra_el_foco(raiz_tk):
     campos = CamposDocumento(raiz_tk)
     al_entrar(campos._tipo)
     assert tuple(campos._tipo.cget("border_color")) == tema.COLOR_PRIMARIO
+
+
+# ---- Tarjeta (sección con título)
+
+def test_tarjeta_con_titulo_subtitulo_y_lugar_en_la_cabecera(raiz_tk):
+    tarjeta = Tarjeta(raiz_tk, "1. Paciente", "Búsquelo por su documento")
+    assert (tarjeta.titulo, tarjeta.subtitulo) == ("1. Paciente", "Búsquelo por su documento")
+    assert tuple(tarjeta.cget("fg_color")) == tema.COLOR_SUPERFICIE
+    assert tuple(tarjeta.cget("border_color")) == tema.COLOR_BORDE and tarjeta.cget("border_width") == 1
+    assert tarjeta.cget("corner_radius") == tema.RADIO_TARJETA
+    ctk.CTkLabel(tarjeta.cabecera, text="extra").pack(side="right")  # la leyenda del mapa, un selector...
+
+
+def test_tarjeta_acepta_opciones_propias(raiz_tk):
+    assert Tarjeta(raiz_tk, "Clasificación", "", width=320).cget("width") == 320
+
+
+# ---- lista_opciones
+
+def test_lista_empieza_en_la_primera_o_vacia(raiz_tk):
+    assert lista_opciones(raiz_tk, ["A", "B"]).get() == "A"
+    assert lista_opciones(raiz_tk, ["A", "B"], vacia=True).get() == ""
+    assert lista_opciones(raiz_tk, []).get() == ""
+
+
+def test_lista_con_el_estilo_de_los_campos(raiz_tk):
+    lista = lista_opciones(raiz_tk, ["A"])
+    assert lista.cget("state") == "readonly" and lista.cget("height") == tema.ALTO_CONTROL
+    assert tuple(lista.cget("border_color")) == tema.COLOR_BORDE_CAMPO
+
+
+def test_lista_con_el_teclado_avisa_como_el_mouse(raiz_tk):
+    from views.componentes.campos import mover_opcion
+    elegidas = []
+    lista = lista_opciones(raiz_tk, ["A", "B", "C"], vacia=True, command=elegidas.append)
+    assert all(lista._entry.bind(tecla) for tecla in ("<Up>", "<Down>", "<space>", "<Alt-Down>"))
+    assert mover_opcion(lista, 1) == "break"
+    assert lista.get() == "A"  # vacía: ↓ elige la primera
+    mover_opcion(lista, 1)
+    mover_opcion(lista, 1)
+    mover_opcion(lista, 1)  # en la última no da la vuelta ni vuelve a avisar
+    assert lista.get() == "C" and elegidas == ["A", "B", "C"]
+
+
+def test_lista_deshabilitada_no_cambia(raiz_tk):
+    from views.componentes.campos import mover_opcion
+    lista = lista_opciones(raiz_tk, ["A", "B"])
+    lista.configure(state="disabled")
+    mover_opcion(lista, 1)
+    assert lista.get() == "A"
+
+
+# ---- casilla
+
+def test_casilla_se_marca_con_el_teclado_y_avisa(raiz_tk):
+    from views.componentes.foco import activar
+    cambios = []
+    caja = casilla(raiz_tk, "Tos leve", lambda: cambios.append(True))
+    assert caja.cget("text") == "Tos leve" and caja.get() == 0
+    assert str(caja._canvas.cget("takefocus")) == "1"
+    activar(caja)  # lo que hacen espacio o Enter
+    assert caja.get() == 1 and cambios == [True]
+
+
+def test_el_foco_de_la_casilla_se_ve_tambien_marcada(raiz_tk):
+    from views.componentes.foco import GROSOR_FOCO, al_entrar_control
+    caja = casilla(raiz_tk, "Tos leve")
+    caja.select()
+    al_entrar_control(caja)
+    # Con el color del texto: un borde azul no se vería sobre la casilla marcada (azul)
+    assert caja.cget("border_width") == GROSOR_FOCO and tuple(caja.cget("border_color")) == tema.COLOR_TEXTO
+
+
+# ---- Selector
+
+def test_selector_empieza_en_la_primera_marcada_como_el_item_activo(raiz_tk):
+    selector = Selector(raiz_tk, [("nuevo", "Nuevo"), ("cola", "En cola")])
+    activo, otro = selector.botones["nuevo"], selector.botones["cola"]
+    assert selector.valor == "nuevo"
+    assert tuple(activo.cget("fg_color")) == tema.COLOR_ACTIVO and activo.cget("border_width") == 1
+    assert otro.cget("fg_color") == "transparent" and otro.cget("border_width") == 0
+
+
+def test_selector_avisa_solo_cuando_cambia(raiz_tk):
+    cambios = []
+    selector = Selector(raiz_tk, [("a", "A"), ("b", "B")], cambios.append)
+    selector.botones["b"].invoke()
+    selector.botones["b"].invoke()
+    selector.elegir("a", avisar=False)
+    assert cambios == ["b"] and selector.valor == "a"
+
+
+def test_selector_se_maneja_con_el_teclado(raiz_tk):
+    from views.componentes.foco import activar
+    selector = Selector(raiz_tk, [("a", "A"), ("b", "B")])
+    assert all(str(b._canvas.cget("takefocus")) == "1" for b in selector.botones.values())
+    activar(selector.botones["b"])
+    assert selector.valor == "b"
+
+
+def test_selector_cambia_el_texto_de_una_opcion(raiz_tk):
+    selector = Selector(raiz_tk, [("cola", "En cola")])
+    selector.cambiar_texto("cola", "En cola (3)")
+    assert selector.texto("cola") == "En cola (3)"
+
+
+def test_selector_rechaza_opciones_invalidas(raiz_tk):
+    with pytest.raises(ValueError):
+        Selector(raiz_tk, [])
+    with pytest.raises(ValueError, match="desconocida"):
+        Selector(raiz_tk, [("a", "A")]).elegir("z")
+
+
+# ---- marcar_error mientras se escribe
+
+def test_quitar_el_error_a_un_campo_con_foco_deja_el_borde_de_foco(raiz_tk, monkeypatch):
+    from views.componentes.foco import GROSOR_FOCO
+    campo = campo_texto(raiz_tk)
+    marcar_error(campo)
+    # Tk no da el foco a una ventana oculta: se simula que el campo lo tiene
+    monkeypatch.setattr(campo, "focus_get", lambda: campo._entry)
+    marcar_error(campo, False)
+    assert campo.cget("border_width") == GROSOR_FOCO and tuple(campo.cget("border_color")) == tema.COLOR_PRIMARIO

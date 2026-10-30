@@ -1,4 +1,4 @@
-"""Tarjetas del tablero: un indicador (KPI) y una casilla del mapa de camas."""
+"""Tarjetas: una sección con título (tablero, triaje), un indicador (KPI) y una casilla del mapa de camas."""
 import customtkinter as ctk
 
 from models.cama import Cama
@@ -10,6 +10,40 @@ SIN_VALOR = "—"
 # Texto del estado dentro de la casilla. «Fuera de servicio» no cabe en el ancho mínimo; la leyenda del mapa
 # lleva el término completo.
 TEXTO_CASILLA = {EstadoCama.FUERA_SERVICIO: "F. de servicio"}
+
+
+class Tarjeta(ctk.CTkFrame):
+    """
+    Una sección de una pantalla: el recuadro con su título y una línea que dice qué contiene («Matriz de camas»,
+    «1. Paciente»). El contenido se coloca en la misma tarjeta, debajo de la cabecera. A la derecha de la cabecera
+    queda lugar para algo propio de la sección (`cabecera`): la leyenda del mapa, un selector.
+    """
+
+    ALTO_TITULO = 20      # las dos líneas ajustadas a su letra (15 y 12 px), como la marca
+    ALTO_SUBTITULO = 16
+
+    def __init__(self, padre, titulo: str, subtitulo: str, **opciones):
+        # `opciones` pasa lo propio de cada tarjeta (p. ej. width para un panel de ancho fijo)
+        super().__init__(padre, fg_color=tema.COLOR_SUPERFICIE, corner_radius=tema.RADIO_TARJETA, border_width=1,
+                         border_color=tema.COLOR_BORDE, **opciones)
+        self.cabecera = ctk.CTkFrame(self, fg_color="transparent")
+        self.cabecera.pack(fill="x", padx=tema.ESPACIO_2, pady=(tema.ESPACIO_MEDIO, tema.ESPACIO))
+        textos = ctk.CTkFrame(self.cabecera, fg_color="transparent")
+        textos.pack(side="left")
+        self._titulo = ctk.CTkLabel(textos, text=titulo, font=tema.fuente("subtitulo"), text_color=tema.COLOR_TEXTO,
+                                    height=self.ALTO_TITULO)
+        self._titulo.pack(anchor="w")
+        self._subtitulo = ctk.CTkLabel(textos, text=subtitulo, font=tema.fuente("pequena"),
+                                       text_color=tema.COLOR_TEXTO_SECUNDARIO, height=self.ALTO_SUBTITULO)
+        self._subtitulo.pack(anchor="w")
+
+    @property
+    def titulo(self) -> str:
+        return self._titulo.cget("text")
+
+    @property
+    def subtitulo(self) -> str:
+        return self._subtitulo.cget("text")
 
 
 class TarjetaKPI(ctk.CTkFrame):
