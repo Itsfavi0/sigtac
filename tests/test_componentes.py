@@ -6,8 +6,9 @@ from models.documento import TipoDocumento
 from models.estados import EstadoCama
 from models.excepciones import ReglaNegocioError
 from views import tema
-from views.componentes import (CamposDocumento, InsigniaNivel, TablaDatos, TarjetaCama, TarjetaKPI, confirmar,
-                               errores, marcar_error, marcar_foco, mostrar_error, mostrar_info, texto_nivel)
+from views.componentes import (BotonPrimario, BotonSecundario, CamposDocumento, InsigniaNivel, Marca, TablaDatos,
+                               TarjetaCama, TarjetaKPI, campo_texto, confirmar, errores, etiqueta_campo, marcar_error,
+                               marcar_foco, mostrar_error, mostrar_info, texto_nivel)
 from views.componentes.documento import ETIQUETAS
 
 
@@ -250,3 +251,134 @@ def test_la_tabla_toma_los_tonos_del_modo(raiz_tk, oscuro, i):
     estilo = ttk.Style(raiz_tk)
     assert estilo.lookup(ESTILO, "background") == tema.COLOR_SUPERFICIE[i]
     assert estilo.lookup(ESTILO, "foreground") == tema.COLOR_TEXTO[i]
+
+
+# ---- botones.py
+
+def test_boton_primario_azul_y_ejecuta_su_accion(raiz_tk):
+    llamadas = []
+    boton = BotonPrimario(raiz_tk, "Ingresar", lambda: llamadas.append("ok"))
+    assert boton.cget("text") == "Ingresar"
+    assert tuple(boton.cget("fg_color")) == tema.COLOR_PRIMARIO
+    assert boton.cget("height") == tema.ALTO_CONTROL
+    boton.invoke()
+    assert llamadas == ["ok"]
+
+
+def test_boton_primario_deshabilitado_conserva_el_texto_legible(raiz_tk):
+    # El gris por defecto de CustomTkinter no se lee sobre el azul
+    boton = BotonPrimario(raiz_tk, "Ingresar", None)
+    assert tuple(boton.cget("text_color_disabled")) == tema.COLOR_TEXTO_SOBRE_PRIMARIO
+
+
+def test_boton_deshabilitado_no_ejecuta_su_accion(raiz_tk):
+    llamadas = []
+    boton = BotonSecundario(raiz_tk, "Cerrar sesión", lambda: llamadas.append("ok"), state="disabled")
+    boton.invoke()
+    assert llamadas == []
+
+
+def test_boton_secundario_con_borde_y_sin_relleno(raiz_tk):
+    boton = BotonSecundario(raiz_tk, "Cerrar sesión", None)
+    assert boton.cget("fg_color") == "transparent"
+    assert boton.cget("border_width") == 1 and tuple(boton.cget("border_color")) == tema.COLOR_BORDE_CAMPO
+
+
+# ---- marca.py
+
+def test_marca_con_nombre_y_servicio(raiz_tk):
+    assert textos(Marca(raiz_tk)) == ["SIGTAC", "Emergencia"]
+
+
+def test_medidas_de_la_marca_multiplos_de_4():
+    assert all(medida % 4 == 0 for medida in (Marca.LADO_LOGO, Marca.ALTO_NOMBRE, Marca.ALTO_SERVICIO))
+    assert Marca.ALTO_NOMBRE + Marca.ALTO_SERVICIO == Marca.LADO_LOGO  # las dos líneas miden lo que el logo
+
+
+# ---- campos.py
+
+def test_campo_texto_con_el_estilo_del_tema_y_foco(raiz_tk):
+    from views.componentes.foco import al_entrar
+    campo = campo_texto(raiz_tk, "Número")
+    assert campo.cget("placeholder_text") == "Número"
+    assert campo.cget("height") == tema.ALTO_CONTROL
+    assert tuple(campo.cget("border_color")) == tema.COLOR_BORDE_CAMPO
+    al_entrar(campo)
+    assert tuple(campo.cget("border_color")) == tema.COLOR_PRIMARIO  # el foco se ve
+
+
+def test_campo_texto_acepta_opciones_propias(raiz_tk):
+    clave = campo_texto(raiz_tk, show="•")
+    assert clave.cget("show") == "•"  # oculta desde el principio, no solo después de recibir el foco
+    clave.insert(0, "secreta")
+    assert clave.cget("show") == "•" and clave.get() == "secreta"
+
+
+def test_etiqueta_campo(raiz_tk):
+    etiqueta = etiqueta_campo(raiz_tk, "Contraseña")
+    assert etiqueta.cget("text") == "Contraseña"
+    assert tuple(etiqueta.cget("text_color")) == tema.COLOR_ETIQUETA
+
+
+
+# ---- foco de botones e interruptores
+
+def test_un_boton_acepta_el_foco_y_se_activa_con_enter_o_espacio(raiz_tk):
+    llamadas = []
+    boton = BotonSecundario(raiz_tk, "Cerrar sesión", lambda: llamadas.append("ok"))
+    from views.componentes.foco import TECLAS_ACTIVAR, activar
+    assert str(boton._canvas.cget("takefocus")) == "1"
+    assert all(boton._canvas.bind(tecla) for tecla in TECLAS_ACTIVAR)  # Enter y espacio tienen acción
+    # Tk no entrega teclas a una ventana oculta: se llama a lo que ejecutan
+    activar(boton)
+    assert llamadas == ["ok"]
+
+
+@pytest.mark.parametrize("clase, color_foco", [
+    (BotonSecundario, tema.COLOR_PRIMARIO), (BotonPrimario, tema.COLOR_TEXTO),  # sobre el azul, el del texto
+])
+def test_el_foco_de_un_boton_se_ve_y_al_salir_vuelve_su_borde(raiz_tk, clase, color_foco):
+    from views.componentes.foco import GROSOR_FOCO, al_entrar_control, al_salir_control
+    boton = clase(raiz_tk, "Aceptar", None)
+    borde = (boton.cget("border_width"), boton.cget("border_color"))
+    al_entrar_control(boton)
+    assert boton.cget("border_width") == GROSOR_FOCO and tuple(boton.cget("border_color")) == color_foco
+    al_salir_control(boton)
+    assert (boton.cget("border_width"), boton.cget("border_color")) == borde
+
+
+def test_fijar_borde_con_foco_se_aplica_al_salir(raiz_tk):
+    from views.componentes.foco import GROSOR_FOCO, al_entrar_control, al_salir_control, fijar_borde
+    boton = BotonSecundario(raiz_tk, "Aceptar", None)
+    al_entrar_control(boton)
+    fijar_borde(boton, 0, tema.COLOR_BORDE)
+    assert boton.cget("border_width") == GROSOR_FOCO  # mientras tiene el foco, se ve el foco
+    al_salir_control(boton)
+    assert boton.cget("border_width") == 0
+
+
+
+def test_el_tipo_de_documento_se_elige_con_el_teclado(raiz_tk):
+    campos = CamposDocumento(raiz_tk)
+    caja = campos._tipo._entry
+    assert all(caja.bind(tecla) for tecla in ("<Up>", "<Down>", "<space>", "<Alt-Down>"))
+    # Tk no entrega teclas a una ventana oculta: se llama a lo que ejecutan ↓ y ↑
+    assert campos.cambiar_tipo(1) == "break"
+    assert campos.valores()[0] == TipoDocumento.CARNE_EXTRANJERIA
+    campos.cambiar_tipo(-1)
+    campos.cambiar_tipo(-1)  # en el primero no da la vuelta
+    assert campos.valores()[0] == TipoDocumento.DNI
+
+
+def test_el_tipo_bloqueado_no_cambia_con_el_teclado(raiz_tk):
+    campos = CamposDocumento(raiz_tk)
+    campos.bloquear()
+    campos.cambiar_tipo(1)
+    assert campos.valores()[0] == TipoDocumento.DNI
+
+
+def test_el_tipo_de_documento_muestra_el_foco(raiz_tk):
+    from views.componentes.foco import al_entrar
+    campos = CamposDocumento(raiz_tk)
+    al_entrar(campos._tipo)
+    assert tuple(campos._tipo.cget("border_color")) == tema.COLOR_PRIMARIO

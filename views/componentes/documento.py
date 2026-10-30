@@ -3,6 +3,7 @@ import customtkinter as ctk
 
 from models.documento import TipoDocumento
 from views import tema
+from views.componentes.campos import campo_texto, etiqueta_campo
 from views.componentes.foco import marcar_foco
 
 # Texto que ve el usuario para cada tipo (el valor del Enum es el código de la BD: DNI, CE, PAS, CPP)
@@ -25,8 +26,8 @@ class CamposDocumento(ctk.CTkFrame):
 
     def __init__(self, padre):
         super().__init__(padre, fg_color="transparent")
-        ctk.CTkLabel(self, text="Documento de identidad", font=tema.fuente("etiqueta"), text_color=tema.COLOR_ETIQUETA,
-                     anchor="w").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, tema.ESPACIO_MINIMO))
+        etiqueta_campo(self, "Documento de identidad").grid(row=0, column=0, columnspan=2, sticky="w",
+                                                            pady=(0, tema.ESPACIO_MINIMO))
         self._tipo = ctk.CTkComboBox(
             self, values=list(ETIQUETAS.values()), state="readonly", width=200, height=tema.ALTO_CONTROL,
             corner_radius=tema.RADIO_CONTROL, border_width=1, font=tema.fuente("normal"),
@@ -36,11 +37,15 @@ class CamposDocumento(ctk.CTkFrame):
             dropdown_hover_color=tema.COLOR_ACTIVO, dropdown_text_color=tema.COLOR_TEXTO)
         self._tipo.set(ETIQUETAS[TipoDocumento.DNI])
         self._tipo.grid(row=1, column=0, sticky="w", padx=(0, tema.ESPACIO))
-        self._numero = marcar_foco(ctk.CTkEntry(
-            self, placeholder_text="Número", height=tema.ALTO_CONTROL, corner_radius=tema.RADIO_CONTROL,
-            border_width=1, font=tema.fuente("normal"), fg_color=tema.COLOR_SUPERFICIE,
-            border_color=tema.COLOR_BORDE_CAMPO, text_color=tema.COLOR_TEXTO,
-            placeholder_text_color=tema.COLOR_PLACEHOLDER))
+        # Con el teclado: el foco se ve, ↑/↓ cambian el tipo y espacio o Alt+↓ abren la lista. La lista es de solo
+        # lectura, así que sin esto no se podía elegir otro tipo sin el mouse.
+        marcar_foco(self._tipo)
+        caja = self._tipo._entry
+        caja.bind("<Up>", lambda _e: self.cambiar_tipo(-1), add="+")
+        caja.bind("<Down>", lambda _e: self.cambiar_tipo(1), add="+")
+        for tecla in ("<space>", "<Alt-Down>"):
+            caja.bind(tecla, lambda _e: self._abrir_lista(), add="+")
+        self._numero = campo_texto(self, "Número")
         self._numero.grid(row=1, column=1, sticky="ew")
         self.grid_columnconfigure(1, weight=1)
         self._bloqueado = False
@@ -55,6 +60,19 @@ class CamposDocumento(ctk.CTkFrame):
 
     def limpiar(self):
         self._escribir(ETIQUETAS[TipoDocumento.DNI], "")
+
+    def cambiar_tipo(self, paso: int) -> str:
+        """Pasa al tipo anterior (-1) o al siguiente (+1), sin dar la vuelta. Bloqueado no cambia nada."""
+        if not self._bloqueado:
+            etiquetas = list(ETIQUETAS.values())
+            actual = etiquetas.index(self._tipo.get())
+            self._tipo.set(etiquetas[max(0, min(len(etiquetas) - 1, actual + paso))])
+        return "break"  # que Tk no haga además lo suyo con la tecla
+
+    def _abrir_lista(self) -> str:
+        if not self._bloqueado:
+            self._tipo._open_dropdown_menu()
+        return "break"
 
     def _escribir(self, etiqueta: str, numero: str):
         # Un campo deshabilitado no acepta texto: se habilita un momento y se deja como estaba
@@ -73,3 +91,8 @@ class CamposDocumento(ctk.CTkFrame):
 
     def enfocar(self):
         self._numero.focus_set()
+
+    @property
+    def campo_numero(self) -> ctk.CTkEntry:
+        """La caja del número, para que la pantalla le asocie teclas (Enter para la acción principal)."""
+        return self._numero
