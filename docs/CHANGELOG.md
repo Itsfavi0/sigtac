@@ -5,6 +5,83 @@
 
 ---
 
+## [2026-10-30] — Fase 6: pantalla de pacientes
+
+### Cambio
+- **`views/pacientes_view.py`** (`PacientesView`, brief §5), con «Buscar / Sin identificar (N)» en la cabecera de la tarjeta:
+  - **Buscar:**
+    - el documento → la ficha ampliada (documento, fecha de nacimiento, edad, sexo, seguro y si está dado de baja);
+    - «Editar datos» corrige nombres, apellidos, fecha, sexo y seguro. El documento no se edita;
+    - «Abrir episodio» pide el motivo, y el paciente pasa a esperar triaje;
+    - sin resultado: «No hay un paciente con ese documento» y «Registrarlo en Triaje», que abre Triaje con el documento ya buscado;
+    - un paciente dado de baja no se edita ni se admite (lo reactiva un administrador).
+  - **Sin identificar:**
+    - la lista de NN;
+    - al elegir uno: documento, nombres, apellidos y fecha → «Identificar»;
+    - si el documento ya es de otro paciente, pregunta (`confirmar`) si fusionar ambos registros. Los episodios del NN pasan al paciente registrado.
+- **Piezas compartidas** (aprobadas por el usuario), en `views/componentes/paciente.py`:
+  - `CamposPaciente`: rellenar desde un paciente, leer los valores marcando el campo culpable y limpiar;
+  - `FichaPaciente`: corta o ampliada.
+  El triaje pasa a usar las dos.
+- **`views/componentes/campos.py`:**
+  - la rejilla de campos que el triaje tenía como métodos privados (`celda`, `campo_en_rejilla`, `lista_en_rejilla`);
+  - la lectura con el campo marcado (`leer_campo`, `leer_opcion`);
+  - `limpiar_al_corregir` y `sin_error`.
+- `Tarjeta.cambiar_textos`, `AppPrincipal.pantalla_actual`, `TriageView.buscar_documento` y `formato.fecha_numerica`.
+- **`prototipo/`:**
+  - `PacientesDemo` con dos NN, edición, identificación y fusión, todo con las reglas reales del modelo;
+  - Triaje y Pacientes comparten los datos de la demo.
+- **Pruebas:**
+  - nueva: `test_pacientes_view.py` (30);
+  - ampliadas: `test_componentes.py` (piezas de paciente y rejilla), `test_triage_view.py` y `test_app_principal.py`.
+
+### Archivos afectados
+- `views/pacientes_view.py` y `views/componentes/paciente.py` (nuevos)
+- `views/componentes/` (`campos.py`, `tarjetas.py` y `__init__.py`), `views/triage_view.py`, `views/app_principal.py` y `views/formato.py`
+- `prototipo/demo.py` y `prototipo/ver.py`
+- Pruebas: `tests/test_pacientes_view.py` (nuevo), `tests/test_componentes.py`, `tests/test_triage_view.py` y `tests/test_app_principal.py`
+- `docs/`
+
+### Motivo
+Es la última pantalla de la Fase 6. Resuelve a los pacientes que llegan sin identificar y permite corregir datos o admitir a alguien sin triarlo en el momento (por ejemplo, desde admisión).
+
+### Impacto
+- Pruebas: **1878 pasan** (antes 1836).
+- Sin cambios de esquema, de controladores ni de modelos.
+- El triaje se comporta igual con las piezas extraídas: sus 55 pruebas pasan.
+- **La demo tenía un dato incoherente:** Carmen Rojas figuraba con el seguro 1 (EsSalud) y se mostraba como «SIS». Lo encontró la prueba de editar. Ahora el id y el nombre salen del mismo catálogo.
+
+### Decisiones
+- **La fusión se ofrece, no se impone.** `identificar()` rechaza un documento que ya existe, porque duplicaría a la persona. Por eso la pantalla busca primero el documento: si existe, pregunta antes de fusionar, porque la fusión no se puede deshacer. Si el usuario no confirma, el formulario conserva lo escrito.
+- **«Registrarlo en Triaje» lleva el documento.** Triaje se abre con él ya buscado y muestra el registro, así no se escribe dos veces. Solo se ofrece si el rol tiene Triaje en el menú.
+- **Mientras se edita o se admite, se ocultan «Editar datos» y «Abrir episodio».** A la vista queda un solo formulario, con su botón principal y «Cancelar».
+- **Dar de baja y reactivar no están aquí.** Exigen el permiso de administración (`PacienteController`) y el brief los deja para la pantalla de administración.
+- **La lista de NN muestra el número de registro.** Dos NN del mismo sexo y la misma edad aparente solo se distinguen por él, que es el que se anota en la pulsera o en la historia provisional.
+- **El título de la tarjeta cambia con el selector** («Buscar paciente» / «Pacientes sin identificar»), porque son dos tareas distintas. En el triaje es fijo porque las dos opciones llevan al mismo paso.
+- **Corregido tras la revisión:**
+  - un dato mal escrito al identificar ya no recarga la lista, que borraba la elección;
+  - al cancelar o terminar, el foco vuelve al documento;
+  - cambiar el documento buscado retira la ficha, y «Registrarlo en Triaje» lleva el documento que se buscó;
+  - el motivo vacío se explica bajo el campo;
+  - el margen bajo el documento es el mismo que en el triaje;
+  - la pregunta de fusión avisa que los datos escritos no se usan;
+  - al abrir un formulario, la pantalla se desplaza para mostrarlo entero.
+- **Proceso de la interfaz** (skill ui-consistency):
+  - lista de comprobación a partir del triaje, la pantalla más reciente del mismo tipo;
+  - revisión calibrada con una fuente escrita a mano, plantada en una copia del triaje, que el revisor encontró;
+  - después, la revisión de la pantalla por un agente que no la escribió.
+
+### Pendientes
+- **Abierto tras la segunda revisión:**
+  - Después de identificar, el foco no vuelve al documento: se queda en el botón, ya deshabilitado.
+  - En «Sin identificar», a 1093×614, «Identificar» queda fuera de la vista hasta desplazar (a «Editar datos» y «Abrir episodio» ya se las desplaza solas).
+  - `_mostrar_al_pie` usa `_parent_canvas`, un atributo interno de `CTkScrollableFrame`: conviene llevarlo a un componente.
+- **Para el equipo:** el número de registro de un NN solo se ve en esta lista. Ni el aviso al registrarlo en Triaje ni la cola lo muestran, así que quien anota la pulsera no tiene de dónde sacarlo.
+- Común con el triaje: cambiar solo el tipo de documento, sin tocar el número, no retira la ficha.
+- Detalles visuales de las pantallas, para el final (los que anotan las entradas del triaje y del tablero).
+
+---
+
 ## [2026-10-30] — Cuentas de prueba en el seed: anotadas y una de médico
 
 ### Cambio

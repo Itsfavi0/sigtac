@@ -34,11 +34,12 @@
 - **Tablero de camas (2026-10-30):** registrado en `PANTALLAS`. `python -m prototipo.ver` abre la aplicación con datos de demostración, sin MySQL.
 - **Criterios de la sugerencia (2026-10-30):** la estrategia de triaje devuelve el nivel y las condiciones que lo decidieron (`evaluar()`); `TriajeController.sugerir()` los entrega en `Sugerencia.criterios`.
 - **Triaje (2026-10-30):** `views/triage_view.py` en un solo flujo (paciente → signos → síntomas → confirmar o reclasificar), con la sugerencia y sus criterios. Piezas nuevas: `Tarjeta`, `lista_opciones`, `casilla` y `Selector`.
-- Pruebas: **1836 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`. Las de las vistas usan una ventana Tk oculta.
+- **Pacientes (2026-10-30):** `views/pacientes_view.py` (buscar, editar, abrir episodio, identificar y fusionar NN). Con ella están las 5 pantallas de la Fase 6; quedan detalles visuales para el final.
+- Pruebas: **1878 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`. Las de las vistas usan una ventana Tk oculta.
 
 ### Tarea actual
 
-Fase 6: sigue la pantalla de pacientes (`pacientes_view.py`). Cada pantalla se registra en `views/app_principal.py` (`PANTALLAS`) y en `prototipo/ver.py` (`PANTALLAS_DEMO`).
+Fase 6: las 5 pantallas están hechas; quedan detalles visuales (CHANGELOG, «Pendientes»). Sigue la Fase 7: integración y pruebas desde las vistas. Cada pantalla nueva se registra en `views/app_principal.py` (`PANTALLAS`) y en `prototipo/ver.py` (`PANTALLAS_DEMO`).
 Falta que el usuario ejecute `scripts/verificar_controladores.py` para confirmar el PDF y los criterios con datos reales.
 
 ---
@@ -53,7 +54,7 @@ Falta que el usuario ejecute `scripts/verificar_controladores.py` para confirmar
 | Fase 3 — DAO | Completada (2026-10-21) |
 | Fase 4 — Controllers | Completada (2026-10-22). Verificada en MySQL 8.0.46 |
 | Fase 5 — Utils | Completada (2026-10-26): `security.py`, `logging_config.py` y `pdf_generator.py` |
-| Fase 6 — Views | En curso: diseño aprobado; tema, componentes, login, ventana principal, tablero y triaje hechos; falta pacientes |
+| Fase 6 — Views | Pantallas hechas (2026-10-30): login, ventana principal, tablero, triaje y pacientes; quedan detalles visuales |
 | Fase 7 — Integración y pruebas | Pendiente |
 
 ---
@@ -168,7 +169,7 @@ Ninguno bloqueante. Las decisiones menores están en "Pendientes conocidos".
 
 1. Validar con el equipo la matriz de permisos (`models/permisos.py`; ver CHANGELOG del 2026-10-21 y 2026-10-26).
 2. Ejecutar `scripts/verificar_controladores.py` para confirmar la exportación a PDF con datos reales.
-3. Fase 6: `pacientes_view.py`. El login, la ventana principal, el tablero y el triaje ya están hechos.
+3. Fase 7: repetir desde las vistas la integración ya verificada en los controladores, y las pruebas de `DEVELOPMENT_PLAN.md` (Fase 7). Antes, los detalles visuales pendientes de la Fase 6.
 
 Respecto al plan original, `auditoria_dao.py` se hizo antes que `triaje_dao.py` y `asignacion_dao.py` porque es de una sola tabla y no depende de transacciones (ver `CHANGELOG.md` del 2026-10-12).
 

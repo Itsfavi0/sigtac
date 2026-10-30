@@ -346,7 +346,8 @@ Las vistas:
 - [x] `views/formato.py` y `prototipo/` (controladores de demostración: `python -m prototipo.ver`)
 - [x] `triage_view.py` (2026-10-30): paciente (buscar, registrar, NN o de la cola), signos con su rango, síntomas y el panel de clasificación con los criterios; reclasificar con justificación (RN-10)
 - [x] Piezas para el triaje (2026-10-30): `Tarjeta` (extraída del tablero), `lista_opciones` (extraída de `CamposDocumento`), `casilla` y `Selector`
-- [ ] `pacientes_view.py`
+- [x] `pacientes_view.py` (2026-10-30): buscar → ficha, editar datos y abrir episodio; sin identificar: identificar o fusionar con confirmación
+- [x] Piezas para pacientes (2026-10-30): `CamposPaciente` y `FichaPaciente` (extraídas del triaje) y la rejilla de campos de `campos.py`
 - [ ] `assets/` (por ahora no hace falta: la interfaz no usa imágenes)
 
 ### Dashboard
