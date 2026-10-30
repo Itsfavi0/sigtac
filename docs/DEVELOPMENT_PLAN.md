@@ -344,7 +344,8 @@ Las vistas:
 - [x] Piezas para las pantallas (2026-10-29): `BotonPrimario`/`BotonSecundario`, `Marca`, `campo_texto`/`etiqueta_campo`
 - [x] `dashboard_view.py` (2026-10-30): KPIs, matriz de camas y cola de espera de cama; se actualiza cada 30 s
 - [x] `views/formato.py` y `prototipo/` (controladores de demostración: `python -m prototipo.ver`)
-- [ ] `triage_view.py`
+- [x] `triage_view.py` (2026-10-30): paciente (buscar, registrar, NN o de la cola), signos con su rango, síntomas y el panel de clasificación con los criterios; reclasificar con justificación (RN-10)
+- [x] Piezas para el triaje (2026-10-30): `Tarjeta` (extraída del tablero), `lista_opciones` (extraída de `CamposDocumento`), `casilla` y `Selector`
 - [ ] `pacientes_view.py`
 - [ ] `assets/` (por ahora no hace falta: la interfaz no usa imágenes)
 

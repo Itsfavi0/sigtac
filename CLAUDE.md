@@ -53,7 +53,7 @@ models/       Dominio: persona, documento, cama, triaje, asignacion, usuario (Cu
               estrategias, permisos, estados y auditoria (Enum), excepciones
 utils/        security.py (bcrypt), logging_config.py, pdf_generator.py (reporte PDF con ReportLab) y colores.py
               (colores de niveles de triaje y estados de cama, compartidos por las vistas y el PDF)
-views/        CustomTkinter: tema.py (único lugar de colores —pares claro/oscuro—, fuentes y espacios); componentes/;
+views/        CustomTkinter: tema.py (único lugar de colores —pares claro/oscuro—, fuentes y espacios); componentes/ (Tarjeta, campos y listas, Selector, tabla...);
               assets/fonts (Inter, OFL); formato.py (textos de nombres, documentos, horas y plazos) y las pantallas
               (Fase 6). Diseño aprobado en docs/diseno/ y PRODUCT.md
 main.py       Punto de entrada: una sola ventana que cambia entre el login y la aplicación

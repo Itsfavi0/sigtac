@@ -5,6 +5,114 @@
 
 ---
 
+## [2026-10-30] — Cuentas de prueba en el seed: anotadas y una de médico
+
+### Cambio
+- **`db_scripts/seed.sql`:**
+  - un comentario sobre `INSERT INTO usuario` con la clave de desarrollo y, por cada cuenta, su documento, su rol y si puede ingresar;
+  - la empleada 7, Valeria Quispe Torres (DNI 77777777, médica), con la cuenta 6, rol «Médico de Emergencia», activa y con la misma clave de desarrollo (hash bcrypt nuevo, costo 12).
+- **`README.md`:** remite a ese comentario. Antes remitía a este CHANGELOG.
+
+### Archivos afectados
+- `db_scripts/seed.sql` y `README.md`
+
+### Motivo
+Para probar el login hay que saber con qué documento y qué clave entra cada rol. Hasta ahora la clave solo estaba en una entrada antigua de este CHANGELOG, y el documento de cada cuenta había que deducirlo cruzando `usuario` con `empleado`. Además no había ninguna cuenta activa de médico: la única con ese rol está desactivada a propósito, para probar el rechazo.
+
+### Impacto
+- El seed crea un empleado y una cuenta más. Para tenerlos en `sigtac_db` hay que volver a cargar el seed, lo que borra los datos existentes; lo decide el usuario.
+- La clave anotada es la del CHANGELOG del inicio del proyecto. Se comprobó con bcrypt contra los 6 hashes, y coincide en todos.
+- `scripts/verificar_controladores.py` no cambia: sigue esperando que el único empleado sin cuenta sea el 5. Falta ejecutarlo contra MySQL para confirmar que el seed carga (lo ejecuta el usuario).
+
+### Decisiones
+- **La cuenta de médico es de una empleada nueva, no de Leonardo Veliz (empleado 5).** El script de verificación crea la cuenta del empleado 5 para probar `crear_cuenta`, y el esquema admite una sola cuenta por empleado (`UN_usuario_empleado`). Si el seed se la diera, esa prueba fallaría por registro duplicado.
+- **La clave va en el seed, junto a los hashes que la usan.** Es una clave de prueba, ya registrada en el repositorio, y el seed ya dice que es solo para desarrollo. Cualquier clave real sigue en el `.env`, que no se versiona.
+
+### Pendientes
+- Ejecutar `scripts/verificar_controladores.py` para confirmar que el seed carga en MySQL.
+
+---
+
+## [2026-10-30] — Fase 6: pantalla de triaje
+
+### Cambio
+- **`views/triage_view.py`** (`TriageView`): el flujo unificado del brief §4.
+  - **1. Paciente:**
+    - «Nuevo / En cola (N)»;
+    - con documento: buscar → ficha, o los campos para registrarlo (nombres, apellidos, fecha dd/mm/aaaa, sexo y seguro);
+    - sin identificar (NN): sexo, edad aparente y seguro;
+    - el motivo de consulta;
+    - en cola: la tabla de los que esperan triaje (llegada, nombre corto, motivo y espera).
+  - **2. Signos vitales:** 6 campos con su unidad y, como ayuda, el rango que admite el modelo (`SignosVitales.RANGOS`). Un signo inválido se marca en rojo y se explica bajo los campos.
+  - **3. Síntomas:** casillas en dos columnas.
+  - **Panel de clasificación:**
+    - fijo a la derecha, con el nivel, su plazo, los criterios y el protocolo;
+    - sin datos: «Complete los signos vitales para ver la sugerencia»;
+    - se recalcula solo, 300 ms después de la última tecla;
+    - «Reclasificar» despliega el nivel final y la justificación (RN-10);
+    - el único botón azul dice qué registra («Confirmar nivel 2») y, deshabilitado, por qué no responde: «Complete los signos vitales» o «Faltan 3 caracteres (mínimo 10)».
+  - **Confirmar:** registrar o buscar al paciente → abrir el episodio → registrar el triaje. Si algo falla, la pantalla recuerda lo que ya hizo y el reintento no lo repite.
+- **Piezas compartidas** (aprobadas por el usuario):
+  - `Tarjeta`, extraída del tablero;
+  - `lista_opciones`/`mover_opcion`, extraídas de `CamposDocumento` (ahora avisan como el mouse y pueden empezar vacías);
+  - `casilla`;
+  - `Selector`: lo elegido se marca como el ítem activo del menú lateral.
+- `marcar_error(campo, False)` vuelve al borde de foco si el campo lo tiene. Antes, al corregir un signo mientras se escribía, el foco desaparecía.
+- **`views/formato.py`:** `leer_numero` (acepta coma o punto) y `leer_fecha`.
+- **`views/app_principal.py`:** `crear_triaje` en `PANTALLAS`.
+- **`prototipo/`:**
+  - `PacientesDemo`;
+  - `TriajeDemo` con `listar_sintomas`, `sugerir` y `registrar`, usando la estrategia real y el catálogo del seed;
+  - `python -m prototipo.ver --pantalla triaje`.
+- **Pruebas:**
+  - nueva: `test_triage_view.py` (55);
+  - ampliadas: `test_componentes.py` (piezas nuevas), `test_formato.py` (lectura) y `test_app_principal.py`.
+
+### Archivos afectados
+- `views/triage_view.py` y `views/componentes/selector.py` (nuevos)
+- `views/componentes/` (`campos.py`, `tarjetas.py`, `documento.py`, `foco.py` y `__init__.py`), `views/dashboard_view.py`, `views/app_principal.py` y `views/formato.py`
+- `prototipo/demo.py` y `prototipo/ver.py`
+- Pruebas: `tests/test_triage_view.py` (nuevo), `tests/test_componentes.py`, `tests/test_formato.py` y `tests/test_app_principal.py`
+- `CLAUDE.md` y `docs/`
+
+### Motivo
+Es la pantalla más usada (PRODUCT.md): pasar de «llegó una persona» a «tiene nivel y está en la cola de cama» con el menor número de pasos. Corrige lo que la crítica marcó en el Figma ([P1]):
+- la sugerencia ya no se muestra sin datos;
+- la justificación es obligatoria solo al reclasificar;
+- hay un único botón principal, anclado al pie del panel.
+
+### Impacto
+- Pruebas: **1836 pasan** (antes 1751).
+- Sin cambios de esquema, de controladores ni de modelos.
+- Capturas revisadas: 1280×800 en claro (vacía, con sugerencia y con registro) y 1093×614 en oscuro (reclasificando, con el botón a la vista).
+
+### Decisiones
+- **Las piezas nuevas van en `views/componentes/`.** Pacientes las reutilizará. Lo decidió el usuario al preguntársele por cada una.
+- **La sugerencia se calcula en el controlador real, también mientras se escribe.** La vista no repite la regla. Solo lee los rangos del modelo para señalar el campo culpable.
+- **Un error al recalcular se lee en el panel, no en un diálogo.** Se recalcula con cada pausa al escribir, y un diálogo tras otro sería inusable. Al abrir la pantalla sí hay un único diálogo, como en el tablero.
+- **El sexo y el seguro empiezan sin elegir** (`lista_opciones(vacia=True)`). Un valor por omisión que nadie revisó sería un dato falso del paciente.
+- **La ficha del paciente buscado muestra su nombre completo**, porque quien tría tiene que confirmar la identidad. La cola usa el nombre corto y el documento enmascarado, como el tablero.
+- **El reintento no repite pasos.** Si el triaje falla después de abrir el episodio (otra PC lo cerró, la BD cayó), la pantalla guarda el paciente y el episodio. Así, el segundo intento no registra dos veces al paciente ni choca con «ya tiene un episodio abierto».
+- **El botón deshabilitado dice por qué.** `BotonPrimario` conserva el texto blanco al deshabilitarse y se ve igual que activo: el texto explica qué falta, como el «Verificando…» del login. Reemplaza al contador, que a 1093×614 quedaba fuera del panel.
+- **La cola de triaje no muestra el documento.** Con 4 columnas cabe a 1093×614 sin desplazarse en horizontal; para identificar al paciente bastan el nombre corto, la hora de llegada y el motivo.
+- **Un borde rojo nunca queda sin explicación.** Un campo del paciente marcado al confirmar o al buscar pierde el rojo en cuanto se corrige (al escribir o al elegir otra opción), y todos se limpian al cambiar «Nuevo/En cola» o «Con documento/Sin identificar». El documento compara el texto: soltar el Enter que buscó no borra el error recién marcado. Lo encontró la segunda revisión y se corrigió a pedido del usuario.
+- **`Tarjeta` usa ESPACIO_MEDIO arriba** (antes 12 − 2 = 10 px, fuera de la base de 4): el tablero baja 2 px su cabecera.
+- **Proceso de la interfaz** (skill ui-consistency):
+  - lista de comprobación a partir del tablero y del login;
+  - revisión calibrada con un error plantado en una copia del tablero, que el revisor encontró;
+  - después, la revisión de la pantalla por un agente que no la escribió.
+
+### Pendientes
+- **Abierto tras la segunda revisión:**
+  - Con 3 o más criterios a 1093×614, la justificación podría recortarse: hoy mide 58 de 72 px con 2 criterios.
+  - Brief §4 («se elige uno y se salta al paso 2»): que Enter o el doble clic en una fila de la cola lleven el foco al primer signo. Con las flechas no, para no romper el teclado.
+- Nombres, apellidos y motivo inválidos solo se avisan con un diálogo, sin marcar el campo: marcarlos obligaría a la vista a repetir la validación del modelo.
+- `TarjetaKPI` conserva `ESPACIO_2 - 2` y `ESPACIO_MEDIO - 2` (anterior a este trabajo).
+- `pacientes_view.py` (buscar, editar, identificar y fusionar NN), con las mismas piezas.
+- Íconos del logo, el menú y los KPIs.
+
+---
+
 ## [2026-10-30] — Criterios de la sugerencia de triaje
 
 ### Cambio
