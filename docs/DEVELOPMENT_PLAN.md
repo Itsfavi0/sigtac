@@ -341,7 +341,8 @@ Las vistas:
 - [x] `login_view.py` (2026-10-29)
 - [x] `app_principal.py` (2026-10-29): las pantallas se registran en `PANTALLAS`
 - [x] Piezas para las pantallas (2026-10-29): `BotonPrimario`/`BotonSecundario`, `Marca`, `campo_texto`/`etiqueta_campo`
-- [ ] `dashboard_view.py`
+- [x] `dashboard_view.py` (2026-10-30): KPIs, matriz de camas y cola de espera de cama; se actualiza cada 30 s
+- [x] `views/formato.py` y `prototipo/` (controladores de demostración: `python -m prototipo.ver`)
 - [ ] `triage_view.py`
 - [ ] `pacientes_view.py`
 - [ ] `assets/` (por ahora no hace falta: la interfaz no usa imágenes)

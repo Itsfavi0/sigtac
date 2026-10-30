@@ -37,7 +37,10 @@ python scripts/verificar_controladores.py
   No copiar ni mover la carpeta `.venv`; los entornos virtuales guardan rutas absolutas. Para recrearlo:
   `rm -rf .venv && python -m venv .venv && python -m pip install -r requirements-dev.txt`.
 - `python main.py` abre la aplicación (login → ventana principal); necesita el `.env` y MySQL. Cada pantalla nueva se
-  registra en `PANTALLAS` de `views/app_principal.py`.
+  registra en `PANTALLAS` de `views/app_principal.py` y, con los controladores de demostración, en `PANTALLAS_DEMO`
+  de `prototipo/ver.py`.
+  `python -m prototipo.ver` abre la aplicación con datos de demostración, sin MySQL (`--rol`, `--modo oscuro`,
+  `--tamano 1093x614`, `--captura archivo.png`).
   Aún no hay linter configurado; si se añade, documentar aquí su comando.
 
 ## Estructura
@@ -51,8 +54,10 @@ models/       Dominio: persona, documento, cama, triaje, asignacion, usuario (Cu
 utils/        security.py (bcrypt), logging_config.py, pdf_generator.py (reporte PDF con ReportLab) y colores.py
               (colores de niveles de triaje y estados de cama, compartidos por las vistas y el PDF)
 views/        CustomTkinter: tema.py (único lugar de colores —pares claro/oscuro—, fuentes y espacios); componentes/;
-              assets/fonts (Inter, OFL) y las pantallas (Fase 6). Diseño aprobado en docs/diseno/ y PRODUCT.md
+              assets/fonts (Inter, OFL); formato.py (textos de nombres, documentos, horas y plazos) y las pantallas
+              (Fase 6). Diseño aprobado en docs/diseno/ y PRODUCT.md
 main.py       Punto de entrada: una sola ventana que cambia entre el login y la aplicación
+prototipo/    demo.py (controladores de demostración con datos inventados) y ver.py (abre la aplicación sin MySQL)
 db_scripts/   schema.sql, seed.sql, crear_usuario_app.sql y diagrama.png
 tests/        pytest: un test_*.py por módulo; conftest.py con los dobles de los controladores
 scripts/      verificar_controladores.py (flujo completo contra MySQL real en una base temporal)

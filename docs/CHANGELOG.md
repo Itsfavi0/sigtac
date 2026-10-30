@@ -5,6 +5,55 @@
 
 ---
 
+## [2026-10-30] — Fase 6: tablero de camas en la ventana principal
+
+### Cambio
+- **`views/dashboard_view.py`** (`DashboardView`): el tablero aprobado (`docs/diseno/`).
+  - **KPIs:** camas libres sobre las camas en servicio, en limpieza y prioridad 1–2 sin cama. El cuarto depende del rol: espera de cama con REPORTES, esperan triaje con TRIAJE y, si no, fuera de servicio.
+  - **Matriz de camas.**
+  - **Cola «Esperan cama»:** nivel, nombre abreviado y documento enmascarado, motivo, espera (en rojo si excede el plazo) y plazo del nivel.
+  - **Actualización:** al abrirse y cada 30 s. Si falla, conserva lo último y avisa a la ventana principal.
+- **`views/app_principal.py`:**
+  - el tablero queda registrado en `PANTALLAS` (`crear_tablero`), con los controladores reales de la sesión;
+  - `informar_actualizacion(correcta, momento)` es el aviso del tablero: «● Actualizado HH:MM» en verde o «● Sin conexión» en rojo (`marcar_sin_conexion`);
+  - la fecha y la hora usan `views/formato.py`. Se quitó `formatear_fecha`, que repetía `formato.fecha_corta`.
+- **`views/formato.py`:** nombre corto («M. Salazar», «NN · varón, ~40 años»), documento enmascarado («DNI 43•••19»), minutos, plazo, fecha en español y porcentaje.
+- **`models/triaje.py`:** `TIEMPO_MAXIMO_POR_NIVEL` (el `tiempo_max_min` del seed) y `excede_plazo(nivel, minutos)`.
+- **`prototipo/`:** controladores de demostración con datos inventados (36 camas, 4 pacientes que esperan cama y 2 que esperan triaje). `python -m prototipo.ver` abre la aplicación sin MySQL y guarda capturas. Le pasa a `AppPrincipal` sus propias `PANTALLAS_DEMO`.
+- **Pruebas:**
+  - nuevas: `test_dashboard_view.py` (14) y `test_formato.py` (28);
+  - ampliadas: `test_app_principal.py` (tablero registrado, sus controladores y «Sin conexión»), `test_triaje.py` (plazo y sus límites) y `test_estados_vs_bd.py` (plazos contra el seed).
+
+### Archivos afectados
+- `views/dashboard_view.py`, `views/formato.py` y `prototipo/` (nuevos)
+- `views/app_principal.py` y `models/triaje.py`
+- `tests/` (2 archivos nuevos y 3 ampliados), `docs/diseno/prototipo_*.png` y `docs/diseno/app.png`, `docs/`, `CLAUDE.md`
+
+### Motivo
+El tablero se hizo en una máquina (fase D5 del plan de diseño) mientras el login y la ventana principal se hacían en otra. Cada máquina tenía su propio `app_principal.py`. Se conservó el de la otra máquina, el más reciente, y el tablero se conectó a él mediante `PANTALLAS`.
+
+### Impacto
+- Pruebas: **1707 pasan** (antes 1646). La suite tarda unos 30 s: cada prueba del tablero arma sus 36 casillas reales.
+- Capturas de `docs/diseno/` rehechas en la ventana nueva: 1280×800 (`app.png`), 1280×720 (claro), y 1093×614 en oscuro y con el rol de limpieza.
+- Sin cambios de esquema.
+
+### Decisiones
+- **La cola de pacientes solo la ven los roles clínicos (permiso PACIENTES).** Limpieza y administración ven la matriz a toda altura, porque no necesitan nombres de pacientes para su trabajo (Ley 29733, datos personales de salud). Además, el nombre va abreviado y el documento enmascarado: la pantalla puede verla cualquiera en la guardia.
+- **«Camas libres» se cuenta sobre las camas en servicio** (15 / 34, no 15 / 36), igual que la ocupación de `ReporteController`.
+- **Un error de la actualización automática no abre un diálogo cada 30 s.** El diálogo solo aparece al abrir la pantalla. Después, el error se ve en el encabezado como «● Sin conexión».
+- **La tarjeta «Conectado» de la barra no vuelve.** El estado de la conexión se muestra solo en el encabezado, que ya existía. Así se respeta la línea que la reemplazó en la barra (entrada del 2026-10-29).
+- **Una sola fábrica para el tablero.** `crear_tablero` crea los controladores reales salvo que reciba otros. El prototipo le pasa los de demostración con `functools.partial`, sin una clase intermedia de controladores.
+- **Los márgenes exteriores los pone `AppPrincipal`, no cada pantalla.** El tablero sumaba los suyos y quedaba 20 px corrido respecto del título; ahora se alinea con el encabezado. Las pantallas que vienen tampoco agregan margen exterior.
+- **El plazo por nivel vive en el modelo**, no en la vista. Una prueba lo compara con `seed.sql`.
+
+### Pendientes
+- Triaje (antes, ampliar la estrategia para que devuelva los criterios) y pacientes, que se registran en `PANTALLAS` y en `PANTALLAS_DEMO`.
+- Íconos del logo, el menú y los KPIs.
+- Acelerar las pruebas del tablero.
+- `git stash drop` del respaldo de la integración, cuando el usuario lo confirme.
+
+---
+
 ## [2026-10-29] — Fase 6: inicio de sesión y ventana principal
 
 ### Cambio
