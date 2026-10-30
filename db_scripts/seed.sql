@@ -95,14 +95,27 @@ INSERT INTO empleado (id_empleado, id_tipo_documento, num_documento, nombres, ap
 (3, 1, '33333333', 'Favio Enrique', 'Brañez Choquemamani', '1998-07-20', 'CEP-98765', 3, 5, NULL, NULL, 1),
 (4, 1, '44444444', 'Renzo Alexander', 'Moya Ángeles', '1999-11-05', NULL, 5, NULL, NULL, 'MAÑANA', 1),
 (5, 1, '55555555', 'Leonardo', 'Veliz Neyra', '1985-09-30', 'CMP-67890', 2, NULL, 'Medicina Interna', NULL, 1),
-(6, 1, '99999999', 'Médico', 'Despedido', '1975-12-12', 'CMP-00000', 2, NULL, 'Medicina Interna', NULL, 0); -- Empleado inactivo para probar borrado lógico
+(6, 1, '99999999', 'Médico', 'Despedido', '1975-12-12', 'CMP-00000', 2, NULL, 'Medicina Interna', NULL, 0), -- Empleado inactivo para probar borrado lógico
+(7, 1, '77777777', 'Valeria', 'Quispe Torres', '1988-04-22', 'CMP-24680', 2, NULL, 'Medicina Interna', NULL, 1); -- Médica con cuenta, para probar el rol de médico
 
+-- Cuentas para probar el inicio de sesión. SOLO DESARROLLO: nunca usar estas claves fuera de un entorno local.
+-- Todas comparten la clave Sigtac#Dev2026 (el hash bcrypt de abajo; comprobado contra cada uno).
+--   Documento      Rol                     ¿Puede ingresar?
+--   DNI 11111111   Administrador           sí
+--   DNI 22222222   Jefe de Guardia         sí
+--   DNI 33333333   Enfermero de Triaje     sí
+--   DNI 44444444   Personal de Limpieza    sí
+--   DNI 77777777   Médico de Emergencia    sí
+--   DNI 99999999   Médico de Emergencia    no: cuenta desactivada y empleado de baja (prueba el rechazo)
+-- 5 intentos fallidos bloquean la cuenta 15 minutos. El empleado 5 (DNI 55555555) no tiene cuenta a propósito:
+-- scripts/verificar_controladores.py se la crea para probar crear_cuenta.
 INSERT INTO usuario (id_usuario, id_empleado, id_rol, hash_clave, activo) VALUES
 (1, 1, 1, '$2b$12$Kx6Fi0botsesFpvqW3KwZ.C6GmZ3TrcA3oRU1lGRsL51tNMWc1jZC', 1),
 (2, 2, 2, '$2b$12$kmUGssmSTQva6xjH0KD6WuJlBgp6iCQXwPqcaxuQaHKgDIrFfgAJ6', 1),
 (3, 3, 4, '$2b$12$fMB5vLsZZWGBkxMwiAKwDOpcaEjapNPCH5pvNVo9doSO0wc/pHQX.', 1),
 (4, 4, 5, '$2b$12$6NyKLTdaDDiRnwyC7v/EheyivOh8k7wpmJp/0ucVgGyxRwlug6LeS', 1),
-(5, 6, 3, '$2b$12$LlWJNQC.mWXbMt7Q5uTWI.EnkvnjmBydy8AMrc69HXCknF60ieyLO', 0); -- Usuario desactivado
+(5, 6, 3, '$2b$12$LlWJNQC.mWXbMt7Q5uTWI.EnkvnjmBydy8AMrc69HXCknF60ieyLO', 0), -- Usuario desactivado
+(6, 7, 3, '$2b$12$eHm0j0YOSHA2Cgj2rOIlYe1RvcjdZjQfqau1Xa/B9bJRV6L91rkZa', 1);
 
 INSERT INTO paciente (id_paciente, id_tipo_documento, num_documento, nombres, apellidos, fecha_nac, sexo, id_seguro) VALUES
 (1, 1, '70123456', 'Rosa', 'Mendoza Flores', '1959-05-14', 'F', 1),

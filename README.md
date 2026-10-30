@@ -71,8 +71,8 @@ mysql -u <usuario_admin> -p < db_scripts/seed.sql
 
 > Ejecútalos solo en una base de desarrollo: destruyen los datos existentes.
 
-Los usuarios de prueba del seed comparten la clave de desarrollo indicada en
-[`docs/CHANGELOG.md`](docs/CHANGELOG.md). Nunca la uses fuera de un entorno local.
+Los usuarios de prueba del seed (documento, rol y clave de desarrollo) están en el comentario sobre
+`INSERT INTO usuario` de [`db_scripts/seed.sql`](db_scripts/seed.sql). Nunca uses esas claves fuera de un entorno local.
 
 ## Pruebas
 
