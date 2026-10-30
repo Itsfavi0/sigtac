@@ -4,7 +4,7 @@ import pytest
 
 from controllers.auth_controller import AuthController, Sesion, exigir_permiso
 from dao.usuario_dao import UsuarioDAO
-from models.excepciones import AutenticacionError, SigtacError, UsuarioSinPermisoError
+from models.excepciones import AutenticacionError, ConexionBDError, SigtacError, UsuarioSinPermisoError
 from models.permisos import Permiso, Rol, tiene_permiso
 
 CLAVE = "Clave#Prueba1"
@@ -58,6 +58,15 @@ def test_login_fallido_lanza_error_generico_y_no_deja_sesion(autenticar):
     with pytest.raises(AutenticacionError) as error:
         auth.iniciar_sesion("DNI", "33333333", "mala")
     assert str(error.value) == AuthController.MENSAJE_FALLO
+    assert not auth.autenticado and auth.sesion is None
+
+
+def test_sin_conexion_el_error_llega_a_la_vista_y_no_deja_sesion(autenticar):
+    # El controlador no captura ConexionBDError: la vista muestra su mensaje, distinto del de clave incorrecta
+    autenticar.side_effect = ConexionBDError(UsuarioDAO.MENSAJE_SIN_CONEXION)
+    auth = AuthController()
+    with pytest.raises(ConexionBDError):
+        auth.iniciar_sesion("DNI", "33333333", CLAVE)
     assert not auth.autenticado and auth.sesion is None
 
 

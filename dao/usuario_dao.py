@@ -1,6 +1,6 @@
 import logging
 from dao.base_dao import BaseDAO
-from models.excepciones import PersistenciaError, ReglaNegocioError
+from models.excepciones import ConexionBDError, PersistenciaError, ReglaNegocioError
 from models.documento import DocumentoIdentidad
 from models.permisos import Rol
 from models.usuario import CuentaUsuario
@@ -18,12 +18,15 @@ class UsuarioDAO(BaseDAO):
     DAO para gestionar el acceso, autenticación y validación de usuarios
     cruzando las tablas empleado, usuario y rol de nuestra base de datos.
 
-    A diferencia del resto de DAO, autenticar() no propaga los errores de BD:
-    ante cualquier fallo devuelve None, para no revelar la causa del rechazo.
+    A diferencia del resto de DAO, autenticar() no propaga los errores de BD: ante cualquier fallo devuelve
+    None, para no revelar la causa del rechazo. La única excepción es la falta de conexión (ConexionBDError),
+    que no dice nada de la cuenta y permite avisar al usuario que el problema es la red o el servidor.
 
     La administración de cuentas (listar, crear, cambiar rol, activar, restablecer la clave) sí
     propaga los errores, como los demás DAO. Ningún método devuelve ni registra el hash de la clave.
     """
+
+    MENSAJE_SIN_CONEXION = "No se pudo conectar con la base de datos. Revise la red o avise a soporte e intente de nuevo."
 
     _SELECT_CUENTA = """
         SELECT u.id_usuario, u.id_empleado, e.nombres, e.apellidos, c.nombre_cargo, r.nombre_rol, u.activo,
@@ -103,7 +106,12 @@ class UsuarioDAO(BaseDAO):
         """
         try:
             resultado = UsuarioDAO._consultar_uno(query, (documento.tipo.value, documento.numero))
-        except PersistenciaError as e:  # incluye ConexionBDError
+        except ConexionBDError as e:
+            # Sin conexión no se sabe nada de la cuenta: avisarlo no revela la causa de un rechazo.
+            # El detalle (servidor, usuario de la BD) va solo al log.
+            logger.error("ERROR DAO [autenticar]: sin conexión con la base de datos: %s", e)
+            raise ConexionBDError(UsuarioDAO.MENSAJE_SIN_CONEXION) from e
+        except PersistenciaError as e:
             logger.error("ERROR DAO [autenticar]: no se pudo consultar el usuario: %s", e)
             return None
 

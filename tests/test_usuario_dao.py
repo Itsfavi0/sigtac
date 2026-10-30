@@ -138,9 +138,12 @@ def test_entradas_invalidas_no_llegan_a_la_bd(monkeypatch, senuelo, tipo, dni, c
 
 
 # ---- Errores de infraestructura
-def test_sin_conexion_devuelve_none(monkeypatch, senuelo):
-    BD(monkeypatch, error_de_conexion=ConexionBDError("sin servidor"))
-    assert UsuarioDAO.autenticar(TIPO, DNI, CLAVE) is None
+def test_sin_conexion_lanza_conexion_bd_error_con_un_mensaje_para_el_usuario(monkeypatch, senuelo):
+    # La falta de conexión no revela nada de la cuenta: se avisa, en vez de responder «clave incorrecta»
+    BD(monkeypatch, error_de_conexion=ConexionBDError("2003: Can't connect to MySQL server 'sigtac_app'@'10.0.0.5'"))
+    with pytest.raises(ConexionBDError) as error:
+        UsuarioDAO.autenticar(TIPO, DNI, CLAVE)
+    assert str(error.value) == UsuarioDAO.MENSAJE_SIN_CONEXION  # sin el servidor ni el usuario de la BD
 
 
 def test_error_de_consulta_devuelve_none_y_cierra_el_cursor(monkeypatch, senuelo):
