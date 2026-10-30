@@ -17,9 +17,12 @@ import customtkinter as ctk
 from models.excepciones import SigtacError
 from models.triaje import SignosVitales, Triaje
 from views import formato, tema
-from views.componentes import (BotonPrimario, BotonSecundario, CamposDocumento, InsigniaNivel, Selector, TablaDatos,
-                               Tarjeta, campo_texto, casilla, etiqueta_campo, lista_opciones, marcar_error, marcar_foco,
-                               mostrar_error, mostrar_info, texto_nivel)
+from views.componentes import (BotonPrimario, BotonSecundario, CamposDocumento, CamposPaciente, FichaPaciente,
+                               InsigniaNivel, Selector, TablaDatos, Tarjeta, campo_texto, casilla, etiqueta_campo,
+                               lista_opciones, marcar_error, marcar_foco, mostrar_error, mostrar_info, texto_nivel)
+from views.componentes.campos import (campo_en_rejilla, leer_campo, leer_opcion, limpiar_al_corregir, lista_en_rejilla,
+                                      sin_error)
+from views.componentes.paciente import SEXOS
 from views.componentes.tabla import ALTO_FILA
 
 logger = logging.getLogger(__name__)
@@ -34,7 +37,6 @@ SIGNOS = {
     "temp": ("Temperatura", "°C", True),
     "sato2": ("SatO₂", "%", False),
 }
-SEXOS = {"Mujer": "F", "Varón": "M"}
 NIVELES = (1, 2, 3, 4, 5)
 
 SIN_SUGERENCIA = "Complete los signos vitales para ver la sugerencia."
@@ -135,62 +137,33 @@ class TriageView(ctk.CTkFrame):
         # Bajo el documento: la indicación, o por qué no se pudo buscar (en el color de error)
         self._aviso = ctk.CTkLabel(self._resultado, text=AVISO_BUSCAR, font=tema.fuente("pequena"),
                                    text_color=tema.COLOR_TEXTO_SECUNDARIO, anchor="w", justify="left")
-        self._ficha = ctk.CTkFrame(self._resultado, fg_color="transparent")
-        self._ficha_nombre = ctk.CTkLabel(self._ficha, text="", font=tema.fuente("fuerte"),
-                                          text_color=tema.COLOR_TEXTO, anchor="w")
-        self._ficha_nombre.pack(anchor="w")
-        self._ficha_datos = ctk.CTkLabel(self._ficha, text="", font=tema.fuente("pequena"),
-                                         text_color=tema.COLOR_TEXTO_SECUNDARIO, anchor="w")
-        self._ficha_datos.pack(anchor="w")
+        self._ficha = FichaPaciente(self._resultado)
 
         self._registro = ctk.CTkFrame(self._resultado, fg_color="transparent")
         ctk.CTkLabel(self._registro, text=NO_REGISTRADO, font=tema.fuente("pequena"),
-                     text_color=tema.COLOR_TEXTO_SECUNDARIO, anchor="w").grid(row=0, column=0, columnspan=2,
-                                                                              sticky="w")
-        self._nombres = self._campo_en_rejilla(self._registro, "Nombres", 1, 0)
-        self._apellidos = self._campo_en_rejilla(self._registro, "Apellidos", 1, 1)
-        self._fecha_nac = self._campo_en_rejilla(self._registro, "Fecha de nacimiento", 2, 0, "dd/mm/aaaa")
-        self._sexo = self._lista_en_rejilla(self._registro, "Sexo", list(SEXOS), 2, 1)
-        self._seguro = self._lista_en_rejilla(self._registro, "Seguro", [], 3, 0)
-        self._registro.grid_columnconfigure((0, 1), weight=1, uniform="registro")
-        for campo in (self._nombres, self._apellidos, self._fecha_nac):
+                     text_color=tema.COLOR_TEXTO_SECUNDARIO, anchor="w").pack(anchor="w")
+        self._datos = CamposPaciente(self._registro)
+        self._datos.pack(fill="x", pady=(tema.ESPACIO_2, 0))
+        for campo in self._datos.entradas:
             self._enter_confirma(campo)
-        self._quitar_error_al_corregir(self._fecha_nac, self._sexo, self._seguro)
         self._mostrar_aviso()
         return marco
 
     def _crear_sin_documento(self, padre) -> ctk.CTkFrame:
         marco = ctk.CTkFrame(padre, fg_color="transparent")
-        self._sexo_nn = self._lista_en_rejilla(marco, "Sexo", list(SEXOS), 0, 0)
-        self._edad_nn = self._campo_en_rejilla(marco, "Edad aparente (años)", 0, 1)
-        self._seguro_nn = self._lista_en_rejilla(marco, "Seguro", [], 0, 2)
+        self._sexo_nn = lista_en_rejilla(marco, "Sexo", list(SEXOS), 0, 0)
+        self._edad_nn = campo_en_rejilla(marco, "Edad aparente (años)", 0, 1)
+        self._seguro_nn = lista_en_rejilla(marco, "Seguro", [], 0, 2)
         marco.grid_columnconfigure((0, 1, 2), weight=1, uniform="nn")
         self._enter_confirma(self._edad_nn)
-        self._quitar_error_al_corregir(self._sexo_nn, self._edad_nn, self._seguro_nn)
+        limpiar_al_corregir(self._sexo_nn, self._edad_nn, self._seguro_nn)
         return marco
-
-    @staticmethod
-    def _quitar_error_al_corregir(*campos):
-        """
-        Un campo marcado al confirmar (fecha, sexo, seguro, edad) pierde el borde rojo en cuanto se corrige: al
-        escribir en él o al elegir otra opción. Si no, quedaría rojo sin que nada diga por qué.
-        """
-        for campo in campos:
-            if isinstance(campo, ctk.CTkComboBox):
-                campo.configure(command=lambda _valor, lista=campo: TriageView._sin_error(lista))
-            else:
-                campo.bind("<KeyRelease>", lambda _e, caja=campo: TriageView._sin_error(caja), add="+")
-
-    @staticmethod
-    def _sin_error(campo):
-        if getattr(campo, "_sigtac_error", False):
-            marcar_error(campo, False)
 
     def _limpiar_errores_paciente(self):
         """Al cambiar de modo, los campos del paciente que quedan ocultos o vuelven a usarse no conservan el rojo."""
-        for campo in (self._documento.campo_numero, self._fecha_nac, self._sexo, self._seguro, self._sexo_nn,
-                      self._edad_nn, self._seguro_nn):
-            self._sin_error(campo)
+        for campo in (self._documento.campo_numero, self._sexo_nn, self._edad_nn, self._seguro_nn):
+            sin_error(campo)
+        self._datos.limpiar_errores()
         self._documento_con_error = None
 
     def _cambiar_modo(self, modo: str):
@@ -211,6 +184,13 @@ class TriageView(ctk.CTkFrame):
         self._con_documento.pack_forget()
         self._sin_documento.pack_forget()
         (self._sin_documento if identidad == "nn" else self._con_documento).pack(fill="x")
+
+    def buscar_documento(self, tipo, numero: str):
+        """Empieza un triaje nuevo con ese documento ya buscado (lo usa Pacientes: «Registrarlo en Triaje»)."""
+        self._modo.elegir("nuevo")
+        self._identidad.elegir("documento")
+        self._documento.fijar(tipo, numero)
+        self.buscar()
 
     def buscar(self, _evento=None):
         """Busca el documento: si el paciente existe muestra su ficha; si no, los campos para registrarlo."""
@@ -234,20 +214,11 @@ class TriageView(ctk.CTkFrame):
         self._paciente = paciente
         if paciente is None:
             self._mostrar_resultado(self._registro)
-            self._nombres.focus_set()
+            self._datos.enfocar()
         else:
-            self._mostrar_ficha(paciente)
+            self._ficha.mostrar(paciente)
+            self._mostrar_resultado(self._ficha)
         return "break"
-
-    def _mostrar_ficha(self, paciente):
-        datos = [f"{paciente.calcular_edad()} años", formato.SEXO[paciente.sexo]]
-        if paciente.nombre_seguro:
-            datos.append(paciente.nombre_seguro)
-        if not paciente.activo:
-            datos.append("Dado de baja")
-        self._ficha_nombre.configure(text=f"{paciente.nombres} {paciente.apellidos}")
-        self._ficha_datos.configure(text=" · ".join(datos))
-        self._mostrar_resultado(self._ficha)
 
     def _mostrar_aviso(self, texto: str = AVISO_BUSCAR, error: bool = False):
         self._aviso.configure(text=texto, text_color=tema.COLOR_ERROR if error else tema.COLOR_TEXTO_SECUNDARIO)
@@ -283,7 +254,7 @@ class TriageView(ctk.CTkFrame):
         cuerpo = self._cuerpo(tarjeta)
         self._campos_signos = {}
         for i, (clave, (nombre, unidad, _decimales)) in enumerate(SIGNOS.items()):
-            campo = self._campo_en_rejilla(cuerpo, f"{nombre} ({unidad})", i // 3, i % 3, rango_admitido(clave))
+            campo = campo_en_rejilla(cuerpo, f"{nombre} ({unidad})", i // 3, i % 3, rango_admitido(clave))
             campo.bind("<KeyRelease>", self._programar_sugerencia, add="+")
             self._enter_confirma(campo)
             self._campos_signos[clave] = campo
@@ -551,40 +522,19 @@ class TriageView(ctk.CTkFrame):
         if self._paciente is not None:
             return self._paciente
         if self._identidad.valor == "nn":
-            sexo = self._elegido(self._sexo_nn, SEXOS, "el sexo")
-            edad = self._leido(self._edad_nn, lambda texto: formato.leer_numero(texto, "La edad aparente"))
-            seguro = self._elegido(self._seguro_nn, self._seguros, "el seguro")
+            sexo = leer_opcion(self._sexo_nn, SEXOS, "Elija el sexo del paciente.")
+            edad = leer_campo(self._edad_nn, lambda texto: formato.leer_numero(texto, "La edad aparente"))
+            seguro = leer_opcion(self._seguro_nn, self._seguros, "Elija el seguro del paciente.")
             self._paciente = self._pacientes.registrar_no_identificado(sexo, edad, seguro)
             return self._paciente
         tipo, numero = self._documento.valores()
         if self._buscado != (tipo, numero.strip()):
             marcar_error(self._documento.campo_numero)
             raise ValueError("Busque el documento del paciente antes de confirmar.")
-        fecha = self._leido(self._fecha_nac, lambda texto: formato.leer_fecha(texto, "La fecha de nacimiento"))
-        sexo = self._elegido(self._sexo, SEXOS, "el sexo")
-        seguro = self._elegido(self._seguro, self._seguros, "el seguro")
-        self._paciente = self._pacientes.registrar(tipo.value, numero, self._nombres.get(), self._apellidos.get(),
-                                                   fecha, sexo, seguro)
+        datos = self._datos.valores()
+        self._paciente = self._pacientes.registrar(tipo.value, numero, datos["nombres"], datos["apellidos"],
+                                                   datos["fecha_nac"], datos["sexo"], datos["id_seguro"])
         return self._paciente
-
-    @staticmethod
-    def _leido(campo, leer):
-        """Lee el texto de un campo con `leer`; si no se puede, el campo queda marcado y el error sigue su camino."""
-        try:
-            valor = leer(campo.get())
-        except ValueError:
-            marcar_error(campo)
-            raise
-        marcar_error(campo, False)
-        return valor
-
-    @staticmethod
-    def _elegido(lista, valores: dict, que: str):
-        if lista.get() not in valores:
-            marcar_error(lista)
-            raise ValueError(f"Elija {que} del paciente.")
-        marcar_error(lista, False)
-        return valores[lista.get()]
 
     def limpiar(self):
         """Deja la pantalla lista para el siguiente paciente (después de registrar)."""
@@ -592,12 +542,12 @@ class TriageView(ctk.CTkFrame):
         self._documento.limpiar()
         self._limpiar_errores_paciente()
         self._mostrar_aviso()
-        for campo in (self._nombres, self._apellidos, self._fecha_nac, self._edad_nn, self._motivo,
-                      *self._campos_signos.values()):
+        self._datos.limpiar()
+        for campo in (self._edad_nn, self._motivo, *self._campos_signos.values()):
             campo.delete(0, "end")
             campo._activate_placeholder()  # CustomTkinter solo lo vuelve a mostrar al perder el foco
             marcar_error(campo, False)
-        for lista in (self._sexo, self._seguro, self._sexo_nn, self._seguro_nn):
+        for lista in (self._sexo_nn, self._seguro_nn):
             lista.set("")
             marcar_error(lista, False)
         for caja in self._casillas.values():
@@ -621,8 +571,8 @@ class TriageView(ctk.CTkFrame):
             mostrar_error(self, error)
             seguros, sintomas, cola = [], [], []
         self._seguros = {s["nombre_seguro"]: s["id_seguro"] for s in seguros}
-        for lista in (self._seguro, self._seguro_nn):
-            lista.configure(values=list(self._seguros))
+        self._datos.cargar_seguros(seguros)
+        self._seguro_nn.configure(values=list(self._seguros))
         self._mostrar_sintomas(sintomas)
         self._mostrar_cola(cola)
 
@@ -670,32 +620,6 @@ class TriageView(ctk.CTkFrame):
         campo = campo_texto(padre, placeholder)
         campo.pack(fill="x")
         return campo
-
-    @staticmethod
-    def _campo_en_rejilla(padre, etiqueta: str, fila: int, columna: int, placeholder: str | None = None):
-        marco = TriageView._celda(padre, etiqueta, fila, columna)
-        campo = campo_texto(marco, placeholder)
-        campo.pack(fill="x")
-        return campo
-
-    @staticmethod
-    def _lista_en_rejilla(padre, etiqueta: str, valores, fila: int, columna: int):
-        marco = TriageView._celda(padre, etiqueta, fila, columna)
-        lista = lista_opciones(marco, valores, vacia=True)
-        lista.pack(fill="x")
-        return lista
-
-    @staticmethod
-    def _celda(padre, etiqueta: str, fila: int, columna: int) -> ctk.CTkFrame:
-        """
-        Una etiqueta con su campo en una rejilla. Entre columnas, ESPACIO, como el tipo y el número del documento;
-        entre filas, ESPACIO_2 arriba (la última fila no suma margen al de la tarjeta).
-        """
-        marco = ctk.CTkFrame(padre, fg_color="transparent")
-        marco.grid(row=fila, column=columna, sticky="ew", padx=(0 if columna == 0 else tema.ESPACIO, 0),
-                   pady=(0 if fila == 0 else tema.ESPACIO_2, 0))
-        etiqueta_campo(marco, etiqueta).pack(anchor="w", pady=(0, tema.ESPACIO_MINIMO))
-        return marco
 
     def destroy(self):
         for tarea in (self._tarea, self._tarea_foco):

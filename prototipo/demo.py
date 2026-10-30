@@ -42,6 +42,8 @@ _ESPERAN_TRIAJE = (
 )
 # Registrada antes, sin episodio abierto: al buscar su DNI aparece su ficha
 _REGISTRADO = (("DNI", "41234567"), "Carmen", "Rojas Llanos", "F")
+# Pacientes que llegaron sin identificar: sexo, edad aparente y seguro
+_SIN_IDENTIFICAR = (("M", 40, 4), ("F", 25, 2))
 
 # Los catálogos de seed.sql
 _SEGUROS = ({"id_seguro": 1, "nombre_seguro": "EsSalud"},
@@ -63,8 +65,10 @@ def _paciente(id_paciente, documento, nombres, apellidos, sexo):
     if documento is None:
         nn = Paciente.no_identificado(sexo, 40, 1)
         return Paciente(id_paciente, None, nn.nombres, nn.apellidos, nn.fecha_nac, sexo, 1)
+    # SIS: el id y el nombre salen del mismo catálogo, para que la ficha y la edición digan lo mismo
+    sis = _SEGUROS[1]
     return Paciente(id_paciente, DocumentoIdentidad(*documento), nombres, apellidos, datetime(1985, 3, 14).date(),
-                    sexo, 1, nombre_seguro="SIS")
+                    sexo, sis["id_seguro"], nombre_seguro=sis["nombre_seguro"])
 
 
 class CamasDemo:
@@ -127,6 +131,16 @@ class TriajeDemo:
     def pacientes_en_cola(self) -> list[Paciente]:
         return [paciente for _, paciente in self._entradas()]
 
+    def cambiar_paciente(self, id_anterior: int, nuevo: Paciente) -> int:
+        """Lo que hace una fusión: los episodios del NN pasan a `nuevo`. Devuelve cuántos se movieron."""
+        entradas = self._entradas()
+        movidos = 0
+        for i, (episodio, paciente) in enumerate(entradas):
+            if paciente.id_paciente == id_anterior:
+                entradas[i] = (episodio, nuevo)
+                movidos += 1
+        return movidos
+
     def listar_sintomas(self):
         return list(_SINTOMAS)
 
@@ -165,6 +179,9 @@ class PacientesDemo:
         self._ahora = ahora
         self._pacientes = [_paciente(200, *_REGISTRADO)]
         self._siguiente = 300
+        for i, (sexo, edad, id_seguro) in enumerate(_SIN_IDENTIFICAR):
+            nn = Paciente.no_identificado(sexo, edad, id_seguro)
+            self._reemplazar(Paciente(250 + i, None, nn.nombres, nn.apellidos, nn.fecha_nac, sexo, id_seguro))
 
     def listar_seguros(self):
         return [dict(seguro) for seguro in _SEGUROS]
@@ -196,6 +213,47 @@ class PacientesDemo:
         episodio = EpisodioEmergencia(self._siguiente, id_paciente, motivo_consulta, fecha_ingreso=self._ahora())
         self._triaje.agregar(episodio, paciente)
         return episodio
+
+    def listar_no_identificados(self):
+        return [p for p in self._pacientes if not p.identificado and p.activo]
+
+    def actualizar_datos(self, id_paciente, nombres, apellidos, fecha_nac, sexo, id_seguro):
+        paciente = self._cargar(id_paciente)
+        paciente.actualizar_datos(nombres, apellidos, fecha_nac, sexo, id_seguro)  # las reglas reales del modelo
+        return self._reemplazar(paciente)
+
+    def identificar(self, id_paciente, tipo_documento, num_documento, nombres, apellidos, fecha_nac):
+        documento = DocumentoIdentidad(tipo_documento, num_documento)
+        paciente = self._cargar(id_paciente)
+        if self.buscar_por_documento(tipo_documento, num_documento) is not None:
+            raise ReglaNegocioError("Ese documento ya pertenece a otro paciente registrado: fusione ambos registros.")
+        paciente.identificar(documento, nombres, apellidos, fecha_nac)
+        return self._reemplazar(paciente)
+
+    def fusionar(self, id_nn: int, id_destino: int) -> int:
+        """Los episodios del NN (aquí, su lugar en la cola de triaje) pasan al paciente registrado."""
+        nn, destino = self._cargar(id_nn), self._cargar(id_destino)
+        nn.fusionar_en(destino)  # valida y anula el NN
+        if self._triaje.en_cola(id_nn) and self._triaje.en_cola(id_destino):
+            raise ReglaNegocioError("Ambos pacientes tienen un episodio abierto: cierre uno antes de fusionarlos.")
+        return self._triaje.cambiar_paciente(id_nn, destino)
+
+    def _cargar(self, id_paciente: int) -> Paciente:
+        conocidos = self._pacientes + self._triaje.pacientes_en_cola()
+        paciente = next((p for p in conocidos if p.id_paciente == id_paciente), None)
+        if paciente is None:
+            raise ReglaNegocioError("El paciente no existe.")
+        return paciente
+
+    def _reemplazar(self, paciente: Paciente) -> Paciente:
+        """Vuelve a armar el paciente con el nombre de su seguro, como lo relee el controlador real."""
+        seguro = next(s["nombre_seguro"] for s in _SEGUROS if s["id_seguro"] == paciente.id_seguro)
+        nuevo = Paciente(paciente.id_paciente, paciente.documento, paciente.nombres, paciente.apellidos,
+                         paciente.fecha_nac, paciente.sexo, paciente.id_seguro, nombre_seguro=seguro)
+        self._pacientes = [nuevo if p.id_paciente == nuevo.id_paciente else p for p in self._pacientes]
+        if all(p.id_paciente != nuevo.id_paciente for p in self._pacientes):
+            self._pacientes.append(nuevo)
+        return nuevo
 
     def _guardar(self, paciente: Paciente) -> Paciente:
         self._siguiente += 1

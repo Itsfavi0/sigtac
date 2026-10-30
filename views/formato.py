@@ -56,6 +56,11 @@ def fecha_corta(dia: date) -> str:
     return f"{_DIAS[dia.weekday()]}, {dia.day} {_MESES[dia.month - 1]} {dia.year}"
 
 
+def fecha_numerica(dia: date) -> str:
+    """«14/03/1985»: la forma en que se escribe una fecha en un campo (la que lee leer_fecha)."""
+    return dia.strftime("%d/%m/%Y")
+
+
 def hora(momento: datetime, con_segundos: bool = False) -> str:
     return momento.strftime("%H:%M:%S" if con_segundos else "%H:%M")
 

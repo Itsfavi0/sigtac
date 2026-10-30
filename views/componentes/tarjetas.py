@@ -37,6 +37,11 @@ class Tarjeta(ctk.CTkFrame):
                                        text_color=tema.COLOR_TEXTO_SECUNDARIO, height=self.ALTO_SUBTITULO)
         self._subtitulo.pack(anchor="w")
 
+    def cambiar_textos(self, titulo: str, subtitulo: str):
+        """Para una tarjeta que cambia de contenido (p. ej. «Buscar paciente» / «Pacientes sin identificar»)."""
+        self._titulo.configure(text=titulo)
+        self._subtitulo.configure(text=subtitulo)
+
     @property
     def titulo(self) -> str:
         return self._titulo.cget("text")

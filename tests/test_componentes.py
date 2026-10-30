@@ -6,7 +6,8 @@ from models.documento import TipoDocumento
 from models.estados import EstadoCama
 from models.excepciones import ReglaNegocioError
 from views import tema
-from views.componentes import (BotonPrimario, BotonSecundario, CamposDocumento, InsigniaNivel, Marca, Selector,
+from views.componentes import (BotonPrimario, BotonSecundario, CamposDocumento, CamposPaciente, FichaPaciente,
+                               InsigniaNivel, Marca, Selector,
                                TablaDatos, Tarjeta, TarjetaCama, TarjetaKPI, campo_texto, casilla, confirmar, errores,
                                etiqueta_campo, lista_opciones, marcar_error, marcar_foco, mostrar_error, mostrar_info,
                                texto_nivel)
@@ -506,3 +507,111 @@ def test_quitar_el_error_a_un_campo_con_foco_deja_el_borde_de_foco(raiz_tk, monk
     monkeypatch.setattr(campo, "focus_get", lambda: campo._entry)
     marcar_error(campo, False)
     assert campo.cget("border_width") == GROSOR_FOCO and tuple(campo.cget("border_color")) == tema.COLOR_PRIMARIO
+
+
+# ---- Datos del paciente (CamposPaciente, FichaPaciente)
+
+def _paciente(**cambios):
+    from datetime import date
+    from models.documento import DocumentoIdentidad
+    from models.persona import Paciente
+    datos = dict(id_paciente=7, documento=DocumentoIdentidad("DNI", "41234567"), nombres="Carmen",
+                 apellidos="Rojas Llanos", fecha_nac=date(1985, 3, 14), sexo="F", id_seguro=2,
+                 nombre_seguro="SIS")
+    datos.update(cambios)
+    return Paciente(**datos)
+
+
+SEGUROS = [{"id_seguro": 1, "nombre_seguro": "EsSalud"}, {"id_seguro": 2, "nombre_seguro": "SIS"}]
+
+
+def test_campos_paciente_empiezan_vacios_sin_sexo_ni_seguro_elegidos(raiz_tk):
+    campos = CamposPaciente(raiz_tk)
+    assert [c.get() for c in campos.entradas] == ["", "", ""]
+    assert campos.sexo.get() == "" and campos.seguro.get() == ""
+    assert campos.fecha_nac.cget("placeholder_text") == "dd/mm/aaaa"
+
+
+def test_campos_paciente_fijar_y_leer(raiz_tk):
+    from datetime import date
+    campos = CamposPaciente(raiz_tk)
+    campos.cargar_seguros(SEGUROS)
+    campos.fijar(_paciente())
+    assert campos.fecha_nac.get() == "14/03/1985" and campos.sexo.get() == "Mujer" and campos.seguro.get() == "SIS"
+    assert campos.valores() == {"nombres": "Carmen", "apellidos": "Rojas Llanos", "fecha_nac": date(1985, 3, 14),
+                                "sexo": "F", "id_seguro": 2}
+
+
+@pytest.mark.parametrize("preparar, campo, mensaje", [
+    (lambda c: c.fecha_nac.insert(0, "1985-03-14"), "fecha_nac", "La fecha de nacimiento debe tener la forma"),
+    (lambda c: c.fecha_nac.insert(0, "14/03/1985"), "sexo", "Elija el sexo del paciente."),
+    (lambda c: (c.fecha_nac.insert(0, "14/03/1985"), c.sexo.set("Varón")), "seguro", "Elija el seguro del paciente."),
+])
+def test_campos_paciente_marcan_el_campo_que_no_se_puede_leer(raiz_tk, preparar, campo, mensaje):
+    campos = CamposPaciente(raiz_tk)
+    campos.cargar_seguros(SEGUROS)
+    preparar(campos)
+    with pytest.raises(ValueError, match=mensaje):
+        campos.valores()
+    assert getattr(campos, campo)._sigtac_error
+    campos.limpiar()
+    assert not getattr(campos, campo)._sigtac_error and campos.fecha_nac.get() == ""
+
+
+def test_campos_paciente_sin_sexo_ni_seguro_al_identificar(raiz_tk):
+    from datetime import date
+    campos = CamposPaciente(raiz_tk, con_sexo_y_seguro=False)
+    assert campos.sexo is None and campos.seguro is None
+    campos.nombres.insert(0, "Lucía")
+    campos.apellidos.insert(0, "Paredes")
+    campos.fecha_nac.insert(0, "02/05/2000")
+    assert campos.valores() == {"nombres": "Lucía", "apellidos": "Paredes", "fecha_nac": date(2000, 5, 2)}
+
+
+def test_ficha_paciente(raiz_tk):
+    ficha = FichaPaciente(raiz_tk)
+    ficha.mostrar(_paciente())
+    assert ficha.nombre == "Carmen Rojas Llanos" and ficha.datos.endswith("años · mujer · SIS")
+    assert ficha._documento.winfo_manager() == ""  # la ficha corta no muestra el documento
+
+
+def test_ficha_ampliada_con_documento_y_nacimiento_y_dado_de_baja(raiz_tk):
+    ficha = FichaPaciente(raiz_tk, ampliada=True)
+    ficha.mostrar(_paciente(activo=False))
+    assert ficha.documento == "DNI 41234567 · nació el 14/03/1985"
+    assert ficha.datos.endswith("· Dado de baja")
+
+
+def test_celda_de_rejilla_con_los_espacios_del_tema(raiz_tk):
+    from views.componentes.campos import celda
+
+    def margen(valor) -> tuple[int, ...]:
+        # Tk lo devuelve como entero o como tupla, ya multiplicado por la escala de la ventana
+        texto = str(valor).replace("(", " ").replace(")", " ").replace(",", " ")
+        numeros = tuple(int(float(n)) for n in texto.split())
+        return numeros if len(numeros) == 2 else numeros * 2
+
+    escala = tema.escala(raiz_tk)
+    primera, segunda = celda(raiz_tk, "A", 0, 0), celda(raiz_tk, "B", 1, 1)
+    # Primera fila y primera columna sin margen; después, ESPACIO entre columnas y ESPACIO_2 arriba
+    assert margen(primera.grid_info()["padx"]) == (0, 0) and margen(primera.grid_info()["pady"]) == (0, 0)
+    assert margen(segunda.grid_info()["padx"]) == (round(tema.ESPACIO * escala), 0)
+    assert margen(segunda.grid_info()["pady"]) == (round(tema.ESPACIO_2 * escala), 0)
+
+
+def test_leer_opcion_y_campo_marcan_y_desmarcan(raiz_tk):
+    from views.componentes.campos import leer_campo, leer_opcion, limpiar_al_corregir, sin_error
+    lista = lista_opciones(raiz_tk, ["A"], vacia=True)
+    with pytest.raises(ValueError, match="Elija"):
+        leer_opcion(lista, {"A": 1}, "Elija algo.")
+    assert lista._sigtac_error
+    lista.set("A")
+    assert leer_opcion(lista, {"A": 1}, "Elija algo.") == 1 and not lista._sigtac_error
+    campo = campo_texto(raiz_tk)
+    campo.insert(0, "x")
+    with pytest.raises(ValueError):
+        leer_campo(campo, int)
+    limpiar_al_corregir(campo)
+    assert campo._entry.bind("<KeyRelease>")
+    sin_error(campo)
+    assert not campo._sigtac_error

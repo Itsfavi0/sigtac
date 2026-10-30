@@ -9,6 +9,7 @@ from models.excepciones import PersistenciaError, ReglaNegocioError
 from models.triaje import SignosVitales, Triaje
 from prototipo.demo import PacientesDemo, TriajeDemo
 from views import tema, triage_view
+from views.componentes.campos import sin_error
 from views.componentes.nivel import texto_nivel
 from models.excepciones import ConexionBDError
 from views.triage_view import (AVISO_BUSCAR, NADIE_ESPERA_TRIAJE, NO_REGISTRADO, SIGNOS, SIN_SUGERENCIA,
@@ -203,8 +204,8 @@ def test_buscar_un_paciente_registrado_muestra_su_ficha(crear):
     vista = crear()
     con_paciente_registrado(vista)
     assert vista._ficha.winfo_manager() == "pack" and vista._registro.winfo_manager() == ""
-    assert vista._ficha_nombre.cget("text") == "Carmen Rojas Llanos"
-    assert vista._ficha_datos.cget("text").endswith("mujer · SIS")
+    assert vista._ficha.nombre == "Carmen Rojas Llanos"
+    assert vista._ficha.datos.endswith("mujer · SIS (Seguro Integral de Salud)")
 
 
 def test_buscar_un_documento_nuevo_abre_el_registro(crear):
@@ -214,7 +215,7 @@ def test_buscar_un_documento_nuevo_abre_el_registro(crear):
     assert vista._registro.winfo_manager() == "pack"
     assert NO_REGISTRADO in [h.cget("text") for h in vista._registro.winfo_children() if isinstance(h, ctk.CTkLabel)]
     # El sexo y el seguro no toman un valor por omisión
-    assert vista._sexo.get() == "" and vista._seguro.get() == ""
+    assert vista._datos.sexo.get() == "" and vista._datos.seguro.get() == ""
 
 
 def test_un_documento_invalido_se_marca_y_se_explica_bajo_el_campo(crear):
@@ -276,7 +277,7 @@ def test_un_campo_marcado_pierde_el_rojo_al_corregirlo(crear):
     escribir(vista._edad_nn, "30")
     # Tk no entrega teclas a una ventana oculta: se comprueba la asociación y se ejecuta lo que hace la tecla
     assert vista._edad_nn._entry.bind("<KeyRelease>")
-    TriageView._sin_error(vista._edad_nn)
+    sin_error(vista._edad_nn)
     assert not vista._edad_nn._sigtac_error
 
 
@@ -429,11 +430,11 @@ def test_confirmar_un_paciente_nuevo_lo_registra_primero(crear):
     vista = crear()
     escribir(vista._documento.campo_numero, "48123456")
     vista.buscar()
-    escribir(vista._nombres, "Pedro")
-    escribir(vista._apellidos, "Quispe Mamani")
-    escribir(vista._fecha_nac, "14/03/1985")
-    vista._sexo.set("Varón")
-    vista._seguro.set("EsSalud")
+    escribir(vista._datos.nombres, "Pedro")
+    escribir(vista._datos.apellidos, "Quispe Mamani")
+    escribir(vista._datos.fecha_nac, "14/03/1985")
+    vista._datos.sexo.set("Varón")
+    vista._datos.seguro.set("EsSalud")
     escribir(vista._motivo, "Caída de altura")
     escribir_signos(vista)
     vista.confirmar()
@@ -458,7 +459,7 @@ def test_confirmar_sin_identificar(crear):
 def _nuevo_sin_fecha(vista):
     escribir(vista._documento.campo_numero, "48123456")
     vista.buscar()
-    escribir(vista._fecha_nac, "1985-03-14")
+    escribir(vista._datos.fecha_nac, "1985-03-14")
 
 
 @pytest.mark.parametrize("preparar, mensaje, campo", [
@@ -467,7 +468,7 @@ def _nuevo_sin_fecha(vista):
      lambda v: v._sexo_nn),
     (lambda v: (v._identidad.elegir("nn"), v._sexo_nn.set("Mujer"), escribir(v._edad_nn, "unos 30")),
      "La edad aparente debe ser un número entero.", lambda v: v._edad_nn),
-    (_nuevo_sin_fecha, "La fecha de nacimiento debe tener la forma dd/mm/aaaa", lambda v: v._fecha_nac),
+    (_nuevo_sin_fecha, "La fecha de nacimiento debe tener la forma dd/mm/aaaa", lambda v: v._datos.fecha_nac),
 ])
 def test_los_datos_que_faltan_se_avisan_y_marcan_su_campo_antes_de_escribir(crear, preparar, mensaje, campo):
     vista = crear()
@@ -536,11 +537,11 @@ def test_si_falla_abrir_el_episodio_el_reintento_no_vuelve_a_registrar_al_pacien
     vista = crear()
     escribir(vista._documento.campo_numero, "48123456")
     vista.buscar()
-    escribir(vista._nombres, "Pedro")
-    escribir(vista._apellidos, "Quispe")
-    escribir(vista._fecha_nac, "14/03/1985")
-    vista._sexo.set("Varón")
-    vista._seguro.set("EsSalud")
+    escribir(vista._datos.nombres, "Pedro")
+    escribir(vista._datos.apellidos, "Quispe")
+    escribir(vista._datos.fecha_nac, "14/03/1985")
+    vista._datos.sexo.set("Varón")
+    vista._datos.seguro.set("EsSalud")
     escribir_signos(vista)  # sin motivo de consulta
     vista.confirmar()
     assert [str(e) for e in vista.dialogos["error"]] == ["El motivo de consulta es obligatorio."]

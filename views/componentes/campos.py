@@ -7,7 +7,7 @@ from collections.abc import Callable, Sequence
 import customtkinter as ctk
 
 from views import tema
-from views.componentes.foco import marcar_foco, marcar_foco_control
+from views.componentes.foco import marcar_error, marcar_foco, marcar_foco_control
 
 LADO_CASILLA = 20  # el cuadro de una casilla: más chico que un campo, alineado con la letra de 13 px
 RADIO_CASILLA = 4  # proporcional a su lado, como RADIO_CONTROL lo es a un campo de 36
@@ -80,6 +80,73 @@ def abrir_lista(lista: ctk.CTkComboBox) -> str:
     if lista.cget("state") != "disabled":
         lista._open_dropdown_menu()
     return "break"
+
+
+# ---- Rejilla de campos: cada celda es una etiqueta con su campo debajo
+
+def celda(padre, etiqueta: str, fila: int, columna: int) -> ctk.CTkFrame:
+    """
+    El lugar de un campo en una rejilla, con su etiqueta. Entre columnas, ESPACIO (como el tipo y el número del
+    documento); entre filas, ESPACIO_2 arriba, así la última fila no suma margen al de la tarjeta.
+    """
+    marco = ctk.CTkFrame(padre, fg_color="transparent")
+    marco.grid(row=fila, column=columna, sticky="ew", padx=(0 if columna == 0 else tema.ESPACIO, 0),
+               pady=(0 if fila == 0 else tema.ESPACIO_2, 0))
+    etiqueta_campo(marco, etiqueta).pack(anchor="w", pady=(0, tema.ESPACIO_MINIMO))
+    return marco
+
+
+def campo_en_rejilla(padre, etiqueta: str, fila: int, columna: int, placeholder: str | None = None) -> ctk.CTkEntry:
+    campo = campo_texto(celda(padre, etiqueta, fila, columna), placeholder)
+    campo.pack(fill="x")
+    return campo
+
+
+def lista_en_rejilla(padre, etiqueta: str, valores: Sequence[str], fila: int, columna: int) -> ctk.CTkComboBox:
+    """Una lista de un dato del paciente: empieza sin elegir (un valor por omisión sería un dato falso)."""
+    lista = lista_opciones(celda(padre, etiqueta, fila, columna), valores, vacia=True)
+    lista.pack(fill="x")
+    return lista
+
+
+# ---- Leer lo escrito marcando el campo culpable
+
+def leer_campo(campo: ctk.CTkEntry, leer: Callable[[str], object]):
+    """Lee el texto de un campo con `leer`; si no se puede, el campo queda marcado y el ValueError sigue su camino."""
+    try:
+        valor = leer(campo.get())
+    except ValueError:
+        marcar_error(campo)
+        raise
+    marcar_error(campo, False)
+    return valor
+
+
+def leer_opcion(lista: ctk.CTkComboBox, valores: dict, mensaje: str):
+    """El valor de la opción elegida (`valores`: texto → valor); sin elegir, marca la lista y lanza ValueError."""
+    if lista.get() not in valores:
+        marcar_error(lista)
+        raise ValueError(mensaje)
+    marcar_error(lista, False)
+    return valores[lista.get()]
+
+
+def limpiar_al_corregir(*campos):
+    """
+    Un campo marcado con error pierde el borde rojo en cuanto se corrige: al escribir en él o al elegir otra opción.
+    Si no, quedaría rojo sin que nada diga por qué. A una lista le asigna su `command` (no debe tener otro).
+    """
+    for campo in campos:
+        if isinstance(campo, ctk.CTkComboBox):
+            campo.configure(command=lambda _valor, lista=campo: sin_error(lista))
+        else:
+            campo.bind("<KeyRelease>", lambda _e, caja=campo: sin_error(caja), add="+")
+
+
+def sin_error(campo):
+    """Quita el borde de error si el campo lo tiene (y deja el de foco si está enfocado)."""
+    if getattr(campo, "_sigtac_error", False):
+        marcar_error(campo, False)
 
 
 def casilla(padre, texto: str, comando: Callable[[], None] | None = None) -> ctk.CTkCheckBox:
