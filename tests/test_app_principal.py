@@ -5,9 +5,14 @@ import customtkinter as ctk
 import pytest
 
 from controllers.auth_controller import AuthController, Sesion
+from controllers.cama_controller import CamaController
+from controllers.reporte_controller import ReporteController
+from controllers.triaje_controller import TriajeController
 from models.permisos import Permiso, Rol, tiene_permiso
-from views import app_principal, tema
-from views.app_principal import MODULOS, TEXTO_PENDIENTE, TEXTO_SIN_MODULOS, AppPrincipal, formatear_fecha, iniciales
+from views import app_principal, formato, tema
+from views.app_principal import (MODULOS, PANTALLAS, SIN_CONEXION, TEXTO_PENDIENTE, TEXTO_SIN_MODULOS, AppPrincipal,
+                                 crear_tablero, iniciales)
+from views.dashboard_view import DashboardView
 
 
 def crear(raiz, sesion, pantallas=None):
@@ -116,14 +121,9 @@ def test_no_se_puede_abrir_un_modulo_que_el_rol_no_tiene(raiz_tk, sesion_de):
 
 # ---- Encabezado
 
-def test_formatear_fecha_en_espanol():
-    assert formatear_fecha(datetime(2026, 10, 27, 10, 42, 18)) == "Mar, 27 oct 2026"
-    assert formatear_fecha(datetime(2026, 11, 1)) == "Dom, 1 nov 2026"
-
-
 def test_el_encabezado_muestra_la_fecha_y_el_reloj(raiz_tk, sesion_de):
     vista, _, _ = crear(raiz_tk, sesion_de(Rol.MEDICO))
-    assert vista._fecha.cget("text") == formatear_fecha(datetime.now())
+    assert vista._fecha.cget("text") == formato.fecha_corta(datetime.now().date())
     assert len(vista._reloj.cget("text")) == len("10:42:18")
 
 
@@ -133,6 +133,52 @@ def test_marcar_actualizado_y_se_borra_al_cambiar_de_modulo(raiz_tk, sesion_de):
     assert vista._actualizado.cget("text") == "● Actualizado 10:42"  # con el punto verde del diseño
     vista.mostrar("triaje")
     assert vista._actualizado.cget("text") == ""  # la hora era de la pantalla anterior
+
+
+def test_informar_actualizacion_correcta_y_sin_conexion(raiz_tk, sesion_de):
+    # Es el al_actualizar del tablero: un fallo se ve en el encabezado, en rojo, sin abrir un diálogo
+    vista, _, _ = crear(raiz_tk, sesion_de(Rol.MEDICO))
+    vista.informar_actualizacion(False, datetime(2026, 10, 27, 10, 42))
+    assert vista._actualizado.cget("text") == f"● {SIN_CONEXION}"
+    assert tuple(vista._actualizado.cget("text_color")) == tema.COLOR_ERROR
+    vista.informar_actualizacion(True, datetime(2026, 10, 27, 10, 43))
+    assert vista._actualizado.cget("text") == "● Actualizado 10:43"
+    assert tuple(vista._actualizado.cget("text_color")) == tema.COLOR_EXITO
+
+
+# ---- Pantallas registradas
+
+def test_el_tablero_esta_registrado():
+    assert PANTALLAS == {"tablero": crear_tablero}
+
+
+def test_crear_tablero_usa_los_controladores_de_la_sesion(raiz_tk, sesion_de, monkeypatch):
+    recibidos = {}
+
+    class TableroFalso(ctk.CTkFrame):
+        def __init__(self, padre, camas, sesion, reportes, triaje, al_actualizar):
+            super().__init__(padre)
+            recibidos.update(camas=camas, sesion=sesion, reportes=reportes, triaje=triaje, aviso=al_actualizar)
+
+    monkeypatch.setattr(app_principal, "DashboardView", TableroFalso)
+    sesion = sesion_de(Rol.JEFE_GUARDIA)
+    vista, _, _ = crear(raiz_tk, sesion, pantallas={"tablero": crear_tablero})
+    assert isinstance(vista._pantalla, TableroFalso)
+    assert isinstance(recibidos["camas"], CamaController) and isinstance(recibidos["reportes"], ReporteController)
+    assert isinstance(recibidos["triaje"], TriajeController) and recibidos["sesion"] is sesion
+    assert recibidos["aviso"] == vista.informar_actualizacion
+
+
+def test_crear_tablero_acepta_otros_controladores(raiz_tk, sesion_de):
+    # Así el prototipo abre el tablero con los controladores de demostración, sin MySQL
+    from prototipo.demo import CamasDemo, ReportesDemo, TriajeDemo
+    sesion = sesion_de(Rol.JEFE_GUARDIA)
+    vista, _, _ = crear(raiz_tk, sesion)
+    tablero = crear_tablero(vista._contenido, sesion, vista, camas=CamasDemo(), reportes=ReportesDemo(),
+                            triaje=TriajeDemo())
+    assert isinstance(tablero, DashboardView)
+    assert vista._actualizado.cget("text").startswith("● Actualizado")
+    tablero.destroy()
 
 
 def test_al_destruirse_se_detiene_el_reloj(raiz_tk, sesion_de):

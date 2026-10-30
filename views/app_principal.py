@@ -14,10 +14,14 @@ from datetime import datetime
 import customtkinter as ctk
 
 from controllers.auth_controller import AuthController, Sesion
+from controllers.cama_controller import CamaController
+from controllers.reporte_controller import ReporteController
+from controllers.triaje_controller import TriajeController
 from models.permisos import Permiso
-from views import tema
+from views import formato, tema
 from views.componentes import BotonSecundario, Marca
 from views.componentes.foco import GROSOR_FOCO, fijar_borde, marcar_foco_control
+from views.dashboard_view import DashboardView
 
 
 @dataclass(frozen=True)
@@ -35,20 +39,22 @@ MODULOS = (
     Modulo("pacientes", "Pacientes", "Buscar, corregir e identificar pacientes", Permiso.PACIENTES),
 )
 
+def crear_tablero(padre, sesion: Sesion, principal: "AppPrincipal", camas=None, reportes=None, triaje=None):
+    """
+    El tablero con los controladores reales de la sesión. El prototipo pasa los de demostración en camas,
+    reportes y triaje (prototipo/ver.py).
+    """
+    return DashboardView(padre, camas or CamaController(sesion), sesion, reportes or ReporteController(sesion),
+                         triaje or TriajeController(sesion), al_actualizar=principal.informar_actualizacion)
+
+
 # clave del módulo → crear(padre, sesion, principal). Cada pantalla de la Fase 6 se agrega aquí al crearse.
-PANTALLAS: dict[str, Callable] = {}
+PANTALLAS: dict[str, Callable] = {"tablero": crear_tablero}
 
 PUNTO = "●"  # delante de «Actualizado», como en el tablero aprobado
+SIN_CONEXION = "Sin conexión"
 TEXTO_PENDIENTE ="Esta pantalla se agrega en el siguiente paso de la Fase 6."
 TEXTO_SIN_MODULOS = "Su rol no tiene módulos disponibles. Consulte con el administrador."
-
-DIAS = ("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
-MESES = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
-
-
-def formatear_fecha(momento: datetime) -> str:
-    """«Lun, 27 oct 2026», sin depender del idioma configurado en Windows."""
-    return f"{DIAS[momento.weekday()]}, {momento.day} {MESES[momento.month - 1]} {momento.year}"
 
 
 def iniciales(sesion: Sesion) -> str:
@@ -200,12 +206,24 @@ class AppPrincipal(ctk.CTkFrame):
 
     def marcar_actualizado(self, momento: datetime | None = None):
         """Lo llama la pantalla al cargar sus datos: «Actualizado 10:42» (brief §2: no «EN VIVO»)."""
-        self._actualizado.configure(text=f"{PUNTO} Actualizado {(momento or datetime.now()):%H:%M}")
+        self._actualizado.configure(text=f"{PUNTO} Actualizado {formato.hora(momento or datetime.now())}",
+                                    text_color=tema.COLOR_EXITO)
+
+    def marcar_sin_conexion(self):
+        """Lo llama la pantalla si no pudo leer sus datos: sigue mostrando lo último que leyó."""
+        self._actualizado.configure(text=f"{PUNTO} {SIN_CONEXION}", text_color=tema.COLOR_ERROR)
+
+    def informar_actualizacion(self, correcta: bool, momento: datetime):
+        """El aviso que reciben las pantallas que se actualizan solas (al_actualizar del tablero)."""
+        if correcta:
+            self.marcar_actualizado(momento)
+        else:
+            self.marcar_sin_conexion()
 
     def _actualizar_reloj(self):
         ahora = datetime.now()
-        self._fecha.configure(text=formatear_fecha(ahora))
-        self._reloj.configure(text=f"{ahora:%H:%M:%S}")
+        self._fecha.configure(text=formato.fecha_corta(ahora.date()))
+        self._reloj.configure(text=formato.hora(ahora, con_segundos=True))
         self._tarea_reloj = self.after(self.MS_RELOJ, self._actualizar_reloj)
 
     # ---- Módulos
