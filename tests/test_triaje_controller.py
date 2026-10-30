@@ -6,7 +6,7 @@ from controllers import triaje_controller
 from controllers.triaje_controller import Sugerencia, TriajeController
 from models.auditoria import AccionAuditoria
 from models.estados import EstadoEpisodio
-from models.estrategias import EstrategiaTriaje, ReglaManchester, ReglaMINSA
+from models.estrategias import Clasificacion, EstrategiaTriaje, ReglaManchester, ReglaMINSA
 from models.excepciones import (NivelTriajeInvalidoError, PersistenciaError, ReglaNegocioError,
                                 SignosVitalesIncompletosError, UsuarioSinPermisoError)
 from models.permisos import Rol
@@ -25,8 +25,8 @@ class EstrategiaFija(EstrategiaTriaje):
     def __init__(self, nivel=3):
         self.nivel = nivel
 
-    def clasificar(self, signos_vitales, sintomas):
-        return self.nivel
+    def evaluar(self, signos_vitales, sintomas):
+        return Clasificacion(self.nivel, ("Criterio de prueba",))
 
     def justificar(self):
         return "Protocolo de prueba."
@@ -103,8 +103,12 @@ def test_cola_de_triaje_es_la_de_episodios_sin_triaje(monkeypatch, ctrl):
 def test_sugerir_usa_la_estrategia_y_no_guarda_nada(datos, sesion_de):
     ctrl = TriajeController(sesion_de(Rol.ENFERMERO), ReglaManchester())
     sugerencia = ctrl.sugerir(SIGNOS, [2])  # dolor torácico (8.5) → Manchester nivel 2
-    assert sugerencia == Sugerencia(2, ReglaManchester().justificar())
+    assert sugerencia == Sugerencia(2, ReglaManchester().justificar(), ("Peso de los síntomas 8.5 ≥ 7",))
     assert datos.llamadas() == ["TriajeDAO.listar_sintomas"]
+
+
+def test_sugerir_devuelve_los_criterios_de_la_estrategia(datos, ctrl):
+    assert ctrl.sugerir(SIGNOS, []).criterios == ("Criterio de prueba",)
 
 
 def test_sugerir_sin_sintomas_no_consulta_el_catalogo(datos, ctrl):

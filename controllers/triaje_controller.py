@@ -16,9 +16,13 @@ from models.triaje import SignosVitales, Sintoma, Triaje
 
 @dataclass(frozen=True)
 class Sugerencia:
-    """Nivel que propone la estrategia de triaje y el protocolo en que se basa (para mostrarlo al profesional)."""
+    """
+    Nivel que propone la estrategia de triaje, el protocolo en que se basa y los criterios que lo decidieron
+    (para mostrarlos al profesional).
+    """
     nivel: int
     protocolo: str
+    criterios: tuple[str, ...]
 
 
 class TriajeController:
@@ -54,11 +58,11 @@ class TriajeController:
         return armar_cola(EstadoEpisodio.EN_ESPERA_TRIAJE)
 
     def sugerir(self, signos: dict, ids_sintomas) -> Sugerencia:
-        """Nivel que sugiere la estrategia, sin guardar nada (la vista lo muestra antes de confirmar)."""
+        """Nivel que sugiere la estrategia y sus criterios, sin guardar nada (la vista los muestra antes de confirmar)."""
         exigir_permiso(self._sesion, Permiso.TRIAJE)
         signos_vitales = self._crear_signos(signos)
-        nivel = self._estrategia.clasificar(signos_vitales.a_diccionario(), self._buscar_sintomas(ids_sintomas))
-        return Sugerencia(nivel, self._estrategia.justificar())
+        clasificacion = self._estrategia.evaluar(signos_vitales.a_diccionario(), self._buscar_sintomas(ids_sintomas))
+        return Sugerencia(clasificacion.nivel, self._estrategia.justificar(), clasificacion.criterios)
 
     # ---- Registro
 

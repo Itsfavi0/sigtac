@@ -244,6 +244,8 @@ def ejecutar_flujo(otra_pc):
     comprobar("cada entrada de la cola trae su paciente", all(e.paciente is not None for e in cola))
     sugerencia = triajes.sugerir(SIGNOS, [7])  # dolor abdominal intenso (5.0) → Manchester 3
     comprobar("sugerir: Manchester propone nivel 3 para dolor abdominal", sugerencia.nivel == 3)
+    comprobar("sugerir: el criterio sale del peso del catálogo real",
+              sugerencia.criterios == ("Peso de los síntomas 5 ≥ 4",))
     id_t_ana = triajes.registrar(ep_ana.id_episodio, SIGNOS, [7])
     comprobar("el primer triaje pasa el episodio a EN ESPERA DE CAMA", estado_ep(ep_ana.id_episodio) == "EN ESPERA DE CAMA")
     comprobar("el triaje queda con sugerido = final = 3 y su síntoma",
