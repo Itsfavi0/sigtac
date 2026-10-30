@@ -15,6 +15,7 @@ import customtkinter as ctk
 
 from controllers.auth_controller import AuthController, Sesion
 from controllers.cama_controller import CamaController
+from controllers.paciente_controller import PacienteController
 from controllers.reporte_controller import ReporteController
 from controllers.triaje_controller import TriajeController
 from models.permisos import Permiso
@@ -22,6 +23,7 @@ from views import formato, tema
 from views.componentes import BotonSecundario, Marca
 from views.componentes.foco import GROSOR_FOCO, fijar_borde, marcar_foco_control
 from views.dashboard_view import DashboardView
+from views.triage_view import TriageView
 
 
 @dataclass(frozen=True)
@@ -48,8 +50,13 @@ def crear_tablero(padre, sesion: Sesion, principal: "AppPrincipal", camas=None, 
                          triaje or TriajeController(sesion), al_actualizar=principal.informar_actualizacion)
 
 
+def crear_triaje(padre, sesion: Sesion, principal: "AppPrincipal", pacientes=None, triaje=None):
+    """El triaje con los controladores reales de la sesión; el prototipo pasa los de demostración."""
+    return TriageView(padre, pacientes or PacienteController(sesion), triaje or TriajeController(sesion))
+
+
 # clave del módulo → crear(padre, sesion, principal). Cada pantalla de la Fase 6 se agrega aquí al crearse.
-PANTALLAS: dict[str, Callable] = {"tablero": crear_tablero}
+PANTALLAS: dict[str, Callable] = {"tablero": crear_tablero, "triaje": crear_triaje}
 
 PUNTO = "●"  # delante de «Actualizado», como en el tablero aprobado
 SIN_CONEXION = "Sin conexión"

@@ -1,5 +1,6 @@
 """
-Cómo se escriben en pantalla los datos del modelo: nombres, documentos, tiempos y fechas.
+Cómo se escriben en pantalla los datos del modelo (nombres, documentos, tiempos y fechas) y cómo se leen los números
+y las fechas que escribe el usuario.
 
 Son funciones puras (sin widgets) para probarlas sin ventana. No contienen reglas de negocio: el plazo de cada
 nivel y si se excede vienen de models/triaje.py; aquí solo se decide cómo se lee.
@@ -10,7 +11,7 @@ from models.persona import Paciente
 from models.triaje import TIEMPO_MAXIMO_POR_NIVEL
 
 SIN_DOCUMENTO = "Sin documento"
-_SEXO = {"M": "varón", "F": "mujer"}
+SEXO = {"M": "varón", "F": "mujer"}
 _DIAS = ("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
 _MESES = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
 
@@ -18,7 +19,7 @@ _MESES = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", 
 def nombre_corto(paciente: Paciente) -> str:
     """«María Salazar Quispe» → «M. Salazar»; un NN → «NN · varón, ~40 años» (lo que se sabe de él)."""
     if not paciente.identificado:
-        return f"NN · {_SEXO[paciente.sexo]}, ~{paciente.calcular_edad()} años"
+        return f"NN · {SEXO[paciente.sexo]}, ~{paciente.calcular_edad()} años"
     return f"{paciente.nombres.strip()[0]}. {paciente.apellidos.split()[0]}"
 
 
@@ -62,3 +63,26 @@ def hora(momento: datetime, con_segundos: bool = False) -> str:
 def porcentaje(parte: int, total: int) -> str:
     """«42 %»; sin total, «—»."""
     return f"{round(100 * parte / total)} %" if total else "—"
+
+
+# ---- Lo que escribe el usuario: texto → dato. Un texto que no se puede leer es un ValueError con su mensaje.
+
+def leer_numero(texto: str, nombre: str, decimales: bool = False) -> int | float:
+    """
+    «120» → 120; con decimales, «37,5» o «37.5» → 37.5 (en Perú se escriben las dos). Si no es un número, el
+    ValueError dice qué campo es («Temperatura debe ser un número.»). No decide rangos: eso es del modelo.
+    """
+    limpio = texto.strip().replace(",", ".") if decimales else texto.strip()
+    try:
+        return float(limpio) if decimales else int(limpio)
+    except ValueError:
+        tipo = "un número" if decimales else "un número entero"
+        raise ValueError(f"{nombre} debe ser {tipo}.") from None
+
+
+def leer_fecha(texto: str, nombre: str) -> date:
+    """«14/03/1985» → date(1985, 3, 14). Otra forma, o una fecha que no existe, es un ValueError."""
+    try:
+        return datetime.strptime(texto.strip(), "%d/%m/%Y").date()
+    except ValueError:
+        raise ValueError(f"{nombre} debe tener la forma dd/mm/aaaa (por ejemplo, 14/03/1985).") from None

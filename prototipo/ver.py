@@ -4,6 +4,7 @@ Abre la aplicación con los controladores de demostración (sin MySQL), para ver
     python -m prototipo.ver                                   # jefe de guardia, modo claro
     python -m prototipo.ver --rol "Personal de Limpieza" --modo oscuro --tamano 1093x614
     python -m prototipo.ver --captura docs/diseno/app.png     # guarda una captura y cierra
+    python -m prototipo.ver --pantalla triaje                 # abre directamente el triaje
 
 Los datos son inventados (prototipo/demo.py).
 """
@@ -14,13 +15,16 @@ import customtkinter as ctk
 
 from controllers.auth_controller import AuthController
 from models.permisos import Rol
-from prototipo.demo import CamasDemo, ReportesDemo, TriajeDemo, sesion_demo
+from prototipo.demo import CamasDemo, PacientesDemo, ReportesDemo, TriajeDemo, sesion_demo
 from views import tema
-from views.app_principal import AppPrincipal, crear_tablero
+from views.app_principal import AppPrincipal, crear_tablero, crear_triaje
 
-# Las mismas pantallas que la aplicación, con los controladores de demostración
+# Las mismas pantallas que la aplicación, con los controladores de demostración. Comparten la cola de triaje: un
+# paciente admitido en Triaje se cuenta en el tablero («Esperan triaje»).
+_TRIAJE = TriajeDemo()
 PANTALLAS_DEMO = {
-    "tablero": partial(crear_tablero, camas=CamasDemo(), reportes=ReportesDemo(), triaje=TriajeDemo()),
+    "tablero": partial(crear_tablero, camas=CamasDemo(), reportes=ReportesDemo(), triaje=_TRIAJE),
+    "triaje": partial(crear_triaje, pacientes=PacientesDemo(_TRIAJE), triaje=_TRIAJE),
 }
 
 
@@ -30,6 +34,7 @@ def main():
     argumentos.add_argument("--modo", default="claro", choices=["claro", "oscuro"])
     argumentos.add_argument("--tamano", default="1280x800", help="ancho x alto de la ventana (p. ej. 1093x614)")
     argumentos.add_argument("--captura", help="guarda una captura PNG de la ventana y la cierra")
+    argumentos.add_argument("--pantalla", choices=list(PANTALLAS_DEMO), help="abre ese módulo en lugar del primero")
     opciones = argumentos.parse_args()
 
     tema.aplicar()
@@ -37,8 +42,11 @@ def main():
     ventana = ctk.CTk(fg_color=tema.COLOR_FONDO)
     ventana.geometry(f"{opciones.tamano}+0+0")
     ventana.minsize(*tema.TAMANO_MINIMO)
-    AppPrincipal(ventana, AuthController(), sesion_demo(Rol(opciones.rol)), al_cerrar=ventana.destroy,
-                 pantallas=PANTALLAS_DEMO).pack(fill="both", expand=True)
+    principal = AppPrincipal(ventana, AuthController(), sesion_demo(Rol(opciones.rol)), al_cerrar=ventana.destroy,
+                             pantallas=PANTALLAS_DEMO)
+    principal.pack(fill="both", expand=True)
+    if opciones.pantalla:
+        principal.mostrar(opciones.pantalla)
     if opciones.captura:
         _capturar_y_cerrar(ventana, opciones.captura)
     ventana.mainloop()

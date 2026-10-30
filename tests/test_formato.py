@@ -71,3 +71,32 @@ def test_porcentaje(parte, total, texto):
 def test_texto_minutos_sin_cero():
     assert formato.texto_minutos(8, con_cero=False) == "8 min"
     assert formato.texto_minutos(75, con_cero=False) == "1 h 15 min"
+
+
+# ---- Lo que escribe el usuario
+
+@pytest.mark.parametrize("texto, decimales, valor", [
+    ("120", False, 120), (" 88 ", False, 88), ("37,5", True, 37.5), ("37.5", True, 37.5), ("38", True, 38.0),
+])
+def test_leer_numero(texto, decimales, valor):
+    assert formato.leer_numero(texto, "Campo", decimales) == valor
+
+
+@pytest.mark.parametrize("texto, decimales, mensaje", [
+    ("", False, "Campo debe ser un número entero."), ("9x", False, "Campo debe ser un número entero."),
+    ("37,5", False, "Campo debe ser un número entero."),  # un signo entero no acepta decimales
+    ("abc", True, "Campo debe ser un número."),
+])
+def test_leer_numero_invalido(texto, decimales, mensaje):
+    with pytest.raises(ValueError, match=mensaje):
+        formato.leer_numero(texto, "Campo", decimales)
+
+
+def test_leer_fecha():
+    assert formato.leer_fecha(" 14/03/1985 ", "La fecha") == date(1985, 3, 14)
+
+
+@pytest.mark.parametrize("texto", ["", "1985-03-14", "31/02/1985", "14/3/85"])
+def test_leer_fecha_invalida(texto):
+    with pytest.raises(ValueError, match="La fecha debe tener la forma dd/mm/aaaa"):
+        formato.leer_fecha(texto, "La fecha")
