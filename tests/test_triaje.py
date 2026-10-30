@@ -4,7 +4,8 @@ from datetime import datetime, timedelta
 import pytest
 
 from models.excepciones import NivelTriajeInvalidoError, ReglaNegocioError
-from models.triaje import EpisodioEmergencia, SignosVitales, Sintoma, Triaje, ordenar_por_prioridad
+from models.triaje import (EpisodioEmergencia, SignosVitales, Sintoma, Triaje, excede_plazo,
+                           ordenar_por_prioridad)
 
 AHORA = datetime(2026, 10, 11, 12, 0)
 
@@ -441,3 +442,22 @@ def test_un_episodio_anulado_no_se_cierra(cerrar):
     ep.anular()
     with pytest.raises(ReglaNegocioError, match="anulado"):
         cerrar(ep)
+
+
+@pytest.mark.parametrize("nivel, minutos, excede", [
+    (1, 0, False), (1, 1, True),          # nivel 1: inmediato, cualquier espera ya excede
+    (2, 10, False), (2, 11, True),        # límite exacto: 10 min no excede
+    (3, 60, False), (3, 60.5, True),
+    (5, 240, False), (5, 241, True),
+])
+def test_excede_plazo(nivel, minutos, excede):
+    assert excede_plazo(nivel, minutos) is excede
+
+
+@pytest.mark.parametrize("nivel, minutos, error", [
+    (0, 5, NivelTriajeInvalidoError), (6, 5, NivelTriajeInvalidoError), (2, -1, ValueError), (2, "5", ValueError),
+    (2, True, ValueError),
+])
+def test_excede_plazo_con_datos_invalidos(nivel, minutos, error):
+    with pytest.raises(error):
+        excede_plazo(nivel, minutos)

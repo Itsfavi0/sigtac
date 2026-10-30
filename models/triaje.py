@@ -7,6 +7,18 @@ from models.excepciones import NivelTriajeInvalidoError, ReglaNegocioError
 # Color de cada nivel de triaje (1 = el más urgente). Coincide con la tabla nivel_triaje de seed.sql.
 COLOR_POR_NIVEL = {1: "Rojo", 2: "Naranja", 3: "Amarillo", 4: "Verde", 5: "Azul"}
 
+# Tiempo máximo de espera de cada nivel, en minutos (nivel_triaje.tiempo_max_min de seed.sql). 0 = inmediato.
+TIEMPO_MAXIMO_POR_NIVEL = {1: 0, 2: 10, 3: 60, 4: 120, 5: 240}
+
+
+def excede_plazo(nivel: int, minutos_espera: int | float) -> bool:
+    """Indica si un paciente de ese nivel lleva esperando más que el tiempo máximo de su nivel."""
+    if not _es_nivel_valido(nivel):
+        raise NivelTriajeInvalidoError("El nivel de triaje debe estar entre 1 (Rojo) y 5 (Azul).")
+    if isinstance(minutos_espera, bool) or not isinstance(minutos_espera, (int, float)) or minutos_espera < 0:
+        raise ValueError("Los minutos de espera deben ser un número no negativo.")
+    return minutos_espera > TIEMPO_MAXIMO_POR_NIVEL[nivel]
+
 
 def _es_nivel_valido(nivel) -> bool:
     # Solo enteros del 1 al 5: True (que vale 1) o 2.0 también pasarían un simple "in range(1, 6)".

@@ -11,7 +11,7 @@ from models.documento import TipoDocumento
 from models.estados import EstadoCama, EstadoEpisodio
 from models.permisos import Rol
 from models.persona import Paciente, PersonalLimpieza
-from models.triaje import COLOR_POR_NIVEL, Triaje
+from models.triaje import COLOR_POR_NIVEL, TIEMPO_MAXIMO_POR_NIVEL, Triaje
 
 DB_SCRIPTS = Path(__file__).resolve().parent.parent / "db_scripts"
 SEED = (DB_SCRIPTS / "seed.sql").read_text(encoding="utf-8")
@@ -64,6 +64,12 @@ def test_los_colores_de_los_niveles_coinciden_con_el_seed():
     bloque = re.search(r"INSERT INTO nivel_triaje \(.*?\) VALUES(.*?);", SEED, re.S).group(1)
     colores = {int(n): color for n, color in re.findall(r"\(\d+, (\d+), '([^']+)', \d+\)", bloque)}
     assert COLOR_POR_NIVEL == colores
+
+
+def test_los_plazos_de_los_niveles_coinciden_con_el_seed():
+    bloque = re.search(r"INSERT INTO nivel_triaje \(.*?\) VALUES(.*?);", SEED, re.S).group(1)
+    plazos = {int(n): int(m) for n, m in re.findall(r"\(\d+, (\d+), '[^']+', (\d+)\)", bloque)}
+    assert TIEMPO_MAXIMO_POR_NIVEL == plazos
 
 
 def test_el_minimo_de_la_justificacion_coincide_con_el_check():
