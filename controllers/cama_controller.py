@@ -1,3 +1,6 @@
+from dataclasses import dataclass
+from datetime import datetime
+
 from controllers.auth_controller import Sesion, exigir_permiso
 from controllers.colas import EntradaCola, armar_cola
 from dao.asignacion_dao import AsignacionDAO
@@ -12,12 +15,26 @@ from models.cama import Cama
 from models.estados import EstadoCama, EstadoEpisodio
 from models.excepciones import CamaNoDisponibleError, ReglaNegocioError
 from models.permisos import Permiso
+from models.persona import Paciente
 from models.triaje import EpisodioEmergencia
+
+
+@dataclass(frozen=True)
+class PacienteEnCama:
+    """Una cama reservada u ocupada con su paciente, lista para mostrarse en la vista."""
+    cama: Cama
+    episodio: EpisodioEmergencia
+    paciente: Paciente | None  # None solo si el paciente no se pudo leer (no debería ocurrir: FK)
+    fecha_asignacion: datetime
+
+    @property
+    def nivel(self) -> int | None:
+        return self.episodio.nivel_actual
 
 
 class CamaController:
     """
-    Gestión de camas: mapa y cola de espera (VER_CAMAS); asignar, ocupar, cancelar, dar de alta,
+    Gestión de camas: mapa y cola de espera (VER_CAMAS); pacientes con cama, asignar, ocupar, cancelar, dar de alta,
     referir, registrar una fuga y sacar o devolver una cama al servicio (GESTION_CAMAS); confirmar la
     limpieza (LIMPIEZA).
 
@@ -55,6 +72,26 @@ class CamaController:
         episodio = self._cargar_episodio(id_episodio)
         nivel = self._exigir_nivel(episodio)
         return [cama for cama in CamaDAO.listar_disponibles() if cama.es_compatible(nivel)]
+
+    def pacientes_con_cama(self) -> list[PacienteEnCama]:
+        """
+        Las camas con una asignación vigente (reservadas u ocupadas) y el paciente de cada una, en el orden del
+        mapa (área y código). Las lecturas van en una transacción, como armar_cola, para que camas, asignaciones y
+        episodios salgan de la misma foto de la BD. Si una asignación vigente apunta a un episodio que no está en
+        atención (un dato inconsistente), no se muestra.
+        """
+        exigir_permiso(self._sesion, Permiso.GESTION_CAMAS)
+        with transaccion():
+            camas = CamaDAO.listar_activas()
+            por_cama = {a.id_cama: a for a in AsignacionDAO.listar_vigentes()}
+            en_atencion = {e.episodio.id_episodio: e for e in armar_cola(EstadoEpisodio.EN_ATENCION)}
+        resultado = []
+        for cama in camas:
+            asignacion = por_cama.get(cama.id_cama)
+            entrada = en_atencion.get(asignacion.id_episodio) if asignacion else None
+            if entrada is not None:
+                resultado.append(PacienteEnCama(cama, entrada.episodio, entrada.paciente, asignacion.fecha_asignacion))
+        return resultado
 
     def solicitudes_limpieza(self) -> list[SolicitudLimpieza]:
         """Bandeja del personal de limpieza: solicitudes pendientes, de la más antigua a la más reciente."""
@@ -215,7 +252,7 @@ class CamaController:
         confirma la limpieza.
         """
         sesion = exigir_permiso(self._sesion, Permiso.GESTION_CAMAS)
-        motivo = self._validar_motivo(motivo)
+        motivo = self.validar_motivo(motivo)
         with transaccion():
             cama = self._cargar_cama(id_cama)
             if cama.estado == EstadoCama.FUERA_SERVICIO:
@@ -245,7 +282,7 @@ class CamaController:
                                    {"estado_anterior": anterior.value, "estado_nuevo": cama.estado.value})
 
     @classmethod
-    def _validar_motivo(cls, motivo) -> str:
+    def validar_motivo(cls, motivo) -> str:
         if not isinstance(motivo, str) or not motivo.strip():
             raise ValueError("El motivo es obligatorio.")
         if len(motivo.strip()) > cls.MAX_MOTIVO:

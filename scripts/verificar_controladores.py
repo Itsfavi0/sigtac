@@ -306,7 +306,14 @@ def ejecutar_flujo(otra_pc):
               and estado_cama(3) == "RESERVADA")
     camas.ocupar(3)
     comprobar("ocupar: RESERVADA → OCUPADA, auditado", estado_cama(3) == "OCUPADA" and bitacora("cama", "UPDATE", 3) == 1)
+    con_cama = camas.pacientes_con_cama()
+    vigentes = valor("SELECT COUNT(*) FROM asignacion_cama WHERE fecha_liberacion IS NULL AND estado_registro = TRUE")
+    comprobar("pacientes_con_cama: la cama 3 con el episodio 2 y su paciente, una fila por asignación vigente",
+              any(p.cama.id_cama == 3 and p.episodio.id_episodio == 2 and p.paciente is not None for p in con_cama)
+              and len(con_cama) == vigentes)
     id_sol = camas.dar_alta(2)
+    comprobar("después del alta, la cama 3 ya no figura con paciente",
+              all(p.cama.id_cama != 3 for p in camas.pacientes_con_cama()))
     comprobar("dar_alta: episodio ALTA con fecha de alta, cama EN LIMPIEZA, asignación liberada, solicitud pendiente",
               estado_ep(2) == "ALTA MÉDICA"
               and valor("SELECT fecha_alta IS NOT NULL FROM episodio_emergencia WHERE id_episodio = 2") == 1

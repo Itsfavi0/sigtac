@@ -4,6 +4,7 @@ import pytest
 
 from controllers import cama_controller
 from controllers.cama_controller import CamaController
+from controllers.colas import EntradaCola
 from models.asignacion import AsignacionCama, SolicitudLimpieza
 from models.auditoria import AccionAuditoria
 from models.cama import CamaObservacion, CamaTraumaShock, CamaUCI
@@ -46,7 +47,7 @@ def limpieza(sesion_de):
 
 # ---- Permisos
 
-GESTION = [("camas_compatibles", (7,)), ("asignar", (7, 3)), ("ocupar", (3,)),
+GESTION = [("pacientes_con_cama", ()), ("camas_compatibles", (7,)), ("asignar", (7, 3)), ("ocupar", (3,)),
            ("cancelar_asignacion", (7,)), ("dar_alta", (7,)), ("referir", (7,)), ("registrar_fuga", (7,)),
            ("poner_fuera_de_servicio", (3, "Monitor dañado")), ("volver_a_servicio", (3,))]
 LIMPIEZA = [("solicitudes_limpieza", ()), ("confirmar_limpieza", (1,))]
@@ -81,6 +82,32 @@ def test_cola_de_espera_es_la_de_episodios_con_triaje(monkeypatch, sesion_de):
     monkeypatch.setattr(cama_controller, "armar_cola", lambda estado: pedidos.append(estado) or ["cola"])
     assert CamaController(sesion_de(Rol.ENFERMERO)).cola_de_espera() == ["cola"]
     assert pedidos == [EstadoEpisodio.EN_ESPERA]
+
+
+def test_pacientes_con_cama_en_el_orden_del_mapa(datos, ctrl, monkeypatch):
+    reservada, ocupada = CamaTraumaShock(1, "TRA-01", "Trauma", EstadoCama.RESERVADA), uci(EstadoCama.OCUPADA)
+    datos["CamaDAO"].listar_activas.return_value = [reservada, ocupada,
+                                                    CamaObservacion(6, "OBS-01", "Obs", EstadoCama.DISPONIBLE)]
+    datos["AsignacionDAO"].listar_vigentes.return_value = [ASIGNACION, AsignacionCama(6, 8, 1, 20, AHORA)]
+    en_atencion = episodio(EstadoEpisodio.EN_ATENCION)
+    otro = EpisodioEmergencia(8, 2, "Trauma", estado=EstadoEpisodio.EN_ATENCION, fecha_ingreso=AHORA,
+                              triajes=(Triaje(2, 1, 20, AHORA),))
+    pedidos = []
+    monkeypatch.setattr(cama_controller, "armar_cola", lambda estado: pedidos.append(estado) or [
+        EntradaCola(1, otro, "paciente 2"), EntradaCola(2, en_atencion, "paciente 1")])
+    con_cama = ctrl.pacientes_con_cama()
+    assert [(p.cama.codigo, p.episodio.id_episodio, p.paciente, p.nivel) for p in con_cama] == [
+        ("TRA-01", 8, "paciente 2", 1), ("UCI-01", 7, "paciente 1", 2)]
+    assert con_cama[0].fecha_asignacion == AHORA
+    assert pedidos == [EstadoEpisodio.EN_ATENCION]
+    assert datos.llamadas() == ["inicio", "CamaDAO.listar_activas", "AsignacionDAO.listar_vigentes", "commit"]
+
+
+def test_pacientes_con_cama_omite_una_asignacion_sin_episodio_en_atencion(datos, ctrl, monkeypatch):
+    datos["CamaDAO"].listar_activas.return_value = [uci(EstadoCama.OCUPADA)]
+    datos["AsignacionDAO"].listar_vigentes.return_value = [ASIGNACION]
+    monkeypatch.setattr(cama_controller, "armar_cola", lambda estado: [])
+    assert ctrl.pacientes_con_cama() == []
 
 
 def test_camas_compatibles_con_el_nivel_del_triaje(datos, ctrl):

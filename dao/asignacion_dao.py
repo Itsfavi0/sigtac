@@ -74,6 +74,14 @@ class AsignacionDAO(BaseDAO):
         return AsignacionDAO._a_asignacion(fila) if fila else None
 
     @staticmethod
+    def listar_vigentes() -> list[AsignacionCama]:
+        """Todas las asignaciones vigentes (qué episodio está en qué cama), de la más antigua a la más reciente."""
+        filas = AsignacionDAO._consultar_varios(
+            AsignacionDAO._SELECT + " WHERE TRUE" + AsignacionDAO._VIGENTE + " ORDER BY fecha_asignacion, id_asignacion"
+        )
+        return [AsignacionDAO._a_asignacion(fila) for fila in filas]
+
+    @staticmethod
     def liberar(id_asignacion: int) -> None:
         """
         Cierra la asignación al dar de alta (RN-07): pone la fecha de liberación (reloj de MySQL).

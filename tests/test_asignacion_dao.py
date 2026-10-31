@@ -106,6 +106,20 @@ def test_buscar_con_id_invalido_no_consulta_la_bd(monkeypatch, metodo):
     bd.clase.assert_not_called()
 
 
+def test_listar_vigentes(monkeypatch):
+    bd = BD(monkeypatch, rows=[fila_asignacion(), fila_asignacion(id_asignacion=2, id_episodio=4, id_cama=6)])
+    vigentes = AsignacionDAO.listar_vigentes()
+    assert [(a.id_episodio, a.id_cama) for a in vigentes] == [(1, 1), (4, 6)]
+    assert all(a.vigente for a in vigentes)
+    assert ("WHERE TRUE AND fecha_liberacion IS NULL AND estado_registro = TRUE "
+            "ORDER BY fecha_asignacion, id_asignacion") in bd.sql
+
+
+def test_listar_vigentes_vacio(monkeypatch):
+    BD(monkeypatch, rows=[])
+    assert AsignacionDAO.listar_vigentes() == []
+
+
 # ---- AsignacionDAO.liberar (RN-07)
 def test_liberar_pone_la_fecha_con_el_reloj_de_mysql(monkeypatch):
     bd = BD(monkeypatch, rowcount=1)
@@ -153,7 +167,8 @@ def test_anular_con_id_invalido_no_llega_a_la_bd(monkeypatch):
 
 def test_asignacion_dao_no_borra():  # el historial de asignaciones se conserva
     publicos = {nombre for nombre in vars(AsignacionDAO) if not nombre.startswith("_")}
-    assert publicos == {"crear", "buscar_vigente_por_episodio", "buscar_vigente_por_cama", "liberar", "anular"}
+    assert publicos == {"crear", "buscar_vigente_por_episodio", "buscar_vigente_por_cama", "listar_vigentes",
+                        "liberar", "anular"}
 
 
 # ---- SolicitudLimpiezaDAO
