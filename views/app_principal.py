@@ -22,7 +22,9 @@ from models.permisos import Permiso
 from views import formato, tema
 from views.componentes import BotonSecundario, Marca
 from views.componentes.foco import GROSOR_FOCO, fijar_borde, marcar_foco_control
+from views.camas_view import GestionCamasView
 from views.dashboard_view import DashboardView
+from views.limpieza_view import LimpiezaView
 from views.pacientes_view import PacientesView
 from views.triage_view import TriageView
 
@@ -35,11 +37,13 @@ class Modulo:
     permiso: Permiso   # sin él, el módulo no aparece en el menú
 
 
-# En el orden del menú. Cola de espera, limpieza y reportes no se muestran hasta que tengan pantalla (brief §2).
+# En el orden del menú. Reportes y administración no se muestran hasta que tengan pantalla (brief §2).
 MODULOS = (
     Modulo("tablero", "Tablero de camas", "Estado de la guardia en este momento", Permiso.VER_CAMAS),
     Modulo("triaje", "Triaje", "Registrar al paciente y clasificar su prioridad", Permiso.TRIAJE),
+    Modulo("camas", "Gestión de camas", "Asignar camas, dar de alta y mantenimiento", Permiso.GESTION_CAMAS),
     Modulo("pacientes", "Pacientes", "Buscar, corregir e identificar pacientes", Permiso.PACIENTES),
+    Modulo("limpieza", "Limpieza", "Camas dadas de alta que esperan limpieza", Permiso.LIMPIEZA),
 )
 
 def crear_tablero(padre, sesion: Sesion, principal: "AppPrincipal", camas=None, reportes=None, triaje=None):
@@ -71,8 +75,19 @@ def crear_pacientes(padre, sesion: Sesion, principal: "AppPrincipal", pacientes=
                          registrar_en_triaje if "triaje" in principal.modulos_visibles else None)
 
 
+def crear_camas(padre, sesion: Sesion, principal: "AppPrincipal", camas=None):
+    """Gestión de camas con el controlador real; el prototipo pasa el de demostración."""
+    return GestionCamasView(padre, camas or CamaController(sesion))
+
+
+def crear_limpieza(padre, sesion: Sesion, principal: "AppPrincipal", camas=None):
+    """Limpieza con el controlador real; el prototipo pasa el de demostración."""
+    return LimpiezaView(padre, camas or CamaController(sesion))
+
+
 # clave del módulo → crear(padre, sesion, principal). Cada pantalla de la Fase 6 se agrega aquí al crearse.
-PANTALLAS: dict[str, Callable] = {"tablero": crear_tablero, "triaje": crear_triaje, "pacientes": crear_pacientes}
+PANTALLAS: dict[str, Callable] = {"tablero": crear_tablero, "triaje": crear_triaje, "camas": crear_camas,
+                                  "pacientes": crear_pacientes, "limpieza": crear_limpieza}
 
 PUNTO = "●"  # delante de «Actualizado», como en el tablero aprobado
 SIN_CONEXION = "Sin conexión"

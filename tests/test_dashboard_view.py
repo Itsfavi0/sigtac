@@ -69,8 +69,9 @@ def test_la_cola_muestra_tres_y_resume_el_resto(crear):
     vista = crear()
     visibles = textos(vista._filas)
     assert ["1", "M. Salazar", "DNI 43•••19", "Dolor torácico agudo", "02 min", "Inmediato"] == visibles[:6]
-    assert "A. Torres" in visibles and "1 paciente más en espera" in visibles
-    assert not any(t.startswith("NN") for t in visibles)  # el cuarto queda en el resumen
+    # Dos de nivel 3: primero el NN, que llegó antes (prioridad y luego llegada); Ana queda en el resumen
+    assert any(t.startswith("NN") for t in visibles) and "1 paciente más en espera" in visibles
+    assert "A. Torres" not in visibles
 
 
 def test_la_espera_que_excede_el_plazo_se_marca(crear):

@@ -35,9 +35,9 @@ def textos_de(widget) -> list[str]:
 
 @pytest.mark.parametrize("rol, esperados", [
     (Rol.ENFERMERO, ["tablero", "triaje", "pacientes"]),
-    (Rol.MEDICO, ["tablero", "triaje", "pacientes"]),
-    (Rol.JEFE_GUARDIA, ["tablero", "triaje", "pacientes"]),
-    (Rol.LIMPIEZA, ["tablero"]),
+    (Rol.MEDICO, ["tablero", "triaje", "camas", "pacientes"]),
+    (Rol.JEFE_GUARDIA, ["tablero", "triaje", "camas", "pacientes"]),
+    (Rol.LIMPIEZA, ["tablero", "limpieza"]),
     (Rol.ADMINISTRADOR, ["tablero"]),
 ])
 def test_el_menu_muestra_solo_los_modulos_del_rol(raiz_tk, sesion_de, rol, esperados):
@@ -61,7 +61,9 @@ def test_un_rol_sin_modulos_ve_un_aviso(raiz_tk):
 
 
 def test_no_se_ofrecen_modulos_sin_pantalla_en_este_alcance():
-    assert [m.permiso for m in MODULOS] == [Permiso.VER_CAMAS, Permiso.TRIAJE, Permiso.PACIENTES]
+    # Reportes y administración aún no tienen pantalla: su permiso no tiene módulo
+    assert [m.permiso for m in MODULOS] == [Permiso.VER_CAMAS, Permiso.TRIAJE, Permiso.GESTION_CAMAS,
+                                            Permiso.PACIENTES, Permiso.LIMPIEZA]
 
 
 # ---- Cambio de módulo
@@ -150,7 +152,8 @@ def test_informar_actualizacion_correcta_y_sin_conexion(raiz_tk, sesion_de):
 
 def test_las_pantallas_hechas_estan_registradas():
     assert PANTALLAS == {"tablero": crear_tablero, "triaje": app_principal.crear_triaje,
-                         "pacientes": app_principal.crear_pacientes}
+                         "camas": app_principal.crear_camas, "pacientes": app_principal.crear_pacientes,
+                         "limpieza": app_principal.crear_limpieza}
 
 
 def test_crear_tablero_usa_los_controladores_de_la_sesion(raiz_tk, sesion_de, monkeypatch):
@@ -180,6 +183,25 @@ def test_crear_tablero_acepta_otros_controladores(raiz_tk, sesion_de):
     assert isinstance(tablero, DashboardView)
     assert vista._actualizado.cget("text").startswith("● Actualizado")
     tablero.destroy()
+
+
+@pytest.mark.parametrize("crear_pantalla, clase", [("crear_camas", "GestionCamasView"),
+                                                    ("crear_limpieza", "LimpiezaView")])
+def test_camas_y_limpieza_usan_el_controlador_de_camas_de_la_sesion(raiz_tk, sesion_de, monkeypatch, crear_pantalla,
+                                                                     clase):
+    recibidos = {}
+
+    class PantallaFalsa(ctk.CTkFrame):
+        def __init__(self, padre, camas):
+            super().__init__(padre)
+            recibidos["camas"] = camas
+
+    monkeypatch.setattr(app_principal, clase, PantallaFalsa)
+    sesion = sesion_de(Rol.JEFE_GUARDIA)
+    vista, _, _ = crear(raiz_tk, sesion)
+    pantalla = getattr(app_principal, crear_pantalla)(vista._contenido, sesion, vista)
+    assert isinstance(recibidos["camas"], CamaController) and recibidos["camas"]._sesion is sesion
+    pantalla.destroy()
 
 
 def test_al_destruirse_se_detiene_el_reloj(raiz_tk, sesion_de):
