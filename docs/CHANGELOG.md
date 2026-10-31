@@ -5,6 +5,103 @@
 
 ---
 
+## [2026-10-31] — Gestión de camas y Limpieza
+
+### Cambio
+- **`views/camas_view.py`** (`GestionCamasView`, módulo «Gestión de camas», permiso GESTION_CAMAS). Es una tarjeta con «Esperan cama (N) / Con cama (N) / Mantenimiento» en la cabecera:
+  - **Esperan cama:**
+    - la cola por prioridad (nivel, paciente, motivo y espera);
+    - al elegir un paciente, sus camas libres compatibles;
+    - «Asignar cama X» la reserva (RN-01, RN-05).
+  - **Con cama:** cama, estado, nivel, paciente y hora de asignación.
+    - Una cama reservada ofrece «Llegó a la cama» y «Cancelar reserva».
+    - Una ocupada ofrece «Dar de alta», y la cama pasa a limpieza (RN-07).
+    - «Referir» y «Registrar fuga» sirven para las dos.
+    - El alta, referir y la fuga piden confirmación.
+  - **Mantenimiento:** las camas libres o fuera de servicio.
+    - Una libre sale de servicio con su motivo. Si falta el motivo, se explica bajo el campo.
+    - Una fuera de servicio vuelve a servicio.
+- **`views/limpieza_view.py`** (`LimpiezaView`, módulo «Limpieza», permiso LIMPIEZA):
+  - las camas por limpiar, de la más antigua a la más reciente;
+  - «Confirmar limpieza de X» deja la cama libre (RN-08).
+- **Lógica que faltaba:**
+  - `CamaController.pacientes_con_cama()` devuelve `PacienteEnCama`: la cama, el episodio, el paciente y la fecha de asignación. Sigue el orden del mapa y hace las lecturas en una transacción, como `armar_cola`;
+  - `AsignacionDAO.listar_vigentes()`;
+  - `CamaController.validar_motivo` pasa a ser público: la demo usa la misma regla.
+- **`TablaDatos`** (extracción aprobada):
+  - `filas=N` fija el alto de la tabla. Triaje y Pacientes lo usan en lugar de su marco de alto fijo;
+  - `cambiar_texto_vacio`.
+- **Ventana principal:** `MODULOS` suma «Gestión de camas» (después de Triaje) y «Limpieza» (al final), con `crear_camas` y `crear_limpieza` en `PANTALLAS`.
+- **`prototipo/`:**
+  - `CamasDemo` recorre el ciclo completo con las reglas reales de `Cama` y `EpisodioEmergencia`, y recuerda lo que se hace;
+  - un paciente triado en `TriajeDemo` pasa a esperar cama (`al_triar`);
+  - todas las pantallas de la demo comparten los mismos datos.
+- **`scripts/verificar_controladores.py`:** 2 comprobaciones de `pacientes_con_cama` contra MySQL.
+- **Pruebas:**
+  - nuevas: `test_camas_view.py` (31) y `test_limpieza_view.py` (6);
+  - ampliadas: `test_cama_controller.py`, `test_asignacion_dao.py`, `test_componentes.py`, `test_app_principal.py`, `test_triage_view.py` y `test_dashboard_view.py`.
+
+### Archivos afectados
+- `views/camas_view.py` y `views/limpieza_view.py` (nuevos)
+- `views/app_principal.py`, `views/componentes/tabla.py`, `views/triage_view.py` y `views/pacientes_view.py`
+- `controllers/cama_controller.py` y `dao/asignacion_dao.py`
+- `prototipo/demo.py` y `prototipo/ver.py`
+- `scripts/verificar_controladores.py`
+- Pruebas: `tests/test_camas_view.py` y `tests/test_limpieza_view.py` (nuevos), `tests/test_cama_controller.py`, `tests/test_asignacion_dao.py`, `tests/test_componentes.py`, `tests/test_app_principal.py`, `tests/test_triage_view.py` y `tests/test_dashboard_view.py`
+- `docs/`
+
+### Motivo
+El sistema es de triaje **y asignación de camas**, pero la interfaz solo llegaba hasta el triaje. Las reglas centrales no se podían demostrar desde la aplicación:
+- RN-01 y RN-05: asignar;
+- RN-07 y RN-08: alta → limpieza → disponible.
+
+Además, la Fase 7 pide repetir desde las vistas la integración «cola → camas compatibles → asignación → liberación → limpieza». Los controladores ya existían. Limpieza va en esta misma tarea porque solo el rol de limpieza confirma una limpieza: sin su pantalla, una cama dada de alta nunca volvía a estar libre.
+
+### Impacto
+- Pruebas: **1928 pasan** (antes 1878).
+- Sin cambios de esquema ni de reglas de negocio.
+- El médico y el jefe de guardia ven «Gestión de camas»; el personal de limpieza ve «Limpieza».
+- **La demo tenía la cola de cama fuera de orden:** dos pacientes de nivel 3 salían en el orden de la lista, no por llegada. Ahora `CamasDemo` usa `ordenar_por_prioridad`, como el controlador real, y se corrigió la prueba del tablero que dependía de ese orden.
+
+### Decisiones
+- **Forma de la pantalla (acordada con el usuario):**
+  - un selector como en Pacientes, que solo reutiliza piezas que ya existen;
+  - se descartaron las dos columnas, como en Triaje, y la matriz clicable. La matriz habría cambiado un componente que el brief dejó solo de lectura.
+- **Qué pide confirmación:**
+  - el alta, referir y la fuga cierran el episodio y no se deshacen;
+  - cancelar una reserva sí se deshace (el paciente vuelve a la cola), así que no pregunta;
+  - confirmar una limpieza tampoco: el botón ya es la confirmación (RN-08).
+- **El botón principal de «Con cama» cambia con el estado de la cama:** «Llegó a la cama» para una reservada y «Dar de alta» para una ocupada. «Cancelar reserva» se deshabilita, en lugar de ocultarse, para que la fila de botones no cambie de forma.
+- **Los datos se releen** al abrir, al cambiar de opción y después de cada operación, porque otra PC pudo cambiarlos. Tras un error se conserva la elección; tras un éxito, no, para que la acción siguiente no recaiga por inercia sobre la misma fila.
+- **El motivo escrito se conserva** si la operación falla. Se borra al guardarlo.
+- **Mantenimiento lista solo camas libres o fuera de servicio.** El controlador rechaza las demás (con paciente o con limpieza pendiente), y listarlas solo ofrecería acciones que van a fallar.
+- **Los textos de éxito no suponen el género del paciente** («Referencia registrada», no «quedó referido»).
+- **«Disponible», no «libre», en lo que lee el usuario:** es el nombre del estado en las columnas y en la leyenda del tablero.
+- **Corregido tras la revisión independiente:**
+  - soltar el Enter que envió un motivo vacío borraba su aviso. Ahora el aviso solo se va si el texto cambia, como el documento en Pacientes;
+  - al volver de otra opción, o tras un error, se perdía la cama compatible elegida. Ahora se conserva si sigue disponible;
+  - ttk avisa más tarde la selección que hace el código. Cada recarga leía dos veces las camas compatibles y podía abrir un diálogo. Ahora el paciente que ya se muestra no se relee, y una recarga no abre diálogos;
+  - referir o registrar una fuga preguntaba con el estado leído antes: si otra PC había marcado la llegada, decía «queda disponible» cuando la cama iba a limpieza. Ahora relee antes de preguntar, y el aviso final sale de lo que devolvió el controlador.
+- **Proceso de la interfaz** (skill ui-consistency):
+  - la pantalla no tenía diseño en el brief, así que la forma se acordó con el usuario antes del código;
+  - la lista de comprobación salió de Pacientes, la pantalla más reciente del mismo tipo;
+  - la revisión se calibró con una diferencia plantada en una copia de Pacientes (un diálogo propio en lugar de `mostrar_error`), y el revisor la encontró;
+  - después revisó las dos pantallas un agente que no las escribió.
+
+### Pendientes
+- Ejecutar `scripts/verificar_controladores.py` para confirmar `pacientes_con_cama` contra MySQL (lo hace el usuario con su cuenta de administrador).
+- Lo que dejó abierto la revisión:
+  - el motivo escrito para una cama se conserva al elegir otra (la familia conserva lo escrito). El botón dice qué cama sale de servicio;
+  - `estado.value.capitalize()` está escrito en tres lugares (tablero, `TarjetaCama` y esta pantalla).
+- Fuera de esta tarea:
+  - el motivo de admisión de Pacientes tiene el mismo fallo del Enter (`pacientes_view.py`);
+  - en modo oscuro, el borde de las tablas (`TablaDatos`) se ve muy claro;
+  - la barra de `CTkScrollableFrame` se ve aunque el contenido quepa.
+- Traslado de cama (sigue abierto): una cama con paciente no se puede poner fuera de servicio.
+- Reportes con PDF y administración siguen sin pantalla.
+
+---
+
 ## [2026-10-30] — Fase 6: pantalla de pacientes
 
 ### Cambio
