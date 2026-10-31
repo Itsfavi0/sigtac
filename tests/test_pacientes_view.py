@@ -209,8 +209,10 @@ def test_sin_motivo_se_marca_y_se_explica_bajo_el_campo(crear):
     vista.abrir_episodio()
     assert vista._motivo._sigtac_error and vista.dialogos["error"] == []
     assert visible(vista._aviso_motivo) and vista._aviso_motivo.cget("text") == "El motivo de consulta es obligatorio."
+    vista._motivo_editado()  # soltar el Enter que lo envió: el texto no cambió, el aviso sigue
+    assert vista._motivo._sigtac_error and visible(vista._aviso_motivo)
     escribir(vista._motivo, "Dolor")
-    vista._motivo_corregido()  # lo que hace soltar una tecla en el campo
+    vista._motivo_editado()  # soltar una tecla que sí cambió el texto
     assert not vista._motivo._sigtac_error and not visible(vista._aviso_motivo)
 
 

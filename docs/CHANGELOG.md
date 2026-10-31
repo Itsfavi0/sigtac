@@ -78,7 +78,7 @@ Además, la Fase 7 pide repetir desde las vistas la integración «cola → cama
 - **Los textos de éxito no suponen el género del paciente** («Referencia registrada», no «quedó referido»).
 - **«Disponible», no «libre», en lo que lee el usuario:** es el nombre del estado en las columnas y en la leyenda del tablero.
 - **Corregido tras la revisión independiente:**
-  - soltar el Enter que envió un motivo vacío borraba su aviso. Ahora el aviso solo se va si el texto cambia, como el documento en Pacientes;
+  - soltar el Enter que envió un motivo vacío borraba su aviso. Ahora el aviso solo se va si el texto cambia, como el documento en Pacientes. El motivo de admisión de Pacientes tenía el mismo fallo y se corrigió igual;
   - al volver de otra opción, o tras un error, se perdía la cama compatible elegida. Ahora se conserva si sigue disponible;
   - ttk avisa más tarde la selección que hace el código. Cada recarga leía dos veces las camas compatibles y podía abrir un diálogo. Ahora el paciente que ya se muestra no se relee, y una recarga no abre diálogos;
   - referir o registrar una fuga preguntaba con el estado leído antes: si otra PC había marcado la llegada, decía «queda disponible» cuando la cama iba a limpieza. Ahora relee antes de preguntar, y el aviso final sale de lo que devolvió el controlador.
@@ -94,7 +94,6 @@ Además, la Fase 7 pide repetir desde las vistas la integración «cola → cama
   - el motivo escrito para una cama se conserva al elegir otra (la familia conserva lo escrito). El botón dice qué cama sale de servicio;
   - `estado.value.capitalize()` está escrito en tres lugares (tablero, `TarjetaCama` y esta pantalla).
 - Fuera de esta tarea:
-  - el motivo de admisión de Pacientes tiene el mismo fallo del Enter (`pacientes_view.py`);
   - en modo oscuro, el borde de las tablas (`TablaDatos`) se ve muy claro;
   - la barra de `CTkScrollableFrame` se ve aunque el contenido quepa.
 - Traslado de cama (sigue abierto): una cama con paciente no se puede poner fuera de servicio.

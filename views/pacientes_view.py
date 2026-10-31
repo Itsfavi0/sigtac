@@ -50,6 +50,7 @@ class PacientesView(ctk.CTkFrame):
         self._paciente = None              # el paciente de la ficha
         self._buscado = None               # (tipo, número) que se buscó: la ficha o «no encontrado» son de él
         self._documento_con_error = {}     # CamposDocumento → (tipo, número) rechazado por mal escrito
+        self._motivo_rechazado = None      # el motivo tal como se rechazó: su aviso sigue hasta que cambie
 
         # Como el formulario del triaje: se desplaza en vertical si no cabe (1093×614)
         self._contenido = contenido = ctk.CTkScrollableFrame(self, fg_color="transparent", corner_radius=0)
@@ -112,7 +113,7 @@ class PacientesView(ctk.CTkFrame):
         self._aviso_motivo = ctk.CTkLabel(self._admision, text="", font=tema.fuente("pequena"),
                                           text_color=tema.COLOR_ERROR, anchor="w")
         self._motivo.bind("<Return>", self.abrir_episodio, add="+")
-        self._motivo.bind("<KeyRelease>", lambda _e: self._motivo_corregido(), add="+")
+        self._motivo.bind("<KeyRelease>", lambda _e: self._motivo_editado(), add="+")
         self._acciones(self._admision, "Abrir episodio", self.abrir_episodio, self.cancelar)
         return marco
 
@@ -185,7 +186,13 @@ class PacientesView(ctk.CTkFrame):
         self.cerrar_formularios()
         self._documento.enfocar()
 
+    def _motivo_editado(self):
+        """Al corregir el motivo rechazado se van el rojo y su aviso. Soltar el Enter que lo envió no lo corrige."""
+        if self._motivo_rechazado is not None and self._motivo.get() != self._motivo_rechazado:
+            self._motivo_corregido()
+
     def _motivo_corregido(self):
+        self._motivo_rechazado = None
         sin_error(self._motivo)
         self._aviso_motivo.pack_forget()
 
@@ -219,6 +226,7 @@ class PacientesView(ctk.CTkFrame):
         except ValueError as error:
             # El paciente sale de la ficha: el único dato que se escribe aquí es el motivo
             marcar_error(self._motivo)
+            self._motivo_rechazado = self._motivo.get()
             self._aviso_motivo.configure(text=str(error))
             self._aviso_motivo.pack(anchor="w", pady=(tema.ESPACIO, 0), after=self._motivo)
             return "break"
