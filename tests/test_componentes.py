@@ -12,6 +12,7 @@ from views.componentes import (BotonPrimario, BotonSecundario, CamposDocumento, 
                                etiqueta_campo, lista_opciones, marcar_error, marcar_foco, mostrar_error, mostrar_info,
                                texto_nivel)
 from views.componentes.documento import ETIQUETAS
+from views.componentes.tabla import ALTO_FILA
 
 
 def textos(widget) -> list[str]:
@@ -212,6 +213,22 @@ def test_cargar_filas_oculta_el_texto_de_vacia(raiz_tk):
     assert tabla._vacio.winfo_manager() == ""
     filas = [tabla._arbol.item(iid, "values") for iid in tabla._arbol.get_children()]
     assert filas == [("1", "Ana Torres", "Dolor torácico"), ("2", "NN", "")]  # None se muestra vacío
+
+
+def test_tabla_con_filas_mide_eso_mas_el_encabezado_aunque_tenga_mas(raiz_tk):
+    marco = ctk.CTkFrame(raiz_tk)
+    tabla = TablaDatos(marco, COLUMNAS, "Vacía", filas=3)
+    tabla.pack(fill="x")
+    assert tabla.cget("height") == ALTO_FILA * 4
+    tabla.cargar([(i, (i, "Ana", "x")) for i in range(20)])  # las demás se desplazan por dentro
+    raiz_tk.update()  # la ventana de las pruebas está oculta: se compara el alto pedido, no el dibujado
+    assert tabla.winfo_reqheight() == round(ALTO_FILA * 4 * tema.escala(tabla))
+    marco.destroy()
+
+
+def test_tabla_con_menos_de_una_fila_es_un_error(raiz_tk):
+    with pytest.raises(ValueError):
+        TablaDatos(raiz_tk, COLUMNAS, "Vacía", filas=0)
 
 
 def test_seleccionar_devuelve_el_id_y_avisa(raiz_tk):

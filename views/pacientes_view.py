@@ -21,7 +21,6 @@ from views.componentes import (BotonPrimario, BotonSecundario, CamposDocumento, 
                                mostrar_error, mostrar_info)
 from views.componentes.campos import sin_error
 from views.componentes.documento import ETIQUETAS
-from views.componentes.tabla import ALTO_FILA
 
 logger = logging.getLogger(__name__)
 
@@ -235,11 +234,9 @@ class PacientesView(ctk.CTkFrame):
 
     def _crear_sin_identificar(self, padre) -> ctk.CTkFrame:
         marco = ctk.CTkFrame(padre, fg_color="transparent")
-        lista = ctk.CTkFrame(marco, fg_color="transparent", height=ALTO_FILA * (self.FILAS_LISTA + 1))
-        lista.pack_propagate(False)
-        lista.pack(fill="x")
-        self._tabla = TablaDatos(lista, self.COLUMNAS_NN, NADIE_SIN_IDENTIFICAR, al_seleccionar=self._nn_elegido)
-        self._tabla.pack(fill="both", expand=True)
+        self._tabla = TablaDatos(marco, self.COLUMNAS_NN, NADIE_SIN_IDENTIFICAR, al_seleccionar=self._nn_elegido,
+                                 filas=self.FILAS_LISTA)
+        self._tabla.pack(fill="x")
 
         # La identidad real del NN elegido
         self._identidad = ctk.CTkFrame(marco, fg_color="transparent")

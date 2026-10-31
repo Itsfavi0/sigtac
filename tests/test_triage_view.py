@@ -303,7 +303,7 @@ def test_cambiar_el_documento_despues_de_buscar_olvida_la_ficha(crear):
 def test_cambiar_a_la_cola_y_a_sin_identificar(crear):
     vista = crear()
     vista._modo.elegir("cola")
-    assert vista._en_cola.winfo_manager() == "pack" and vista._nuevo.winfo_manager() == ""
+    assert vista._tabla.winfo_manager() == "pack" and vista._nuevo.winfo_manager() == ""
     vista._modo.elegir("nuevo")
     vista._identidad.elegir("nn")
     assert vista._sin_documento.winfo_manager() == "pack" and vista._con_documento.winfo_manager() == ""

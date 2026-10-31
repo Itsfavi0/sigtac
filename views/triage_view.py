@@ -23,7 +23,6 @@ from views.componentes import (BotonPrimario, BotonSecundario, CamposDocumento, 
 from views.componentes.campos import (campo_en_rejilla, leer_campo, leer_opcion, limpiar_al_corregir, lista_en_rejilla,
                                       sin_error)
 from views.componentes.paciente import SEXOS
-from views.componentes.tabla import ALTO_FILA
 
 logger = logging.getLogger(__name__)
 
@@ -116,10 +115,7 @@ class TriageView(ctk.CTkFrame):
         self._motivo = self._campo(self._nuevo, "Motivo de consulta", "Por qué acude a emergencia")
         self._enter_confirma(self._motivo)
 
-        self._en_cola = ctk.CTkFrame(cuerpo, fg_color="transparent", height=ALTO_FILA * (self.FILAS_COLA + 1))
-        self._en_cola.pack_propagate(False)
-        self._tabla = TablaDatos(self._en_cola, self.COLUMNAS_COLA, NADIE_ESPERA_TRIAJE)
-        self._tabla.pack(fill="both", expand=True)
+        self._tabla = TablaDatos(cuerpo, self.COLUMNAS_COLA, NADIE_ESPERA_TRIAJE, filas=self.FILAS_COLA)
         self._nuevo.pack(fill="x")
 
     def _crear_con_documento(self, padre) -> ctk.CTkFrame:
@@ -172,9 +168,9 @@ class TriageView(ctk.CTkFrame):
         self._mostrar_aviso()
         if modo == "cola":
             self._nuevo.pack_forget()
-            self._en_cola.pack(fill="x")
+            self._tabla.pack(fill="x")
         else:
-            self._en_cola.pack_forget()
+            self._tabla.pack_forget()
             self._nuevo.pack(fill="x")
 
     def _cambiar_identidad(self, identidad: str):

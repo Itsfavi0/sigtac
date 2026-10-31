@@ -42,11 +42,18 @@ class TablaDatos(ctk.CTkFrame):
     `columnas`: lista de (título, ancho en píxeles). Cada fila se carga como (id, valores): el id no se
     muestra, identifica la fila (p. ej. el id_episodio) y es lo que devuelve `seleccionado()`.
     `al_seleccionar(id)` se llama cuando el usuario elige una fila.
+    Con `filas`, la tabla mide eso más el encabezado y las demás filas se desplazan por dentro; sin él, toma el alto
+    que le dé su contenedor (p. ej. con fill="both").
     """
 
     def __init__(self, padre, columnas: Sequence[tuple[str, int]], texto_vacio: str,
-                 al_seleccionar: Callable[[Hashable], None] | None = None):
-        super().__init__(padre, fg_color="transparent")
+                 al_seleccionar: Callable[[Hashable], None] | None = None, filas: int | None = None):
+        if filas is not None and filas < 1:
+            raise ValueError("Una tabla muestra al menos una fila.")
+        alto = {} if filas is None else {"height": ALTO_FILA * (filas + 1)}
+        super().__init__(padre, fg_color="transparent", **alto)
+        if filas is not None:
+            self.grid_propagate(False)  # el alto no depende de cuántas filas tenga cargadas
         _configurar_estilo(self)
         nombres = [f"c{i}" for i in range(len(columnas))]
         self._arbol = ttk.Treeview(self, columns=nombres, show="headings", selectmode="browse", style=ESTILO)
@@ -81,6 +88,10 @@ class TablaDatos(ctk.CTkFrame):
         else:
             # Centrado en la zona de filas: medio alto de fila más abajo, para no tapar el encabezado
             self._vacio.place(relx=0.5, rely=0.5, y=round(ALTO_FILA * tema.escala(self) / 2), anchor="center")
+
+    def cambiar_texto_vacio(self, texto: str):
+        """Para una tabla cuyo vacío significa cosas distintas («Elija un paciente…» / «No hay camas…»)."""
+        self._vacio.configure(text=texto)
 
     def seleccionado(self) -> Hashable | None:
         """El id de la fila elegida, o None si no hay ninguna."""
