@@ -53,6 +53,9 @@ class ReporteController:
 
     # Camas en uso: tienen un paciente asignado (aún no llegó o ya está en ella)
     CAMAS_EN_USO = (EstadoCama.RESERVADA, EstadoCama.OCUPADA)
+    # El rango de DATETIME de MySQL (años 1000 a 9999). Al último día se le suma uno para incluirlo completo, así que
+    # el 31/12/9999 no cabría (Python lanzaría OverflowError, que la vista no espera)
+    ANIO_MINIMO, ANIO_MAXIMO = 1000, 9998
 
     def __init__(self, sesion: Sesion):
         self._sesion = sesion
@@ -78,6 +81,8 @@ class ReporteController:
                 raise ValueError("El período se indica con días (date), sin hora.")
         if desde > hasta:
             raise ValueError("La fecha inicial no puede ser posterior a la final.")
+        if desde.year < self.ANIO_MINIMO or hasta.year > self.ANIO_MAXIMO:
+            raise ValueError(f"El período debe estar entre los años {self.ANIO_MINIMO} y {self.ANIO_MAXIMO}.")
         inicio = datetime.combine(desde, time.min)
         fin = datetime.combine(hasta + timedelta(days=1), time.min)  # [inicio, fin): incluye todo el último día
 

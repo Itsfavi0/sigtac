@@ -85,6 +85,12 @@ def test_un_solo_dia(datos, ctrl):
     datos["ReporteDAO"].contar_triajes_por_nivel.assert_called_once_with(datetime(2026, 10, 22), datetime(2026, 10, 23))
 
 
+def test_los_anios_limite_se_aceptan(datos, ctrl):  # valores límite del rango de MySQL
+    preparar(datos)
+    ctrl.indicadores(date(1000, 1, 1), date(9998, 12, 31))
+    datos["ReporteDAO"].contar_ingresos.assert_called_once_with(datetime(1000, 1, 1), datetime(9999, 1, 1))
+
+
 def test_sin_triajes_el_porcentaje_es_none(datos, ctrl):
     preparar(datos, total=0, reclasificados=0)
     assert ctrl.indicadores(date(2026, 10, 1), date(2026, 10, 1)).porcentaje_reclasificacion is None
@@ -95,6 +101,8 @@ def test_sin_triajes_el_porcentaje_es_none(datos, ctrl):
     (datetime(2026, 10, 1, 8), date(2026, 10, 31), "date"),
     ("2026-10-01", date(2026, 10, 31), "date"),
     (date(2026, 10, 1), None, "date"),
+    (date(2026, 10, 1), date(9999, 12, 31), "años"),   # sumarle un día desbordaría date
+    (date(999, 12, 31), date(2026, 10, 1), "años"),
 ])
 def test_periodo_invalido_no_consulta(datos, ctrl, desde, hasta, mensaje):
     with pytest.raises(ValueError, match=mensaje):
