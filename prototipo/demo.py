@@ -4,12 +4,13 @@ Controladores de demostración: los mismos métodos que los reales, con datos de
 Sirven para ver y revisar las pantallas (prototipo/ver.py) y para la demo sin base de datos. Los datos son
 inventados: ningún nombre ni número corresponde a una persona real.
 """
+from collections import Counter
 from datetime import datetime, timedelta
 
 from controllers.auth_controller import Sesion
 from controllers.cama_controller import CamaController, PacienteEnCama
 from controllers.colas import EntradaCola
-from controllers.reporte_controller import IndicadoresPeriodo
+from controllers.reporte_controller import EstadoGuardia, IndicadoresPeriodo
 from controllers.triaje_controller import Sugerencia
 from models.cama import CamaHospitalizacion, CamaObservacion, CamaTraumaShock, CamaUCI
 from models.documento import DocumentoIdentidad
@@ -20,6 +21,7 @@ from models.excepciones import CamaNoDisponibleError, ReglaNegocioError
 from models.permisos import Rol
 from models.persona import Paciente
 from models.triaje import EpisodioEmergencia, SignosVitales, Sintoma, Triaje, ordenar_por_prioridad
+from utils import pdf_generator
 
 D, O, L, R, F = (EstadoCama.DISPONIBLE, EstadoCama.OCUPADA, EstadoCama.EN_LIMPIEZA, EstadoCama.RESERVADA,
                  EstadoCama.FUERA_SERVICIO)
@@ -435,5 +437,41 @@ class PacientesDemo:
 
 
 class ReportesDemo:
+    """
+    Indicadores inventados que crecen con los días del período, y el estado de la guardia contado de las otras demos
+    (camas, colas). Exporta el PDF real con utils/pdf_generator.py.
+    """
+
+    TRIAJES_POR_DIA = {1: 1, 2: 2, 3: 5, 4: 3, 5: 1}
+    INGRESOS_POR_DIA = 14
+
+    def __init__(self, camas: "CamasDemo | None" = None, triaje: "TriajeDemo | None" = None):
+        self._camas, self._triaje = camas, triaje
+
     def indicadores(self, desde, hasta):
-        return IndicadoresPeriodo(desde, hasta, 42, {1: 3, 2: 6, 3: 15, 4: 9, 5: 3}, 12.5, 6.0, 8.0, 312.0)
+        if desde > hasta:  # el mismo mensaje que ReporteController
+            raise ValueError("La fecha inicial no puede ser posterior a la final.")
+        dias = (hasta - desde).days + 1
+        por_nivel = {nivel: cantidad * dias for nivel, cantidad in self.TRIAJES_POR_DIA.items()}
+        return IndicadoresPeriodo(desde, hasta, self.INGRESOS_POR_DIA * dias, por_nivel, 12.5, 6.0, 8.0, 312.0)
+
+    def estado_actual(self):
+        if self._camas is None:
+            return EstadoGuardia({EstadoCama.DISPONIBLE: 15, EstadoCama.OCUPADA: 12, EstadoCama.RESERVADA: 2,
+                                  EstadoCama.EN_LIMPIEZA: 4, EstadoCama.FUERA_SERVICIO: 3}, 34.5,
+                                 {EstadoEpisodio.EN_ESPERA_TRIAJE: 3, EstadoEpisodio.EN_ESPERA: 4,
+                                  EstadoEpisodio.EN_ATENCION: 14})
+        camas = Counter(cama.estado for cama in self._camas.mapa_camas())
+        en_servicio = sum(camas.values()) - camas[EstadoCama.FUERA_SERVICIO]
+        en_uso = camas[EstadoCama.RESERVADA] + camas[EstadoCama.OCUPADA]
+        ocupacion = round(100 * en_uso / en_servicio, 1) if en_servicio else None
+        pacientes = Counter(p.episodio.estado for p in self._camas.pacientes_con_cama())
+        pacientes[EstadoEpisodio.EN_ESPERA] += len(self._camas.cola_de_espera())
+        if self._triaje is not None:
+            pacientes[EstadoEpisodio.EN_ESPERA_TRIAJE] += len(self._triaje.cola_de_triaje())
+        return EstadoGuardia(dict(camas), ocupacion, dict(pacientes))
+
+    def exportar_pdf(self, desde, hasta, ruta):
+        ruta = pdf_generator.validar_ruta_pdf(ruta)
+        return pdf_generator.guardar_reporte(ruta, self.indicadores(desde, hasta), self.estado_actual(),
+                                             datetime.now(), "Elena Ríos Paredes (demostración)")

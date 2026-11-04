@@ -36,9 +36,9 @@ def textos_de(widget) -> list[str]:
 @pytest.mark.parametrize("rol, esperados", [
     (Rol.ENFERMERO, ["tablero", "triaje", "pacientes"]),
     (Rol.MEDICO, ["tablero", "triaje", "camas", "pacientes"]),
-    (Rol.JEFE_GUARDIA, ["tablero", "triaje", "camas", "pacientes"]),
+    (Rol.JEFE_GUARDIA, ["tablero", "triaje", "camas", "pacientes", "reportes"]),
     (Rol.LIMPIEZA, ["tablero", "limpieza"]),
-    (Rol.ADMINISTRADOR, ["tablero"]),
+    (Rol.ADMINISTRADOR, ["tablero", "reportes"]),
 ])
 def test_el_menu_muestra_solo_los_modulos_del_rol(raiz_tk, sesion_de, rol, esperados):
     vista, _, _ = crear(raiz_tk, sesion_de(rol))
@@ -61,9 +61,9 @@ def test_un_rol_sin_modulos_ve_un_aviso(raiz_tk):
 
 
 def test_no_se_ofrecen_modulos_sin_pantalla_en_este_alcance():
-    # Reportes y administración aún no tienen pantalla: su permiso no tiene módulo
+    # Administración aún no tiene pantalla: su permiso no tiene módulo
     assert [m.permiso for m in MODULOS] == [Permiso.VER_CAMAS, Permiso.TRIAJE, Permiso.GESTION_CAMAS,
-                                            Permiso.PACIENTES, Permiso.LIMPIEZA]
+                                            Permiso.PACIENTES, Permiso.LIMPIEZA, Permiso.REPORTES]
 
 
 # ---- Cambio de módulo
@@ -153,7 +153,24 @@ def test_informar_actualizacion_correcta_y_sin_conexion(raiz_tk, sesion_de):
 def test_las_pantallas_hechas_estan_registradas():
     assert PANTALLAS == {"tablero": crear_tablero, "triaje": app_principal.crear_triaje,
                          "camas": app_principal.crear_camas, "pacientes": app_principal.crear_pacientes,
-                         "limpieza": app_principal.crear_limpieza}
+                         "limpieza": app_principal.crear_limpieza, "reportes": app_principal.crear_reportes}
+
+
+def test_crear_reportes_usa_el_controlador_de_la_sesion_y_avisa_al_encabezado(raiz_tk, sesion_de, monkeypatch):
+    recibidos = {}
+
+    class ReportesFalsa(ctk.CTkFrame):
+        def __init__(self, padre, reportes, al_actualizar):
+            super().__init__(padre)
+            recibidos.update(reportes=reportes, aviso=al_actualizar)
+
+    monkeypatch.setattr(app_principal, "ReportesView", ReportesFalsa)
+    sesion = sesion_de(Rol.ADMINISTRADOR)
+    vista, _, _ = crear(raiz_tk, sesion)
+    pantalla = app_principal.crear_reportes(vista._contenido, sesion, vista)
+    assert isinstance(recibidos["reportes"], ReporteController) and recibidos["reportes"]._sesion is sesion
+    assert recibidos["aviso"] == vista.informar_actualizacion
+    pantalla.destroy()
 
 
 def test_crear_tablero_usa_los_controladores_de_la_sesion(raiz_tk, sesion_de, monkeypatch):

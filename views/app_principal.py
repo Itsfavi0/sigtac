@@ -26,6 +26,7 @@ from views.camas_view import GestionCamasView
 from views.dashboard_view import DashboardView
 from views.limpieza_view import LimpiezaView
 from views.pacientes_view import PacientesView
+from views.reportes_view import ReportesView
 from views.triage_view import TriageView
 
 
@@ -37,13 +38,14 @@ class Modulo:
     permiso: Permiso   # sin él, el módulo no aparece en el menú
 
 
-# En el orden del menú. Reportes y administración no se muestran hasta que tengan pantalla (brief §2).
+# En el orden del menú. Administración no se muestra hasta que tenga pantalla (brief §2).
 MODULOS = (
     Modulo("tablero", "Tablero de camas", "Estado de la guardia en este momento", Permiso.VER_CAMAS),
     Modulo("triaje", "Triaje", "Registrar al paciente y clasificar su prioridad", Permiso.TRIAJE),
     Modulo("camas", "Gestión de camas", "Asignar camas, dar de alta y mantenimiento", Permiso.GESTION_CAMAS),
     Modulo("pacientes", "Pacientes", "Buscar, corregir e identificar pacientes", Permiso.PACIENTES),
     Modulo("limpieza", "Limpieza", "Camas dadas de alta que esperan limpieza", Permiso.LIMPIEZA),
+    Modulo("reportes", "Reportes", "Indicadores de un período y exportación a PDF", Permiso.REPORTES),
 )
 
 def crear_tablero(padre, sesion: Sesion, principal: "AppPrincipal", camas=None, reportes=None, triaje=None):
@@ -85,9 +87,18 @@ def crear_limpieza(padre, sesion: Sesion, principal: "AppPrincipal", camas=None)
     return LimpiezaView(padre, camas or CamaController(sesion))
 
 
+def crear_reportes(padre, sesion: Sesion, principal: "AppPrincipal", reportes=None):
+    """
+    Reportes con el controlador real; el prototipo pasa el de demostración. Como el tablero, avisa al encabezado
+    cuándo leyó los datos («Ahora en la guardia» es una foto de ese momento).
+    """
+    return ReportesView(padre, reportes or ReporteController(sesion), al_actualizar=principal.informar_actualizacion)
+
+
 # clave del módulo → crear(padre, sesion, principal). Cada pantalla de la Fase 6 se agrega aquí al crearse.
 PANTALLAS: dict[str, Callable] = {"tablero": crear_tablero, "triaje": crear_triaje, "camas": crear_camas,
-                                  "pacientes": crear_pacientes, "limpieza": crear_limpieza}
+                                  "pacientes": crear_pacientes, "limpieza": crear_limpieza,
+                                  "reportes": crear_reportes}
 
 PUNTO = "●"  # delante de «Actualizado», como en el tablero aprobado
 SIN_CONEXION = "Sin conexión"

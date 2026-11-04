@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import customtkinter as ctk
 import pytest
 
@@ -10,7 +12,7 @@ from views.componentes import (BotonPrimario, BotonSecundario, CamposDocumento, 
                                InsigniaNivel, Marca, Selector,
                                TablaDatos, Tarjeta, TarjetaCama, TarjetaKPI, campo_texto, casilla, confirmar, errores,
                                etiqueta_campo, lista_opciones, marcar_error, marcar_foco, mostrar_error, mostrar_info,
-                               texto_nivel)
+                               pedir_ruta_pdf, texto_nivel)
 from views.componentes.documento import ETIQUETAS
 from views.componentes.tabla import ALTO_FILA
 
@@ -55,6 +57,22 @@ def test_mostrar_info_y_confirmar(dialogos):
     assert confirmar(None, "¿Fusionar los pacientes?") is True
     assert [(tipo, texto) for tipo, _, texto, _ in dialogos] == [
         ("info", "Triaje registrado"), ("pregunta", "¿Fusionar los pacientes?")]
+
+
+@pytest.mark.parametrize("elegida, esperada", [("C:/reportes/octubre.pdf", Path("C:/reportes/octubre.pdf")),
+                                               ("", None)])  # "" = el usuario canceló
+def test_pedir_ruta_pdf_propone_el_nombre_y_devuelve_la_ruta(monkeypatch, elegida, esperada):
+    recibido = {}
+
+    def guardar_como(**opciones):
+        recibido.update(opciones)
+        return elegida
+
+    monkeypatch.setattr(errores.filedialog, "asksaveasfilename", guardar_como)
+    ventana = object()
+    assert pedir_ruta_pdf(ventana, "indicadores.pdf") == esperada
+    assert recibido["parent"] is ventana and recibido["initialfile"] == "indicadores.pdf"
+    assert recibido["defaultextension"] == ".pdf"
 
 
 # ---- nivel.py
@@ -505,6 +523,26 @@ def test_selector_cambia_el_texto_de_una_opcion(raiz_tk):
     selector = Selector(raiz_tk, [("cola", "En cola")])
     selector.cambiar_texto("cola", "En cola (3)")
     assert selector.texto("cola") == "En cola (3)"
+
+
+def test_selector_sin_eleccion_y_volver_a_elegir_la_misma_avisa(raiz_tk):
+    # Un período escrito a mano no es ningún atajo; volver a pulsar el que estaba debe aplicarlo de nuevo
+    cambios = []
+    selector = Selector(raiz_tk, [("a", "A"), ("b", "B")], cambios.append)
+    selector.quitar_eleccion()
+    assert selector.valor is None
+    assert all(b.cget("fg_color") == "transparent" and b.cget("border_width") == 0 for b in selector.botones.values())
+    selector.botones["a"].invoke()
+    assert cambios == ["a"] and selector.valor == "a"
+
+
+def test_selector_de_repetir_avisa_tambien_la_misma_opcion(raiz_tk):
+    cambios = []
+    selector = Selector(raiz_tk, [("a", "A"), ("b", "B")], cambios.append, repetir=True)
+    selector.botones["a"].invoke()
+    selector.botones["a"].invoke()
+    selector.elegir("a", avisar=False)
+    assert cambios == ["a", "a"]
 
 
 def test_selector_rechaza_opciones_invalidas(raiz_tk):

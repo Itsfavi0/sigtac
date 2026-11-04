@@ -2,7 +2,7 @@
 from views.componentes.botones import BotonPrimario, BotonSecundario
 from views.componentes.campos import campo_texto, casilla, etiqueta_campo, lista_opciones
 from views.componentes.documento import CamposDocumento
-from views.componentes.errores import confirmar, mostrar_error, mostrar_info
+from views.componentes.errores import confirmar, mostrar_error, mostrar_info, pedir_ruta_pdf
 from views.componentes.foco import marcar_error, marcar_foco
 from views.componentes.marca import Marca
 from views.componentes.matriz import MatrizCamas
@@ -16,4 +16,4 @@ __all__ = ["BotonPrimario", "BotonSecundario", "CamposDocumento", "CamposPacient
            "Marca", "MatrizCamas", "Selector",
            "TablaDatos", "Tarjeta", "TarjetaCama", "TarjetaKPI", "campo_texto", "casilla", "confirmar",
            "etiqueta_campo", "lista_opciones", "marcar_error", "marcar_foco", "mostrar_error", "mostrar_info",
-           "texto_nivel"]
+           "pedir_ruta_pdf", "texto_nivel"]

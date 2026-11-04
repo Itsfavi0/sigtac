@@ -70,6 +70,14 @@ def porcentaje(parte: int, total: int) -> str:
     return f"{round(100 * parte / total)} %" if total else "—"
 
 
+def texto_porcentaje(valor: float | None) -> str:
+    """
+    Un porcentaje ya calculado, entero como los de porcentaje() (el tablero): 44.1 → «44 %»; None → «—». El PDF
+    conserva el decimal que da el controlador.
+    """
+    return "—" if valor is None else f"{round(valor)} %"
+
+
 # ---- Lo que escribe el usuario: texto → dato. Un texto que no se puede leer es un ValueError con su mensaje.
 
 def leer_numero(texto: str, nombre: str, decimales: bool = False) -> int | float:

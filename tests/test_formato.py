@@ -68,6 +68,12 @@ def test_porcentaje(parte, total, texto):
     assert formato.porcentaje(parte, total) == texto
 
 
+@pytest.mark.parametrize("valor, texto", [(44.1, "44 %"), (37.6, "38 %"), (0.0, "0 %"), (100.0, "100 %"),
+                                          (None, "—")])
+def test_texto_porcentaje(valor, texto):
+    assert formato.texto_porcentaje(valor) == texto
+
+
 def test_texto_minutos_sin_cero():
     assert formato.texto_minutos(8, con_cero=False) == "8 min"
     assert formato.texto_minutos(75, con_cero=False) == "1 h 15 min"

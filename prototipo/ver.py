@@ -17,21 +17,23 @@ from controllers.auth_controller import AuthController
 from models.permisos import Rol
 from prototipo.demo import CamasDemo, PacientesDemo, ReportesDemo, TriajeDemo, sesion_demo
 from views import tema
-from views.app_principal import (AppPrincipal, crear_camas, crear_limpieza, crear_pacientes, crear_tablero,
-                                 crear_triaje)
+from views.app_principal import (AppPrincipal, crear_camas, crear_limpieza, crear_pacientes, crear_reportes,
+                                 crear_tablero, crear_triaje)
 
 # Las mismas pantallas que la aplicación, con los controladores de demostración. Comparten los datos: un paciente
 # admitido en Pacientes aparece en la cola de Triaje; triado, espera cama en Gestión de camas; dado de alta, su cama
-# aparece en Limpieza. El tablero lo cuenta todo.
+# aparece en Limpieza. El tablero y «Ahora en la guardia» de Reportes lo cuentan todo.
 _CAMAS = CamasDemo()
 _TRIAJE = TriajeDemo(al_triar=_CAMAS.esperar_cama)
 _PACIENTES = PacientesDemo(_TRIAJE)
+_REPORTES = ReportesDemo(_CAMAS, _TRIAJE)
 PANTALLAS_DEMO = {
-    "tablero": partial(crear_tablero, camas=_CAMAS, reportes=ReportesDemo(), triaje=_TRIAJE),
+    "tablero": partial(crear_tablero, camas=_CAMAS, reportes=_REPORTES, triaje=_TRIAJE),
     "triaje": partial(crear_triaje, pacientes=_PACIENTES, triaje=_TRIAJE),
     "camas": partial(crear_camas, camas=_CAMAS),
     "pacientes": partial(crear_pacientes, pacientes=_PACIENTES),
     "limpieza": partial(crear_limpieza, camas=_CAMAS),
+    "reportes": partial(crear_reportes, reportes=_REPORTES),
 }
 
 
