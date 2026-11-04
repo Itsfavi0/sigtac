@@ -5,6 +5,84 @@
 
 ---
 
+## [2026-11-04] — Fase 6: pantalla de Reportes
+
+### Cambio
+- **`views/reportes_view.py`** (`ReportesView`, módulo «Reportes», permiso REPORTES: jefe de guardia y administrador):
+  - **Período:**
+    - «Desde» y «Hasta» (dd/mm/aaaa);
+    - los atajos «Hoy / Últimos 7 días / Este mes» en la cabecera;
+    - «Ver indicadores» (principal, también con Enter) y «Exportar PDF…».
+    - Al abrir se muestra el mes en curso.
+  - **Indicadores:** una línea que dice qué período muestran y que los tiempos son promedios desde el ingreso. Debajo, 4 tarjetas: ingresos, espera de triaje, espera de cama y estancia.
+  - **Dos tarjetas lado a lado:**
+    - «Triajes por nivel»: tabla con el nivel, los triajes y el porcentaje, y la reclasificación;
+    - «Ahora en la guardia»: las camas por estado, la ocupación y los pacientes en emergencia por estado.
+  - **Al pie:** el aviso «Prototipo académico: los indicadores no tienen validez clínica» (`PRODUCT.md`).
+  - **Exportar:** primero muestra el período escrito, así la pantalla dice lo mismo que el PDF. Después pide la ruta («Guardar como», con un nombre propuesto) y llama a `ReporteController.exportar_pdf`.
+- **Piezas compartidas:**
+  - `pedir_ruta_pdf` en `views/componentes/errores.py`: el diálogo «Guardar como», junto a los demás diálogos (aprobado por el usuario);
+  - `Selector.quitar_eleccion()` y el parámetro `repetir`: sin opción marcada, y volver a pedir la opción ya marcada;
+  - `formato.texto_porcentaje`: un porcentaje ya calculado, entero como los del tablero.
+- **`ReporteController.indicadores`** rechaza con `ValueError` los años fuera de 1000–9998, el rango de DATETIME de MySQL. Con «31/12/9999», sumar el día siguiente lanzaba `OverflowError`, que ninguna vista espera.
+- **Ventana principal:** `MODULOS` suma «Reportes», al final, con `crear_reportes` en `PANTALLAS`. Como el tablero, avisa al encabezado («Actualizado HH:MM» o «Sin conexión»).
+- **`prototipo/`:**
+  - `ReportesDemo` hace indicadores que crecen con los días del período;
+  - el estado de la guardia sale de las camas y las colas de las otras demos;
+  - el PDF se exporta con el generador real;
+  - el tablero y Reportes comparten la misma demo.
+- **Pruebas:**
+  - nueva: `test_reportes_view.py` (34);
+  - ampliadas: `test_componentes.py` (diálogo y selector), `test_formato.py`, `test_reporte_controller.py` (años límite) y `test_app_principal.py` (el menú del jefe de guardia y del administrador).
+
+### Archivos afectados
+- `views/reportes_view.py` (nuevo)
+- `views/app_principal.py`, `views/formato.py`, `views/componentes/errores.py`, `views/componentes/selector.py` y `views/componentes/__init__.py`
+- `controllers/reporte_controller.py`
+- `prototipo/demo.py` y `prototipo/ver.py`
+- Pruebas: `tests/test_reportes_view.py` (nuevo), `tests/test_componentes.py`, `tests/test_formato.py`, `tests/test_reporte_controller.py` y `tests/test_app_principal.py`
+- `docs/`
+
+### Motivo
+Los indicadores y el PDF existían desde la Fase 5, pero solo se podían usar desde código o desde `verificar_controladores.py`. El jefe de guardia y el administrador no tenían cómo verlos ni exportarlos. Es una de las dos pantallas que faltaban para cerrar la Fase 6; la otra es la de administración.
+
+### Impacto
+- Pruebas: **1976 pasan** (antes 1928).
+- Sin cambios de esquema.
+- Una regla nueva en el controlador: el rango de años del período.
+- El administrador ve ahora «Tablero de camas» y «Reportes». Antes solo veía el tablero.
+
+### Decisiones
+- **Forma de la pantalla (acordada con el usuario, porque el brief no la describía):**
+  - el período, los 4 indicadores y las dos tarjetas: lo mismo que trae el PDF;
+  - atajos y fechas escritas;
+  - el diálogo «Guardar como» en `componentes/errores.py`, para que ninguna vista llame a tkinter directamente.
+- **El atajo marcado sigue a las fechas escritas.** Si no corresponde a ninguno, no se marca ninguno. Pulsar el marcado vuelve a pedir su período, por ejemplo «Hoy» en una pantalla abierta desde ayer. El día 1, «Hoy» y «Este mes» son el mismo período, y se conserva el que eligió el usuario.
+- **Tras un fallo se conserva lo último mostrado,** como en el tablero. La línea sobre los indicadores dice de qué período es, así no se confunde con lo que dicen los campos.
+- **Las notas de los tiempos van vacías.** A 1093×614, «5 h 12 min» no deja lugar para una nota en la tarjeta; que son promedios lo dice la línea de arriba.
+- **Porcentajes enteros en pantalla**, como el tablero; el PDF conserva el decimal del controlador. Una misma pantalla no mezcla los dos formatos.
+- **Las fechas marcadas en rojo pierden la marca cuando lo escrito cambia,** no con cualquier tecla, igual que el motivo en Camas. Así soltar el Enter que envió la fecha no la desmarca. Un período que rechaza el controlador (la inicial después de la final) marca las dos fechas, porque no se sabe cuál está mal.
+- **«Sin conexión» solo ante un error de la BD.** Un PDF abierto en otro programa (`ReporteError`) muestra su mensaje, pero no cambia el encabezado.
+- **«Espera de cama» se mide desde el ingreso**, como la calcula el controlador; `PROJECT_CONTEXT.md` §12 habla de «triaje a cama». La pantalla muestra lo que entrega el controlador.
+- **Proceso de la interfaz** (skill ui-consistency):
+  - la lista de comprobación salió de Limpieza (estructura) y del tablero (indicadores);
+  - la revisión se calibró con un `16` escrito a mano en lugar de `tema.ESPACIO_2`, plantado en una copia de Limpieza en un worktree temporal, y el revisor lo encontró;
+  - después revisaron la pantalla, en paralelo, un verificador de la interfaz y un auditor de código, ninguno de los dos autor de la pantalla. Lo que encontraron está corregido: la línea de pacientes cortada, el atajo marcado que no respondía, los dos formatos de porcentaje, el singular de «Ingresos», el marcador de los indicadores, el período mostrado tras un fallo y el `OverflowError`.
+
+### Pendientes
+- **Indicadores que el controlador no calcula** (`PROJECT_CONTEXT.md` §12):
+  - rotación de cama;
+  - cumplimiento del tiempo objetivo por nivel.
+- **El texto del estado de cama** (`estado.value.capitalize()`) ya está escrito en tablero, `TarjetaCama`, Gestión de camas, Reportes y el PDF: conviene llevarlo a `formato.py`. `texto_tiempo` repite el cálculo del cuarto indicador del tablero.
+- **Al exportar, «Ahora en la guardia» se vuelve a leer.** Si pasa tiempo en el diálogo «Guardar como», el PDF puede diferir de lo que se ve.
+- **Mostrar «Sin conexión» con cualquier `SigtacError`:** el tablero lo hace así y Reportes, al consultar, también. Sería más preciso filtrar por `PersistenciaError`.
+- **Común a toda la familia:**
+  - el borde claro de `TablaDatos` en modo oscuro;
+  - la barra de desplazamiento visible aunque las filas quepan.
+- **Administración** sigue sin pantalla.
+
+---
+
 ## [2026-10-31] — Gestión de camas y Limpieza
 
 ### Cambio
