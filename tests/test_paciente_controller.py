@@ -343,6 +343,25 @@ def test_solo_el_administrador_da_de_baja_o_reactiva(datos, sesion_de, metodo, r
     assert datos.llamadas() == []
 
 
+def test_el_administrador_busca_por_documento_para_dar_de_baja(datos, admin):
+    datos["PacienteDAO"].buscar_por_documento.return_value = rosa(activo=False)
+    assert admin.buscar_para_administrar("DNI", DNI).activo is False
+    datos["PacienteDAO"].buscar_por_documento.assert_called_once_with(DocumentoIdentidad("DNI", DNI))
+
+
+@pytest.mark.parametrize("rol", [Rol.ENFERMERO, Rol.MEDICO, Rol.JEFE_GUARDIA, Rol.LIMPIEZA])
+def test_buscar_para_administrar_solo_el_administrador(datos, sesion_de, rol):
+    with pytest.raises(UsuarioSinPermisoError):
+        PacienteController(sesion_de(rol)).buscar_para_administrar("DNI", DNI)
+    assert datos.llamadas() == []
+
+
+def test_buscar_para_administrar_valida_el_documento(datos, admin):
+    with pytest.raises(ValueError):
+        admin.buscar_para_administrar("DNI", "123")
+    datos["PacienteDAO"].buscar_por_documento.assert_not_called()
+
+
 def test_dar_de_baja_bloquea_comprueba_y_audita(datos, admin):  # RN-11
     datos["PacienteDAO"].bloquear.return_value = True
     datos["EpisodioDAO"].listar_por_paciente.return_value = [episodio(estado=EstadoEpisodio.ALTA)]

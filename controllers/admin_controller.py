@@ -1,6 +1,7 @@
-from datetime import date, datetime, time, timedelta
+from datetime import date
 
 from controllers.auth_controller import Sesion, exigir_permiso
+from controllers.periodo import rango_de_dias
 from dao.auditoria_dao import AuditoriaDAO
 from dao.transaccion import transaccion
 from dao.usuario_dao import UsuarioDAO
@@ -40,6 +41,11 @@ class AdminController:
         exigir_permiso(self._sesion, Permiso.ADMINISTRACION)
         return list(Rol)
 
+    def listar_tablas_auditables(self) -> list[str]:
+        """Las tablas por las que se puede filtrar la bitácora, en orden alfabético."""
+        exigir_permiso(self._sesion, Permiso.ADMINISTRACION)
+        return sorted(AuditoriaDAO.TABLAS_AUDITABLES)
+
     def bitacora(self, desde: date, hasta: date, tabla: str | None = None, id_usuario: int | None = None,
                  limite: int = 200) -> list[dict]:
         """
@@ -47,13 +53,7 @@ class AdminController:
         Se consulta como [desde 00:00, hasta + 1 día 00:00), igual que los indicadores de ReporteController.
         """
         exigir_permiso(self._sesion, Permiso.ADMINISTRACION)
-        for valor in (desde, hasta):
-            if not isinstance(valor, date) or isinstance(valor, datetime):
-                raise ValueError("El período se indica con fechas (date), sin hora.")
-        if desde > hasta:
-            raise ValueError("La fecha inicial no puede ser posterior a la final.")
-        inicio = datetime.combine(desde, time.min)
-        fin = datetime.combine(hasta + timedelta(days=1), time.min)
+        inicio, fin = rango_de_dias(desde, hasta)
         return AuditoriaDAO.listar(inicio, fin, tabla=tabla, id_usuario=id_usuario, limite=limite)
 
     def historial_de_registro(self, tabla: str, id_registro: int) -> list[dict]:

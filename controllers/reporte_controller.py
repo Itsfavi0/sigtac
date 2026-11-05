@@ -1,8 +1,9 @@
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime
 from pathlib import Path
 
 from controllers.auth_controller import Sesion, exigir_permiso
+from controllers.periodo import rango_de_dias
 from dao.reporte_dao import ReporteDAO
 from dao.transaccion import transaccion
 from models.estados import EstadoCama, EstadoEpisodio
@@ -53,9 +54,6 @@ class ReporteController:
 
     # Camas en uso: tienen un paciente asignado (aún no llegó o ya está en ella)
     CAMAS_EN_USO = (EstadoCama.RESERVADA, EstadoCama.OCUPADA)
-    # El rango de DATETIME de MySQL (años 1000 a 9999). Al último día se le suma uno para incluirlo completo, así que
-    # el 31/12/9999 no cabría (Python lanzaría OverflowError, que la vista no espera)
-    ANIO_MINIMO, ANIO_MAXIMO = 1000, 9998
 
     def __init__(self, sesion: Sesion):
         self._sesion = sesion
@@ -75,16 +73,7 @@ class ReporteController:
     def indicadores(self, desde: date, hasta: date) -> IndicadoresPeriodo:
         """Indicadores entre dos días, ambos incluidos (p. ej. del 1 al 31 de octubre)."""
         exigir_permiso(self._sesion, Permiso.REPORTES)
-        for valor in (desde, hasta):
-            # datetime es subclase de date: se exige un día, sin hora
-            if not isinstance(valor, date) or isinstance(valor, datetime):
-                raise ValueError("El período se indica con días (date), sin hora.")
-        if desde > hasta:
-            raise ValueError("La fecha inicial no puede ser posterior a la final.")
-        if desde.year < self.ANIO_MINIMO or hasta.year > self.ANIO_MAXIMO:
-            raise ValueError(f"El período debe estar entre los años {self.ANIO_MINIMO} y {self.ANIO_MAXIMO}.")
-        inicio = datetime.combine(desde, time.min)
-        fin = datetime.combine(hasta + timedelta(days=1), time.min)  # [inicio, fin): incluye todo el último día
+        inicio, fin = rango_de_dias(desde, hasta)  # [inicio, fin): incluye todo el último día
 
         with transaccion():  # todas las consultas ven la misma foto de la BD
             ingresos = ReporteDAO.contar_ingresos(inicio, fin)

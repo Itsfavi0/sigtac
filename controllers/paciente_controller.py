@@ -38,6 +38,14 @@ class PacienteController:
         exigir_permiso(self._sesion, Permiso.PACIENTES)
         return PacienteDAO.buscar_por_documento(DocumentoIdentidad(tipo_documento, num_documento))
 
+    def buscar_para_administrar(self, tipo_documento: str, num_documento: str) -> Paciente | None:
+        """
+        La misma búsqueda, para dar de baja o reactivar (ADMINISTRACION): el administrador no atiende pacientes y no
+        tiene el permiso PACIENTES, pero necesita encontrar el registro que va a corregir.
+        """
+        exigir_permiso(self._sesion, Permiso.ADMINISTRACION)
+        return PacienteDAO.buscar_por_documento(DocumentoIdentidad(tipo_documento, num_documento))
+
     def listar_no_identificados(self) -> list[Paciente]:
         """Pacientes NN activos que aún esperan ser identificados."""
         exigir_permiso(self._sesion, Permiso.PACIENTES)

@@ -35,6 +35,7 @@ def ctrl(sesion_de):
 OPERACIONES = [
     ("listar_cuentas", ()), ("listar_empleados_sin_cuenta", ()), ("listar_roles", ()),
     ("bitacora", (date(2026, 10, 1), date(2026, 10, 31))), ("historial_de_registro", ("paciente", 1)),
+    ("listar_tablas_auditables", ()),
     ("crear_cuenta", (3, Rol.ENFERMERO, CLAVE)), ("cambiar_rol", (3, Rol.MEDICO)), ("desactivar", (3,)),
     ("activar", (3,)), ("restablecer_clave", (3, CLAVE)), ("desbloquear", (3,)),
 ]
@@ -79,6 +80,18 @@ def test_bitacora_incluye_los_dos_dias(datos, ctrl):
 def test_bitacora_con_periodo_invalido(datos, ctrl, desde, hasta):
     with pytest.raises(ValueError):
         ctrl.bitacora(desde, hasta)
+    datos["AuditoriaDAO"].listar.assert_not_called()
+
+
+def test_listar_tablas_auditables_en_orden(datos, ctrl):
+    datos["AuditoriaDAO"].TABLAS_AUDITABLES = frozenset({"usuario", "cama", "paciente"})
+    assert ctrl.listar_tablas_auditables() == ["cama", "paciente", "usuario"]
+
+
+def test_bitacora_con_un_anio_fuera_del_rango_de_mysql(datos, ctrl):
+    # Sumarle un día al 31/12/9999 desbordaría date: antes era un OverflowError que la vista no esperaba
+    with pytest.raises(ValueError, match="años"):
+        ctrl.bitacora(date(2026, 10, 1), date(9999, 12, 31))
     datos["AuditoriaDAO"].listar.assert_not_called()
 
 
