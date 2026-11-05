@@ -16,11 +16,18 @@ _DIAS = ("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
 _MESES = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
 
 
+def abreviar(nombres: str, apellidos: str) -> str:
+    """«María», «Salazar Quispe» → «M. Salazar»: la inicial y el primer apellido (de un paciente, de una cuenta)."""
+    inicial = f"{nombres.strip()[0]}. " if nombres.strip() else ""
+    primer_apellido = apellidos.split()[0] if apellidos.split() else ""
+    return f"{inicial}{primer_apellido}".strip()
+
+
 def nombre_corto(paciente: Paciente) -> str:
     """«María Salazar Quispe» → «M. Salazar»; un NN → «NN · varón, ~40 años» (lo que se sabe de él)."""
     if not paciente.identificado:
         return f"NN · {SEXO[paciente.sexo]}, ~{paciente.calcular_edad()} años"
-    return f"{paciente.nombres.strip()[0]}. {paciente.apellidos.split()[0]}"
+    return abreviar(paciente.nombres, paciente.apellidos)
 
 
 def documento_enmascarado(paciente: Paciente) -> str:

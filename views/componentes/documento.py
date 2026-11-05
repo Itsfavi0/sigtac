@@ -68,6 +68,11 @@ class CamposDocumento(ctk.CTkFrame):
     def enfocar(self):
         self._numero.focus_set()
 
+    def al_cambiar_tipo(self, funcion):
+        """`funcion()` se llama cuando el usuario elige otro tipo (con el mouse o con ↑/↓), como el número avisa con
+        <KeyRelease>: así la pantalla sabe que el documento ya no es el que buscó."""
+        self._tipo.configure(command=lambda _valor: funcion())
+
     @property
     def campo_numero(self) -> ctk.CTkEntry:
         """La caja del número, para que la pantalla le asocie teclas (Enter para la acción principal)."""

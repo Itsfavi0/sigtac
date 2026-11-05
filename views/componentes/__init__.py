@@ -8,11 +8,13 @@ from views.componentes.marca import Marca
 from views.componentes.matriz import MatrizCamas
 from views.componentes.nivel import InsigniaNivel, texto_nivel
 from views.componentes.paciente import CamposPaciente, FichaPaciente
+from views.componentes.periodo import CamposPeriodo
 from views.componentes.selector import Selector
 from views.componentes.tabla import TablaDatos
 from views.componentes.tarjetas import Tarjeta, TarjetaCama, TarjetaKPI
 
-__all__ = ["BotonPrimario", "BotonSecundario", "CamposDocumento", "CamposPaciente", "FichaPaciente", "InsigniaNivel",
+__all__ = ["BotonPrimario", "BotonSecundario", "CamposDocumento", "CamposPaciente", "CamposPeriodo", "FichaPaciente",
+           "InsigniaNivel",
            "Marca", "MatrizCamas", "Selector",
            "TablaDatos", "Tarjeta", "TarjetaCama", "TarjetaKPI", "campo_texto", "casilla", "confirmar",
            "etiqueta_campo", "lista_opciones", "marcar_error", "marcar_foco", "mostrar_error", "mostrar_info",

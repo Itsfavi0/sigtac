@@ -9,7 +9,7 @@ from models.estados import EstadoCama, EstadoEpisodio
 from models.excepciones import ConexionBDError, ReporteError
 from prototipo.demo import ReportesDemo
 from views import reportes_view, tema
-from views.reportes_view import SIN_LECTURA, ReportesView, nombre_archivo, periodo_de, texto_periodo
+from views.reportes_view import SIN_LECTURA, ReportesView, nombre_archivo
 
 HOY = date(2026, 10, 15)
 AHORA = datetime(2026, 10, 15, 10, 42)
@@ -43,10 +43,10 @@ def filas(tabla) -> list[tuple]:
 
 def escribir(vista, campo, texto):
     """Escribe en Desde o Hasta como el usuario: reemplaza el texto y suelta una tecla."""
-    caja = getattr(vista, campo)
+    caja = getattr(vista.periodo, campo)
     caja.delete(0, "end")
     caja.insert(0, texto)
-    vista._fechas_editadas()
+    vista.periodo.fechas_editadas()
 
 
 def kpis(vista) -> list[tuple[str, str]]:
@@ -59,37 +59,16 @@ def marcado(campo) -> bool:
 
 # ---- Funciones puras
 
-@pytest.mark.parametrize("atajo, hoy, esperado", [
-    ("hoy", HOY, (HOY, HOY)),
-    ("semana", HOY, (date(2026, 10, 9), HOY)),                         # 7 días contando hoy
-    ("semana", date(2027, 1, 3), (date(2026, 12, 28), date(2027, 1, 3))),  # cruza el año
-    ("mes", HOY, (date(2026, 10, 1), HOY)),
-    ("mes", date(2026, 11, 1), (date(2026, 11, 1), date(2026, 11, 1))),  # el día 1: solo ese día
-])
-def test_periodo_de_cada_atajo(atajo, hoy, esperado):
-    assert periodo_de(atajo, hoy) == esperado
-
-
-def test_atajo_desconocido():
-    with pytest.raises(ValueError, match="desconocido"):
-        periodo_de("año", HOY)
-
-
 def test_nombre_del_archivo_propuesto():
     assert nombre_archivo(date(2026, 10, 1), date(2026, 10, 31)) == "sigtac_indicadores_2026-10-01_2026-10-31.pdf"
-
-
-def test_texto_del_periodo():
-    assert texto_periodo(date(2026, 10, 1), HOY) == "Del 01/10/2026 al 15/10/2026"
-    assert texto_periodo(HOY, HOY) == "El 15/10/2026"
 
 
 # ---- Al abrir
 
 def test_al_abrir_muestra_el_mes_en_curso(crear):
     vista = crear()
-    assert (vista._desde.get(), vista._hasta.get()) == ("01/10/2026", "15/10/2026")
-    assert vista._atajos.valor == "mes"
+    assert (vista.periodo.desde.get(), vista.periodo.hasta.get()) == ("01/10/2026", "15/10/2026")
+    assert vista.periodo.atajos.valor == "mes"
     vista.reportes.indicadores.assert_called_once_with(date(2026, 10, 1), HOY)
     assert vista._periodo_mostrado.cget("text") == "Del 01/10/2026 al 15/10/2026" + NOTA
     # 15 días de la demo: 14 ingresos y 12 triajes por día
@@ -120,9 +99,9 @@ def test_ahora_en_la_guardia(crear):
 
 def test_el_dia_1_al_abrir_queda_marcado_este_mes(crear):  # «Hoy» y «Este mes» son el mismo período
     vista = crear(hoy=date(2026, 11, 1))
-    assert vista._atajos.valor == "mes"
-    vista._atajos.botones["hoy"].invoke()
-    assert vista._atajos.valor == "hoy"
+    assert vista.periodo.atajos.valor == "mes"
+    vista.periodo.atajos.botones["hoy"].invoke()
+    assert vista.periodo.atajos.valor == "hoy"
 
 
 def test_si_la_bd_falla_al_abrir_hay_un_solo_aviso(crear):
@@ -167,40 +146,40 @@ def test_uno_en_singular(crear):
 
 def test_un_atajo_rellena_las_fechas_y_consulta(crear):
     vista = crear()
-    vista._atajos.botones["hoy"].invoke()
-    assert (vista._desde.get(), vista._hasta.get()) == ("15/10/2026", "15/10/2026")
+    vista.periodo.atajos.botones["hoy"].invoke()
+    assert (vista.periodo.desde.get(), vista.periodo.hasta.get()) == ("15/10/2026", "15/10/2026")
     vista.reportes.indicadores.assert_called_with(HOY, HOY)
     assert kpis(vista)[0] == ("14", "pacientes")
 
 
 def test_pulsar_el_atajo_marcado_vuelve_a_pedirlo(crear):
     vista = crear()
-    vista._atajos.botones["mes"].invoke()
+    vista.periodo.atajos.botones["mes"].invoke()
     assert vista.reportes.indicadores.call_count == 2
 
 
 def test_al_escribir_el_atajo_sigue_a_las_fechas(crear):
     vista = crear()
-    escribir(vista, "_desde", "01/09/2026")
-    assert vista._atajos.valor is None  # aún sin consultar: «Este mes» ya no corresponde
-    escribir(vista, "_desde", "09/10/2026")
-    assert vista._atajos.valor == "semana"
-    escribir(vista, "_desde", "09/10/20")  # a medio escribir
-    assert vista._atajos.valor is None and not marcado(vista._desde)
+    escribir(vista, "desde", "01/09/2026")
+    assert vista.periodo.atajos.valor is None  # aún sin consultar: «Este mes» ya no corresponde
+    escribir(vista, "desde", "09/10/2026")
+    assert vista.periodo.atajos.valor == "semana"
+    escribir(vista, "desde", "09/10/20")  # a medio escribir
+    assert vista.periodo.atajos.valor is None and not marcado(vista.periodo.desde)
 
 
 def test_tras_escribir_otro_periodo_el_mes_vuelve_con_su_atajo(crear):
     vista = crear()
-    escribir(vista, "_desde", "01/09/2026")
-    vista._atajos.botones["mes"].invoke()
-    assert vista._desde.get() == "01/10/2026"
+    escribir(vista, "desde", "01/09/2026")
+    vista.periodo.atajos.botones["mes"].invoke()
+    assert vista.periodo.desde.get() == "01/10/2026"
     vista.reportes.indicadores.assert_called_with(date(2026, 10, 1), HOY)
-    assert vista._atajos.valor == "mes"
+    assert vista.periodo.atajos.valor == "mes"
 
 
 def test_un_periodo_escrito_se_consulta(crear):
     vista = crear()
-    escribir(vista, "_desde", "01/09/2026")
+    escribir(vista, "desde", "01/09/2026")
     assert vista.ver_indicadores() == "break"
     vista.reportes.indicadores.assert_called_with(date(2026, 9, 1), HOY)
     assert vista._periodo_mostrado.cget("text").startswith("Del 01/09/2026 al 15/10/2026")
@@ -208,49 +187,49 @@ def test_un_periodo_escrito_se_consulta(crear):
 
 def test_enter_en_las_dos_fechas_consulta(crear):
     vista = crear()
-    for campo in (vista._desde, vista._hasta):
+    for campo in (vista.periodo.desde, vista.periodo.hasta):
         assert "ver_indicadores" in campo._entry.bind("<Return>")
 
 
-@pytest.mark.parametrize("campo, texto", [("_desde", "1/13/2026"), ("_desde", "31/02/2026"), ("_hasta", "ayer"),
-                                          ("_hasta", "")])
+@pytest.mark.parametrize("campo, texto", [("desde", "1/13/2026"), ("desde", "31/02/2026"), ("hasta", "ayer"),
+                                          ("hasta", "")])
 def test_una_fecha_mal_escrita_marca_su_campo_y_no_consulta(crear, campo, texto):
     vista = crear()
     escribir(vista, campo, texto)
     vista.ver_indicadores()
-    assert marcado(getattr(vista, campo))
+    assert marcado(getattr(vista.periodo, campo))
     assert "dd/mm/aaaa" in str(vista.dialogos["error"][0])
     assert vista.reportes.indicadores.call_count == 1  # solo al abrir
 
 
 def test_la_marca_se_va_al_corregir_no_al_soltar_enter(crear):
     vista = crear()
-    escribir(vista, "_hasta", "ayer")
+    escribir(vista, "hasta", "ayer")
     vista.ver_indicadores()
-    vista._fechas_editadas()  # soltar el Enter: el texto no cambió
-    assert marcado(vista._hasta)
-    escribir(vista, "_hasta", "15/10/2026")
-    assert not marcado(vista._hasta)
+    vista.periodo.fechas_editadas()  # soltar el Enter: el texto no cambió
+    assert marcado(vista.periodo.hasta)
+    escribir(vista, "hasta", "15/10/2026")
+    assert not marcado(vista.periodo.hasta)
 
 
 def test_un_periodo_rechazado_marca_las_dos_fechas_y_conserva_lo_mostrado(crear):  # valor límite: desde > hasta
     reportes = MagicMock(wraps=ReportesDemo())
     vista = crear(reportes=reportes)
     reportes.indicadores.side_effect = ValueError("La fecha inicial no puede ser posterior a la final.")
-    escribir(vista, "_desde", "16/10/2026")
+    escribir(vista, "desde", "16/10/2026")
     vista.ver_indicadores()
     assert [str(e) for e in vista.dialogos["error"]] == ["La fecha inicial no puede ser posterior a la final."]
-    assert marcado(vista._desde) and marcado(vista._hasta)
+    assert marcado(vista.periodo.desde) and marcado(vista.periodo.hasta)
     assert vista._periodo_mostrado.cget("text").startswith("Del 01/10/2026 al 15/10/2026")
     assert vista.avisos == [True]  # no es un problema de conexión
-    escribir(vista, "_desde", "14/10/2026")  # al corregir una, el período cambió: se van las dos marcas
-    assert not marcado(vista._desde) and not marcado(vista._hasta)
+    escribir(vista, "desde", "14/10/2026")  # al corregir una, el período cambió: se van las dos marcas
+    assert not marcado(vista.periodo.desde) and not marcado(vista.periodo.hasta)
 
 
 def test_si_la_bd_falla_despues_conserva_lo_ultimo_y_dice_de_que_periodo_es(crear):
     vista = crear()
     vista.reportes.estado_actual.side_effect = ConexionBDError("No hay conexión con la base de datos.")
-    vista._atajos.botones["hoy"].invoke()
+    vista.periodo.atajos.botones["hoy"].invoke()
     assert kpis(vista)[0] == ("210", "pacientes")
     assert vista._periodo_mostrado.cget("text").startswith("Del 01/10/2026 al 15/10/2026")  # no el de «Hoy»
     assert vista.avisos == [True, False]
@@ -272,7 +251,7 @@ def guardar_como(monkeypatch, dialogos):
 
 def test_exportar_guarda_el_pdf_del_periodo_mostrado(crear, guardar_como, tmp_path):
     vista = crear()
-    escribir(vista, "_desde", "01/09/2026")
+    escribir(vista, "desde", "01/09/2026")
     destino = tmp_path / "septiembre.pdf"
     guardar_como(destino)
     vista.exportar()
@@ -295,7 +274,7 @@ def test_cancelar_el_dialogo_no_exporta(crear, guardar_como):
 def test_con_una_fecha_mal_escrita_no_se_abre_el_dialogo(crear, guardar_como, tmp_path):
     vista = crear()
     guardar_como(tmp_path / "x.pdf")
-    escribir(vista, "_desde", "ayer")
+    escribir(vista, "desde", "ayer")
     vista.exportar()
     assert vista.dialogos["ruta"] == []
     vista.reportes.exportar_pdf.assert_not_called()

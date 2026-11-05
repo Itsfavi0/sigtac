@@ -8,6 +8,7 @@ from collections import Counter
 from datetime import datetime, timedelta
 
 from controllers.auth_controller import Sesion
+from controllers.periodo import rango_de_dias
 from controllers.cama_controller import CamaController, PacienteEnCama
 from controllers.colas import EntradaCola
 from controllers.reporte_controller import EstadoGuardia, IndicadoresPeriodo
@@ -17,9 +18,11 @@ from models.documento import DocumentoIdentidad
 from models.estados import EstadoCama, EstadoEpisodio
 from models.estrategias import ReglaManchester
 from models.asignacion import SolicitudLimpieza
+from models.auditoria import AccionAuditoria
 from models.excepciones import CamaNoDisponibleError, ReglaNegocioError
 from models.permisos import Rol
 from models.persona import Paciente
+from models.usuario import CuentaUsuario, validar_clave_nueva, validar_rol
 from models.triaje import EpisodioEmergencia, SignosVitales, Sintoma, Triaje, ordenar_por_prioridad
 from utils import pdf_generator
 
@@ -346,9 +349,11 @@ class TriajeDemo:
 class PacientesDemo:
     """Buscar, registrar y admitir pacientes; abrir un episodio lo agrega a la cola de `triaje`."""
 
-    def __init__(self, triaje: TriajeDemo, ahora=datetime.now):
+    def __init__(self, triaje: TriajeDemo, ahora=datetime.now, al_auditar=None, camas: "CamasDemo | None" = None):
         self._triaje = triaje
         self._ahora = ahora
+        self._al_auditar = al_auditar  # (tabla, acción, id) → la bitácora de AdminDemo
+        self._camas = camas            # para saber si el paciente espera cama o está en una (episodio abierto)
         self._pacientes = [_paciente(200, *_REGISTRADO)]
         self._siguiente = 300
         for i, (sexo, edad, id_seguro) in enumerate(_SIN_IDENTIFICAR):
@@ -376,7 +381,7 @@ class PacientesDemo:
     def abrir_episodio(self, id_paciente: int, motivo_consulta: str):
         if not isinstance(motivo_consulta, str) or not motivo_consulta.strip():
             raise ValueError("El motivo de consulta es obligatorio.")
-        paciente = next((p for p in self._pacientes if p.id_paciente == id_paciente), None)
+        paciente = next((p for p in self._pacientes if p.id_paciente == id_paciente and p.activo), None)
         if paciente is None:
             raise ReglaNegocioError("El paciente no existe o está dado de baja.")
         if self._triaje.en_cola(id_paciente):
@@ -410,6 +415,39 @@ class PacientesDemo:
             raise ReglaNegocioError("Ambos pacientes tienen un episodio abierto: cierre uno antes de fusionarlos.")
         return self._triaje.cambiar_paciente(id_nn, destino)
 
+    def buscar_para_administrar(self, tipo_documento: str, num_documento: str):
+        return self.buscar_por_documento(tipo_documento, num_documento)
+
+    def dar_de_baja(self, id_paciente: int) -> None:
+        paciente = self._cargar(id_paciente)
+        if not paciente.activo:
+            raise ReglaNegocioError("El paciente no existe o ya está dado de baja.")
+        if self._episodio_abierto(id_paciente):
+            raise ReglaNegocioError("El paciente tiene un episodio abierto: ciérrelo antes.")
+        paciente.anular()
+        self._reemplazar(paciente)
+        self._auditar("paciente", AccionAuditoria.ANULAR, id_paciente)
+
+    def reactivar(self, id_paciente: int):
+        paciente = self._cargar(id_paciente)
+        paciente.reactivar()  # las reglas reales del modelo (un NN no se reactiva)
+        self._auditar("paciente", AccionAuditoria.REACTIVAR, id_paciente)
+        return self._reemplazar(paciente)
+
+    def _episodio_abierto(self, id_paciente: int) -> bool:
+        """Como el controlador: espera triaje, espera cama o está en una."""
+        if self._triaje.en_cola(id_paciente):
+            return True
+        if self._camas is None:
+            return False
+        en_camas = [e.paciente for e in self._camas.cola_de_espera()] + \
+                   [p.paciente for p in self._camas.pacientes_con_cama()]
+        return any(p is not None and p.id_paciente == id_paciente for p in en_camas)
+
+    def _auditar(self, tabla, accion, id_registro):
+        if self._al_auditar is not None:
+            self._al_auditar(tabla, accion, id_registro)
+
     def _cargar(self, id_paciente: int) -> Paciente:
         conocidos = self._pacientes + self._triaje.pacientes_en_cola()
         paciente = next((p for p in conocidos if p.id_paciente == id_paciente), None)
@@ -421,7 +459,8 @@ class PacientesDemo:
         """Vuelve a armar el paciente con el nombre de su seguro, como lo relee el controlador real."""
         seguro = next(s["nombre_seguro"] for s in _SEGUROS if s["id_seguro"] == paciente.id_seguro)
         nuevo = Paciente(paciente.id_paciente, paciente.documento, paciente.nombres, paciente.apellidos,
-                         paciente.fecha_nac, paciente.sexo, paciente.id_seguro, nombre_seguro=seguro)
+                         paciente.fecha_nac, paciente.sexo, paciente.id_seguro, activo=paciente.activo,
+                         nombre_seguro=seguro)
         self._pacientes = [nuevo if p.id_paciente == nuevo.id_paciente else p for p in self._pacientes]
         if all(p.id_paciente != nuevo.id_paciente for p in self._pacientes):
             self._pacientes.append(nuevo)
@@ -475,3 +514,122 @@ class ReportesDemo:
         ruta = pdf_generator.validar_ruta_pdf(ruta)
         return pdf_generator.guardar_reporte(ruta, self.indicadores(desde, hasta), self.estado_actual(),
                                              datetime.now(), "Elena Ríos Paredes (demostración)")
+
+
+# (id_usuario, id_empleado, nombres, apellidos, cargo, rol, activo, bloqueada, intentos)
+_CUENTAS = ((1, 1, "Elena", "Ríos Paredes", "Médica Jefa", Rol.ADMINISTRADOR, True, False, 0),
+            (2, 2, "Luis", "Ramos Díaz", "Médico", Rol.MEDICO, True, False, 0),
+            (3, 3, "Ana", "Quispe Rojas", "Enfermera", Rol.ENFERMERO, True, True, 5),
+            (4, 4, "Rosa", "Díaz Vela", "Médica", Rol.JEFE_GUARDIA, True, False, 2),
+            (5, 5, "Jorge", "Salas Mori", "Técnico de limpieza", Rol.LIMPIEZA, True, False, 0),
+            (6, 6, "Pedro", "Huamán Ccori", "Enfermero", Rol.ENFERMERO, False, False, 0))
+_SIN_CUENTA = ({"id_empleado": 7, "nombres": "Carla", "apellidos": "Vega Torres", "nombre_cargo": "Enfermera"},
+               {"id_empleado": 8, "nombres": "Miguel", "apellidos": "Arias Cano", "nombre_cargo": "Médico"})
+_TABLAS_DEMO = ("asignacion_cama", "cama", "episodio_emergencia", "paciente", "triaje", "usuario")
+
+
+class AdminDemo:
+    """
+    Cuentas y bitácora con las reglas reales: CuentaUsuario decide las transiciones, la política de claves es
+    validar_clave_nueva y el período, rango_de_dias. La sesión de la demo es la cuenta 1 (no se modifica a sí misma).
+    Cada operación, también la baja de un paciente en PacientesDemo (anotar), queda en la bitácora.
+    """
+
+    ID_PROPIO = 1
+
+    def __init__(self, ahora=datetime.now):
+        self._ahora = ahora
+        self._cuentas = {fila[0]: CuentaUsuario(*fila) for fila in _CUENTAS}
+        self._sin_cuenta = [dict(e) for e in _SIN_CUENTA]
+        self._bitacora = []
+        momento = ahora()
+        for minutos, id_usuario, tabla, accion, id_registro, detalles in (
+                (180, 2, "paciente", AccionAuditoria.INSERT, 200, None),
+                (95, 4, "triaje", AccionAuditoria.INSERT, 31, {"nivel": 2}),
+                (40, 1, "usuario", AccionAuditoria.UPDATE, 6, {"activo": False}),
+                (12, 4, "cama", AccionAuditoria.UPDATE, 7, {"estado_anterior": "OCUPADA",
+                                                            "estado_nuevo": "EN LIMPIEZA"})):
+            self._anotar(id_usuario, tabla, accion, id_registro, detalles, momento - timedelta(minutes=minutos))
+
+    # ---- Consultas
+
+    def listar_cuentas(self):
+        return sorted(self._cuentas.values(), key=lambda c: (c.apellidos, c.nombres))
+
+    def listar_empleados_sin_cuenta(self):
+        return sorted((dict(e) for e in self._sin_cuenta), key=lambda e: (e["apellidos"], e["nombres"]))
+
+    def listar_tablas_auditables(self):
+        return list(_TABLAS_DEMO)
+
+    def bitacora(self, desde, hasta, tabla=None, id_usuario=None, limite=200):
+        inicio, fin = rango_de_dias(desde, hasta)  # las mismas validaciones que el controlador
+        registros = [r for r in self._bitacora if inicio <= r["fecha_hora"] < fin
+                     and tabla in (None, r["tabla_afectada"]) and id_usuario in (None, r["id_usuario"])]
+        return sorted(registros, key=lambda r: (r["fecha_hora"], r["id_bitacora"]), reverse=True)[:limite]
+
+    # ---- Cuentas
+
+    def crear_cuenta(self, id_empleado, rol, clave):
+        rol = validar_rol(rol)
+        validar_clave_nueva(clave)
+        empleado = next((e for e in self._sin_cuenta if e["id_empleado"] == id_empleado), None)
+        if empleado is None:
+            raise ReglaNegocioError("El empleado no existe o ya tiene una cuenta.")
+        id_usuario = max(self._cuentas) + 1
+        cuenta = CuentaUsuario(id_usuario, id_empleado, empleado["nombres"], empleado["apellidos"],
+                               empleado["nombre_cargo"], rol, True)
+        self._cuentas[id_usuario] = cuenta
+        self._sin_cuenta.remove(empleado)
+        self.anotar("usuario", AccionAuditoria.INSERT, id_usuario, {"id_empleado": id_empleado, "rol": rol.value})
+        return cuenta
+
+    def cambiar_rol(self, id_usuario, rol):
+        rol = validar_rol(rol)
+        self._otra_cuenta(id_usuario, "cambiar su propio rol")
+        cuenta = self._cargar(id_usuario)
+        anterior = cuenta.rol
+        cuenta.cambiar_rol(rol)
+        self.anotar("usuario", AccionAuditoria.UPDATE, id_usuario,
+                    {"rol_anterior": anterior.value, "rol_nuevo": cuenta.rol.value})
+
+    def desactivar(self, id_usuario):
+        self._otra_cuenta(id_usuario, "desactivar su propia cuenta")
+        self._cargar(id_usuario).desactivar()
+        self.anotar("usuario", AccionAuditoria.UPDATE, id_usuario, {"activo": False})
+
+    def activar(self, id_usuario):
+        self._cargar(id_usuario).activar()
+        self.anotar("usuario", AccionAuditoria.UPDATE, id_usuario, {"activo": True})
+
+    def restablecer_clave(self, id_usuario, clave_nueva):
+        validar_clave_nueva(clave_nueva)
+        cuenta = self._cargar(id_usuario)
+        if cuenta.bloqueada or cuenta.intentos_fallidos:
+            cuenta.desbloquear()  # como UsuarioDAO.restablecer_clave
+        self.anotar("usuario", AccionAuditoria.UPDATE, id_usuario, {"clave_restablecida": True})
+
+    def desbloquear(self, id_usuario):
+        self._cargar(id_usuario).desbloquear()
+        self.anotar("usuario", AccionAuditoria.UPDATE, id_usuario, {"desbloqueada": True})
+
+    # ---- Bitácora de la demo
+
+    def anotar(self, tabla, accion, id_registro, detalles=None):
+        """Lo que hace la sesión de la demo (también la baja de un paciente en PacientesDemo)."""
+        self._anotar(self.ID_PROPIO, tabla, accion, id_registro, detalles, self._ahora())
+
+    def _anotar(self, id_usuario, tabla, accion, id_registro, detalles, momento):
+        self._bitacora.append({"id_bitacora": len(self._bitacora) + 1, "id_usuario": id_usuario,
+                               "tabla_afectada": tabla, "accion": AccionAuditoria(accion),
+                               "id_registro_afectado": id_registro, "fecha_hora": momento, "detalles": detalles})
+
+    def _otra_cuenta(self, id_usuario, accion):
+        if id_usuario == self.ID_PROPIO:
+            raise ReglaNegocioError(f"No puede {accion}: pídaselo a otro administrador.")
+
+    def _cargar(self, id_usuario):
+        cuenta = self._cuentas.get(id_usuario)
+        if cuenta is None:
+            raise ReglaNegocioError("La cuenta no existe.")
+        return cuenta

@@ -74,6 +74,13 @@ def test_texto_porcentaje(valor, texto):
     assert formato.texto_porcentaje(valor) == texto
 
 
+@pytest.mark.parametrize("nombres, apellidos, texto", [("María", "Salazar Quispe", "M. Salazar"),
+                                                       ("  luis ", "Ramos", "l. Ramos"),
+                                                       ("", "Ramos Díaz", "Ramos"), ("Ana", "", "A.")])
+def test_abreviar(nombres, apellidos, texto):  # sin nombres o sin apellidos no falla
+    assert formato.abreviar(nombres, apellidos) == texto
+
+
 def test_texto_minutos_sin_cero():
     assert formato.texto_minutos(8, con_cero=False) == "8 min"
     assert formato.texto_minutos(75, con_cero=False) == "1 h 15 min"

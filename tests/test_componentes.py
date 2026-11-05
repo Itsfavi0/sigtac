@@ -1,3 +1,4 @@
+from datetime import date
 from pathlib import Path
 
 import customtkinter as ctk
@@ -14,6 +15,7 @@ from views.componentes import (BotonPrimario, BotonSecundario, CamposDocumento, 
                                etiqueta_campo, lista_opciones, marcar_error, marcar_foco, mostrar_error, mostrar_info,
                                pedir_ruta_pdf, texto_nivel)
 from views.componentes.documento import ETIQUETAS
+from views.componentes.periodo import CamposPeriodo, periodo_de, texto_periodo
 from views.componentes.tabla import ALTO_FILA
 
 
@@ -199,6 +201,15 @@ def test_no_valida_el_numero(raiz_tk):
     campos = CamposDocumento(raiz_tk)
     campos.fijar(TipoDocumento.DNI, " 123 ")
     assert campos.valores() == (TipoDocumento.DNI, " 123 ")
+
+
+def test_avisa_al_cambiar_el_tipo(raiz_tk):
+    from views.componentes.campos import mover_opcion
+    campos = CamposDocumento(raiz_tk)
+    avisos = []
+    campos.al_cambiar_tipo(lambda: avisos.append(campos.valores()[0]))
+    mover_opcion(campos._tipo, 1)  # ↓ en la lista, como el usuario
+    assert avisos == [TipoDocumento.CARNE_EXTRANJERIA]
 
 
 def test_bloquear_deja_los_campos_solo_para_leer(raiz_tk):
@@ -670,3 +681,91 @@ def test_leer_opcion_y_campo_marcan_y_desmarcan(raiz_tk):
     assert campo._entry.bind("<KeyRelease>")
     sin_error(campo)
     assert not campo._sigtac_error
+
+
+# ---- periodo.py (CamposPeriodo)
+
+HOY = date(2026, 10, 15)
+
+
+@pytest.mark.parametrize("atajo, hoy, esperado", [
+    ("hoy", HOY, (HOY, HOY)),
+    ("semana", HOY, (date(2026, 10, 9), HOY)),                              # 7 días contando hoy
+    ("semana", date(2027, 1, 3), (date(2026, 12, 28), date(2027, 1, 3))),  # cruza el año
+    ("mes", HOY, (date(2026, 10, 1), HOY)),
+    ("mes", date(2026, 11, 1), (date(2026, 11, 1), date(2026, 11, 1))),    # el día 1: solo ese día
+])
+def test_periodo_de_cada_atajo(atajo, hoy, esperado):
+    assert periodo_de(atajo, hoy) == esperado
+
+
+def test_atajo_desconocido():
+    with pytest.raises(ValueError, match="desconocido"):
+        periodo_de("año", HOY)
+
+
+def test_texto_del_periodo():
+    assert texto_periodo(date(2026, 10, 1), HOY) == "Del 01/10/2026 al 15/10/2026"
+    assert texto_periodo(HOY, HOY) == "El 15/10/2026"
+
+
+def crear_periodo(raiz, hoy=HOY, **opciones):
+    pedidos = []
+    periodo = CamposPeriodo(raiz, lambda: pedidos.append(periodo.leer()), hoy=lambda: hoy, **opciones)
+    return periodo, pedidos
+
+
+def escribir_fecha(periodo, campo, texto):
+    campo.delete(0, "end")
+    campo.insert(0, texto)
+    periodo.fechas_editadas()
+
+
+def test_periodo_empieza_en_el_atajo_inicial_sin_avisar(raiz_tk):
+    periodo, pedidos = crear_periodo(raiz_tk, inicial="hoy")
+    assert (periodo.desde.get(), periodo.hasta.get()) == ("15/10/2026", "15/10/2026")
+    assert periodo.atajos.valor == "hoy" and pedidos == []
+    assert periodo.leer() == (HOY, HOY)
+
+
+def test_periodo_sin_cabecera_pone_los_atajos_en_su_fila(raiz_tk):
+    periodo, _ = crear_periodo(raiz_tk)
+    assert periodo.atajos.master is periodo
+    tarjeta = Tarjeta(raiz_tk, "Período", "")
+    con_cabecera, _ = crear_periodo(tarjeta, cabecera=tarjeta.cabecera)
+    assert con_cabecera.atajos.master is tarjeta.cabecera
+
+
+def test_un_atajo_rellena_y_avisa_aunque_ya_este_marcado(raiz_tk):
+    periodo, pedidos = crear_periodo(raiz_tk)
+    periodo.atajos.botones["semana"].invoke()
+    periodo.atajos.botones["semana"].invoke()
+    assert pedidos == [(date(2026, 10, 9), HOY)] * 2
+
+
+def test_el_atajo_sigue_a_lo_escrito_y_el_marcado_va_primero(raiz_tk):
+    periodo, _ = crear_periodo(raiz_tk, hoy=date(2026, 11, 1))  # el día 1, «Hoy» y «Este mes» coinciden
+    assert periodo.atajos.valor == "mes"
+    escribir_fecha(periodo, periodo.desde, "31/10/2026")
+    assert periodo.atajos.valor is None
+    escribir_fecha(periodo, periodo.desde, "01/11/2026")
+    assert periodo.atajos.valor == "hoy"  # sin marcado, el primero que coincide
+
+
+def test_una_fecha_mal_escrita_queda_marcada_hasta_que_cambia(raiz_tk):
+    periodo, _ = crear_periodo(raiz_tk)
+    escribir_fecha(periodo, periodo.hasta, "31/02/2026")
+    with pytest.raises(ValueError, match="dd/mm/aaaa"):
+        periodo.leer()
+    periodo.fechas_editadas()  # soltar el Enter: el texto no cambió
+    assert periodo.hasta._sigtac_error
+    escribir_fecha(periodo, periodo.hasta, "28/02/2026")
+    assert not periodo.hasta._sigtac_error
+
+
+def test_rechazar_marca_las_dos_y_al_corregir_se_van(raiz_tk):
+    periodo, _ = crear_periodo(raiz_tk)
+    periodo.rechazar()
+    assert periodo.desde._sigtac_error and periodo.hasta._sigtac_error
+    escribir_fecha(periodo, periodo.desde, "02/10/2026")
+    assert not periodo.desde._sigtac_error and not periodo.hasta._sigtac_error

@@ -3,9 +3,8 @@ Reportes: los indicadores de un período y el estado de la guardia en este momen
 administrador (permiso REPORTES). «Exportar PDF…» guarda el período que se ve en pantalla; «Ahora en la guardia» se
 vuelve a leer al guardar.
 
-- «Período»: los atajos (Hoy / Últimos 7 días / Este mes) rellenan «Desde» y «Hasta», que también se escriben
-  (dd/mm/aaaa). Al abrir se muestra el mes en curso. El atajo marcado es el que corresponde a las fechas escritas;
-  pulsarlo otra vez vuelve a pedir ese período.
+- «Período» (CamposPeriodo): los atajos (Hoy / Últimos 7 días / Este mes) rellenan «Desde» y «Hasta», que también se
+  escriben (dd/mm/aaaa). Al abrir se muestra el mes en curso.
 - Los 4 indicadores del período: ingresos y los tiempos promedio desde el ingreso (hasta el triaje, hasta la cama y
   hasta el alta: la estancia). Encima, qué período muestran.
 - «Triajes por nivel», con la reclasificación, y «Ahora en la guardia»: camas por estado, ocupación y pacientes.
@@ -16,7 +15,7 @@ principal («Sin conexión»).
 """
 import logging
 from collections.abc import Callable
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
 import customtkinter as ctk
 
@@ -24,43 +23,24 @@ from models.estados import EstadoCama, EstadoEpisodio
 from models.excepciones import PersistenciaError, SigtacError
 from models.triaje import COLOR_POR_NIVEL
 from views import formato, tema
-from views.componentes import (BotonPrimario, BotonSecundario, Selector, TablaDatos, Tarjeta, TarjetaKPI,
-                               etiqueta_campo, marcar_error, mostrar_error, mostrar_info, pedir_ruta_pdf, texto_nivel)
-from views.componentes.campos import campo_en_rejilla, leer_campo
+from views.componentes import (BotonPrimario, BotonSecundario, CamposPeriodo, TablaDatos, Tarjeta, TarjetaKPI,
+                               etiqueta_campo, mostrar_error, mostrar_info, pedir_ruta_pdf, texto_nivel)
+from views.componentes.periodo import texto_periodo
 
 logger = logging.getLogger(__name__)
 
 AVISO_PROTOTIPO = "Prototipo académico: los indicadores no tienen validez clínica."
 SIN_LECTURA = "No se pudieron leer los datos."
 SIN_DATOS = "sin datos"
-ATAJOS = (("hoy", "Hoy"), ("semana", "Últimos 7 días"), ("mes", "Este mes"))
 NIVELES = tuple(sorted(COLOR_POR_NIVEL))
 # Los pacientes que siguen en emergencia, en el orden en que avanzan
 PACIENTES = ((EstadoEpisodio.EN_ESPERA_TRIAJE, "esperan triaje"), (EstadoEpisodio.EN_ESPERA, "esperan cama"),
              (EstadoEpisodio.EN_ATENCION, "con cama"))
 
 
-def periodo_de(atajo: str, hoy: date) -> tuple[date, date]:
-    """Los días (desde, hasta) de un atajo, ambos incluidos: «semana» son los últimos 7 días contando hoy."""
-    if atajo == "hoy":
-        return hoy, hoy
-    if atajo == "semana":
-        return hoy - timedelta(days=6), hoy
-    if atajo == "mes":
-        return hoy.replace(day=1), hoy
-    raise ValueError(f"Atajo de período desconocido: {atajo!r}.")
-
-
 def nombre_archivo(desde: date, hasta: date) -> str:
     """El nombre que propone «Guardar como»: «sigtac_indicadores_2026-10-01_2026-10-31.pdf»."""
     return f"sigtac_indicadores_{desde.isoformat()}_{hasta.isoformat()}.pdf"
-
-
-def texto_periodo(desde: date, hasta: date) -> str:
-    """«Del 01/10/2026 al 15/10/2026»; un solo día, «El 15/10/2026»."""
-    if desde == hasta:
-        return f"El {formato.fecha_numerica(desde)}"
-    return f"Del {formato.fecha_numerica(desde)} al {formato.fecha_numerica(hasta)}"
 
 
 def texto_tiempo(minutos: float | None) -> str | None:
@@ -95,85 +75,26 @@ class ReportesView(ctk.CTkFrame):
         ctk.CTkLabel(contenido, text=AVISO_PROTOTIPO, font=tema.fuente("pequena"),
                      text_color=tema.COLOR_TEXTO_SECUNDARIO, anchor="w").pack(anchor="w", pady=(tema.ESPACIO_MEDIO, 0))
 
-        self._atajos.elegir("mes", avisar=False)
-        self._fijar_periodo(*periodo_de("mes", self._hoy()))
         self._consultar(avisar_error=True)
 
     # ---- Período
 
     def _crear_periodo(self, padre) -> Tarjeta:
         tarjeta = Tarjeta(padre, "Período", "Días completos, ambos incluidos")
-        # repetir: pulsar el atajo marcado vuelve a pedir el período (p. ej. «Hoy» en una pantalla abierta desde ayer)
-        self._atajos = Selector(tarjeta.cabecera, ATAJOS, self._atajo_elegido, repetir=True)
-        self._atajos.pack(side="right")
         cuerpo = ctk.CTkFrame(tarjeta, fg_color="transparent")
         cuerpo.pack(fill="x", padx=tema.ESPACIO_2, pady=(0, tema.ESPACIO_2))
-
-        fechas = ctk.CTkFrame(cuerpo, fg_color="transparent")
-        fechas.pack(fill="x")
-        fechas.grid_columnconfigure((0, 1, 2), weight=1, uniform="periodo")  # la rejilla de 3 del triaje
-        self._desde = campo_en_rejilla(fechas, "Desde", 0, 0, "dd/mm/aaaa")
-        self._hasta = campo_en_rejilla(fechas, "Hasta", 0, 1, "dd/mm/aaaa")
-        # (desde, hasta) tal como se rechazaron. El rojo se va cuando lo escrito cambia, no con cualquier tecla (como el
-        # motivo en Camas): soltar el Enter que envió la fecha no la corrige
-        self._periodo_rechazado = None
-        for campo in (self._desde, self._hasta):
+        # Los atajos, a la derecha de la cabecera; al abrir, el mes en curso
+        self.periodo = CamposPeriodo(cuerpo, lambda: self._consultar(avisar_error=True), hoy=self._hoy,
+                                     cabecera=tarjeta.cabecera)
+        self.periodo.pack(fill="x")
+        for campo in self.periodo.entradas:
             campo.bind("<Return>", self.ver_indicadores, add="+")
-            campo.bind("<KeyRelease>", lambda _e: self._fechas_editadas(), add="+")
 
         fila = ctk.CTkFrame(cuerpo, fg_color="transparent")
         fila.pack(fill="x", pady=(tema.ESPACIO_2, 0))
         BotonPrimario(fila, "Ver indicadores", self.ver_indicadores).pack(side="left")
         BotonSecundario(fila, "Exportar PDF…", self.exportar).pack(side="left", padx=(tema.ESPACIO, 0))
         return tarjeta
-
-    def _atajo_elegido(self, atajo: str):
-        self._fijar_periodo(*periodo_de(atajo, self._hoy()))
-        self._consultar(avisar_error=True)
-
-    def _fijar_periodo(self, desde: date, hasta: date):
-        for campo, dia in ((self._desde, desde), (self._hasta, hasta)):
-            campo.delete(0, "end")
-            campo.insert(0, formato.fecha_numerica(dia))
-            marcar_error(campo, False)
-        self._periodo_rechazado = None
-
-    def _texto_periodo(self) -> tuple[str, str]:
-        return self._desde.get(), self._hasta.get()
-
-    def _fechas_editadas(self):
-        """
-        Al escribir en una fecha: el atajo marcado sigue a lo escrito, y un período rechazado (una fecha mal escrita o
-        las dos que rechazó el controlador) pierde el rojo en cuanto cambia.
-        """
-        if self._periodo_rechazado is not None and self._texto_periodo() != self._periodo_rechazado:
-            self._periodo_rechazado = None
-            marcar_error(self._desde, False)
-            marcar_error(self._hasta, False)
-        self._marcar_atajo()
-
-    def _leer_periodo(self) -> tuple[date, date]:
-        """Las dos fechas escritas. Una que no se puede leer queda marcada y su ValueError sigue a quien llamó."""
-        desde = leer_campo(self._desde, lambda texto: formato.leer_fecha(texto, "La fecha inicial"))
-        hasta = leer_campo(self._hasta, lambda texto: formato.leer_fecha(texto, "La fecha final"))
-        return desde, hasta
-
-    def _marcar_atajo(self):
-        """
-        Marca el atajo que corresponde a las fechas escritas, o ninguno. El marcado va primero: el día 1, «Hoy» y
-        «Este mes» son el mismo período, y se conserva el que eligió el usuario.
-        """
-        try:
-            escrito = (formato.leer_fecha(self._desde.get(), "Desde"), formato.leer_fecha(self._hasta.get(), "Hasta"))
-        except ValueError:
-            escrito = None  # a medio escribir: no marca el campo; eso lo hace la consulta
-        hoy = self._hoy()
-        claves = sorted((clave for clave, _ in ATAJOS), key=lambda clave: clave != self._atajos.valor)
-        atajo = next((clave for clave in claves if periodo_de(clave, hoy) == escrito), None)
-        if atajo is None:
-            self._atajos.quitar_eleccion()
-        else:
-            self._atajos.elegir(atajo, avisar=False)
 
     # ---- Indicadores y detalle
 
@@ -269,9 +190,8 @@ class ReportesView(ctk.CTkFrame):
         mostró. Con `avisar_error`, el error se muestra.
         """
         try:
-            desde, hasta = self._leer_periodo()
+            desde, hasta = self.periodo.leer()
         except ValueError as error:
-            self._periodo_rechazado = self._texto_periodo()
             if avisar_error:
                 mostrar_error(self, error)
             return None
@@ -283,9 +203,7 @@ class ReportesView(ctk.CTkFrame):
                 logger.warning("No se pudieron leer los indicadores (%s).", type(error).__name__)
                 self._avisar(False)
             else:  # el período no vale como tal (la inicial después de la final, un año fuera de rango)
-                marcar_error(self._desde)
-                marcar_error(self._hasta)
-                self._periodo_rechazado = self._texto_periodo()
+                self.periodo.rechazar()
             if avisar_error:
                 mostrar_error(self, error)
             return None

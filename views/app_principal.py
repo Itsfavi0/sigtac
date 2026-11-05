@@ -13,6 +13,7 @@ from datetime import datetime
 
 import customtkinter as ctk
 
+from controllers.admin_controller import AdminController
 from controllers.auth_controller import AuthController, Sesion
 from controllers.cama_controller import CamaController
 from controllers.paciente_controller import PacienteController
@@ -22,6 +23,7 @@ from models.permisos import Permiso
 from views import formato, tema
 from views.componentes import BotonSecundario, Marca
 from views.componentes.foco import GROSOR_FOCO, fijar_borde, marcar_foco_control
+from views.admin_view import AdminView
 from views.camas_view import GestionCamasView
 from views.dashboard_view import DashboardView
 from views.limpieza_view import LimpiezaView
@@ -38,7 +40,7 @@ class Modulo:
     permiso: Permiso   # sin él, el módulo no aparece en el menú
 
 
-# En el orden del menú. Administración no se muestra hasta que tenga pantalla (brief §2).
+# En el orden del menú.
 MODULOS = (
     Modulo("tablero", "Tablero de camas", "Estado de la guardia en este momento", Permiso.VER_CAMAS),
     Modulo("triaje", "Triaje", "Registrar al paciente y clasificar su prioridad", Permiso.TRIAJE),
@@ -46,6 +48,7 @@ MODULOS = (
     Modulo("pacientes", "Pacientes", "Buscar, corregir e identificar pacientes", Permiso.PACIENTES),
     Modulo("limpieza", "Limpieza", "Camas dadas de alta que esperan limpieza", Permiso.LIMPIEZA),
     Modulo("reportes", "Reportes", "Indicadores de un período y exportación a PDF", Permiso.REPORTES),
+    Modulo("admin", "Administración", "Cuentas de usuario, bitácora y baja de pacientes", Permiso.ADMINISTRACION),
 )
 
 def crear_tablero(padre, sesion: Sesion, principal: "AppPrincipal", camas=None, reportes=None, triaje=None):
@@ -95,10 +98,18 @@ def crear_reportes(padre, sesion: Sesion, principal: "AppPrincipal", reportes=No
     return ReportesView(padre, reportes or ReporteController(sesion), al_actualizar=principal.informar_actualizacion)
 
 
+def crear_admin(padre, sesion: Sesion, principal: "AppPrincipal", admin=None, pacientes=None):
+    """
+    Administración con los controladores reales; el prototipo pasa los de demostración. Pacientes solo se usa para
+    buscar, dar de baja y reactivar (permiso ADMINISTRACION).
+    """
+    return AdminView(padre, admin or AdminController(sesion), pacientes or PacienteController(sesion))
+
+
 # clave del módulo → crear(padre, sesion, principal). Cada pantalla de la Fase 6 se agrega aquí al crearse.
 PANTALLAS: dict[str, Callable] = {"tablero": crear_tablero, "triaje": crear_triaje, "camas": crear_camas,
                                   "pacientes": crear_pacientes, "limpieza": crear_limpieza,
-                                  "reportes": crear_reportes}
+                                  "reportes": crear_reportes, "admin": crear_admin}
 
 PUNTO = "●"  # delante de «Actualizado», como en el tablero aprobado
 SIN_CONEXION = "Sin conexión"

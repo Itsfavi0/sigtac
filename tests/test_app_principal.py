@@ -38,7 +38,7 @@ def textos_de(widget) -> list[str]:
     (Rol.MEDICO, ["tablero", "triaje", "camas", "pacientes"]),
     (Rol.JEFE_GUARDIA, ["tablero", "triaje", "camas", "pacientes", "reportes"]),
     (Rol.LIMPIEZA, ["tablero", "limpieza"]),
-    (Rol.ADMINISTRADOR, ["tablero", "reportes"]),
+    (Rol.ADMINISTRADOR, ["tablero", "reportes", "admin"]),
 ])
 def test_el_menu_muestra_solo_los_modulos_del_rol(raiz_tk, sesion_de, rol, esperados):
     vista, _, _ = crear(raiz_tk, sesion_de(rol))
@@ -60,10 +60,12 @@ def test_un_rol_sin_modulos_ve_un_aviso(raiz_tk):
     assert TEXTO_SIN_MODULOS in textos_de(vista)
 
 
-def test_no_se_ofrecen_modulos_sin_pantalla_en_este_alcance():
-    # Administración aún no tiene pantalla: su permiso no tiene módulo
+def test_cada_permiso_tiene_su_modulo():
+    # Todos los permisos tienen pantalla: el menú es la matriz de permisos
     assert [m.permiso for m in MODULOS] == [Permiso.VER_CAMAS, Permiso.TRIAJE, Permiso.GESTION_CAMAS,
-                                            Permiso.PACIENTES, Permiso.LIMPIEZA, Permiso.REPORTES]
+                                            Permiso.PACIENTES, Permiso.LIMPIEZA, Permiso.REPORTES,
+                                            Permiso.ADMINISTRACION]
+    assert {m.permiso for m in MODULOS} == set(Permiso)
 
 
 # ---- Cambio de módulo
@@ -153,7 +155,27 @@ def test_informar_actualizacion_correcta_y_sin_conexion(raiz_tk, sesion_de):
 def test_las_pantallas_hechas_estan_registradas():
     assert PANTALLAS == {"tablero": crear_tablero, "triaje": app_principal.crear_triaje,
                          "camas": app_principal.crear_camas, "pacientes": app_principal.crear_pacientes,
-                         "limpieza": app_principal.crear_limpieza, "reportes": app_principal.crear_reportes}
+                         "limpieza": app_principal.crear_limpieza, "reportes": app_principal.crear_reportes,
+                         "admin": app_principal.crear_admin}
+
+
+def test_crear_admin_usa_los_controladores_de_la_sesion(raiz_tk, sesion_de, monkeypatch):
+    from controllers.admin_controller import AdminController
+    from controllers.paciente_controller import PacienteController
+    recibidos = {}
+
+    class AdminFalsa(ctk.CTkFrame):
+        def __init__(self, padre, admin, pacientes):
+            super().__init__(padre)
+            recibidos.update(admin=admin, pacientes=pacientes)
+
+    monkeypatch.setattr(app_principal, "AdminView", AdminFalsa)
+    sesion = sesion_de(Rol.ADMINISTRADOR)
+    vista, _, _ = crear(raiz_tk, sesion)
+    pantalla = app_principal.crear_admin(vista._contenido, sesion, vista)
+    assert isinstance(recibidos["admin"], AdminController) and recibidos["admin"]._sesion is sesion
+    assert isinstance(recibidos["pacientes"], PacienteController) and recibidos["pacientes"]._sesion is sesion
+    pantalla.destroy()
 
 
 def test_crear_reportes_usa_el_controlador_de_la_sesion_y_avisa_al_encabezado(raiz_tk, sesion_de, monkeypatch):
