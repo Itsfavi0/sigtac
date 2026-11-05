@@ -393,19 +393,21 @@ En los controladores (sin interfaz), verificado en MySQL con `scripts/verificar_
 
 ### Pruebas
 
-- [ ] Autenticación correcta.
-- [ ] Contraseña incorrecta.
-- [ ] Usuario desactivado.
-- [ ] CRUD paciente.
-- [ ] Borrado lógico.
-- [ ] Clasificación.
-- [ ] Reclasificación con justificación.
-- [ ] Reclasificación sin justificación.
-- [ ] Compatibilidad de camas.
-- [ ] Reserva de cama no disponible.
-- [ ] Transacciones/rollback.
-- [ ] Auditoría.
-- [ ] Reportes.
+Comprobadas desde la interfaz, con la app real contra MySQL (revisión de tester del 2026-11-05; ver CHANGELOG).
+
+- [x] Autenticación correcta.
+- [x] Contraseña incorrecta.
+- [x] Usuario desactivado.
+- [x] CRUD paciente.
+- [x] Borrado lógico.
+- [x] Clasificación.
+- [x] Reclasificación con justificación.
+- [x] Reclasificación sin justificación.
+- [x] Compatibilidad de camas.
+- [x] Reserva de cama no disponible.
+- [x] Transacciones/rollback.
+- [x] Auditoría.
+- [x] Reportes.
 
 ---
 

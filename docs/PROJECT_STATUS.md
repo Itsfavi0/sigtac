@@ -39,11 +39,12 @@
 - **Reportes (2026-11-04):** `views/reportes_view.py` muestra los indicadores de un período (atajos y fechas), «Triajes por nivel» y «Ahora en la guardia», y exporta el PDF. Piezas nuevas: `pedir_ruta_pdf`, `Selector.quitar_eleccion` y `repetir`. `ReporteController.indicadores` rechaza los años fuera del rango de MySQL.
 - **Administración (2026-11-04):** `views/admin_view.py` (cuentas, nueva cuenta, bitácora y baja o reactivación de pacientes). Con ella **la Fase 6 tiene todas sus pantallas**. Piezas nuevas: `CamposPeriodo` (compartida con Reportes) y `CamposDocumento.al_cambiar_tipo`. Lógica nueva: `controllers/periodo.py` (`rango_de_dias`, la validación del período de indicadores y bitácora), `PacienteController.buscar_para_administrar` y `AdminController.listar_tablas_auditables`.
 - **Etapa 1, detalles visuales e íconos (2026-11-04):** `Desplazable` (barras solo cuando hacen falta), `TablaDatos` (borde en oscuro, `sin_lectura`, `al_activar`), el texto de los estados en `models/estados.py`, medidas en `tema.py`, arreglos en Pacientes, Triaje y Administración, e íconos de Tabler (MIT) en el menú, el logo y los indicadores. **La Fase 6 queda cerrada.**
-- Pruebas: **2115 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`. Las de las vistas usan una ventana Tk oculta.
+- **Fase 7, revisión de tester (2026-11-05):** pasan las 13 pruebas del plan (app real contra MySQL y recorrido de la demo). Corregido: segundo triaje desde Triaje (RN-09, `PacienteController.episodio_abierto`), los datos clínicos se borran al cambiar de paciente y el tamaño mínimo pasa a 1093×540. Resumen para el equipo en `docs/ESTADO_EQUIPO.md`.
+- Pruebas: **2136 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`. Las de las vistas usan una ventana Tk oculta.
 
 ### Tarea actual
 
-Fase 6 cerrada: todas las pantallas, los detalles visuales comunes y los íconos. Sigue la Fase 7: integración y pruebas desde las vistas. Cada pantalla nueva se registra en `views/app_principal.py` (`PANTALLAS`) y en `prototipo/ver.py` (`PANTALLAS_DEMO`).
+Fase 7 en curso: revisión de tester hecha y sus 3 problemas corregidos. Quedan los detalles menores (CHANGELOG del 2026-11-05, «Pendientes») y preparar la sustentación. Cada pantalla nueva se registra en `views/app_principal.py` (`PANTALLAS`) y en `prototipo/ver.py` (`PANTALLAS_DEMO`).
 Falta que el usuario ejecute `scripts/verificar_controladores.py` para confirmar el PDF, los criterios y `pacientes_con_cama` con datos reales.
 
 ---
@@ -59,7 +60,7 @@ Falta que el usuario ejecute `scripts/verificar_controladores.py` para confirmar
 | Fase 4 — Controllers | Completada (2026-10-22). Verificada en MySQL 8.0.46 |
 | Fase 5 — Utils | Completada (2026-10-26): `security.py`, `logging_config.py` y `pdf_generator.py` |
 | Fase 6 — Views | Pantallas hechas: login, ventana principal, tablero, triaje y pacientes (2026-10-30); gestión de camas y limpieza (2026-10-31); reportes, administración, detalles visuales e íconos (2026-11-04). **Completada** |
-| Fase 7 — Integración y pruebas | Pendiente |
+| Fase 7 — Integración y pruebas | En curso: revisión de tester (2026-11-05), 13/13 pruebas del plan; corregidos sus 3 problemas |
 
 ---
 

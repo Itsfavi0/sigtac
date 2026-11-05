@@ -5,6 +5,65 @@
 
 ---
 
+## [2026-11-05] — Fase 7: revisión de tester y tres correcciones de Triaje y la ventana
+
+### Cambio
+- **Revisión de tester** (unos 60 casos):
+  - Hecha con la app real contra `sigtac_db`, manejando la ventana como un usuario, y con un recorrido de todas las pantallas en la demo (5 roles, claro y oscuro, 4 tamaños).
+  - Pasan las 13 pruebas de la Fase 7 de `DEVELOPMENT_PLAN.md` (resumen para el equipo en `docs/ESTADO_EQUIPO.md`).
+  - Aparecieron 3 problemas, corregidos aquí, y detalles menores (en «Pendientes»).
+- **Segundo triaje desde la pantalla (RN-09):**
+  - Antes, buscar en Triaje a alguien que ya estaba en emergencia pedía un motivo y, recién al confirmar, decía que ya tenía un episodio abierto. Al paciente que empeora mientras espera cama no se lo podía volver a triar.
+  - Ahora, al buscarlo, Triaje no pide motivo y muestra bajo la ficha dónde está («En emergencia desde las 04:29 · en espera de cama · nivel 3 · Amarillo»). El triaje se agrega a ese mismo episodio.
+  - El aviso final dice adónde va el paciente: pasa a la cola de cama, sigue en ella con el nivel nuevo o sigue en su cama.
+  - Lógica nueva: `PacienteController.episodio_abierto` (permiso PACIENTES), la regla que ya usaba `abrir_episodio`, ahora pública. `TriajeController.registrar` ya admitía cualquier episodio abierto y no cambió.
+- **Cambiar de paciente en Triaje borra los datos clínicos:**
+  - Se borran el motivo, los signos, los síntomas y la reclasificación (`_limpiar_clinico`, que también usa `limpiar()`).
+  - Ocurre al pasar entre Nuevo y En cola o entre Con documento y Sin identificar, al cambiar el documento ya buscado y al elegir otra fila de la cola.
+  - Antes, lo medido a un paciente podía quedar en el triaje de otro.
+- **Tamaño mínimo de la ventana: 1093×540** (antes 960×540). Por debajo de 1093 de ancho se cortaban textos, títulos de indicadores y pestañas; en Triaje, «En cola» quedaba en 3 px y no se podía llegar a la cola.
+- **Demo:** `TriajeDemo(otro_episodio=...)`, `CamasDemo.abiertos/episodio` y `PacientesDemo.episodio_abierto`, para mostrar el segundo triaje en `prototipo.ver`.
+
+### Archivos afectados
+- `controllers/paciente_controller.py`, `views/triage_view.py`, `views/tema.py`
+- `prototipo/demo.py`, `prototipo/ver.py`
+- Pruebas: `test_triage_view.py`, `test_paciente_controller.py`, `test_tema.py`
+- `docs/` (`ESTADO_EQUIPO.md`, nuevo)
+
+### Motivo
+Lo encontrado en la revisión de tester de la Fase 7: una regla de negocio (RN-09) sin camino desde la interfaz, un riesgo de mezclar datos clínicos de dos pacientes y una ventana que podía achicarse más de lo que soportan las pantallas.
+
+### Impacto
+- Pruebas: **2136 pasan** (antes 2115).
+- Sin cambios de esquema. Un método nuevo de controlador, de solo lectura.
+- **Cambios visibles:**
+  - Triaje reconoce a quien ya está en emergencia;
+  - los datos clínicos se borran al cambiar de paciente;
+  - la ventana no se achica por debajo de 1093 de ancho.
+
+### Decisiones
+- **El segundo triaje se hace en Triaje**, no con un botón en Gestión de camas: quien vuelve a evaluar es la enfermera, y su rol no tiene Gestión de camas. Vale para los tres estados abiertos (espera triaje, espera cama, con cama), como admite el modelo (`agregar_triaje`).
+- **Borrar sin preguntar** (decisión del usuario): mezclar datos de dos pacientes es más grave que volver a escribir unos signos. Se borra también el motivo, los síntomas y la reclasificación, que son del mismo paciente. Buscar de nuevo el mismo documento (un segundo Enter) no borra nada, y lo medido antes de la primera búsqueda se conserva para el paciente que se busca.
+- **Revisión independiente** (un agente que no escribió el cambio): encontró un caso real, ya corregido. Al ir de la cola a «Nuevo» y volver, la tabla seguía marcando al paciente anterior y elegir otro no borraba lo medido. Corregidos además: un error de la BD al buscar otro documento ya no deja como destino del triaje al paciente anterior (`buscar` olvida antes al paciente si el documento cambió), la línea bajo la ficha lleva la fecha si llegó otro día, y la demo ya edita a quien espera cama.
+- **El alto mínimo se mantiene en 540:** CustomTkinter multiplica el mínimo por el zoom de Windows. En una laptop de 1366×768 al 125 %, maximizada, quedan unos 540 px lógicos de alto, así que un mínimo mayor haría la ventana más alta que la pantalla. Lo que no entra a lo alto ya se desplaza.
+
+### Pendientes
+- **Detalles menores de la revisión:**
+  - mensajes con nombres técnicos («EN ATENCIÓN (CON CAMA)», «nombres es obligatorio.», tablas sin tilde en el filtro de la bitácora);
+  - el error del PDF trata de «tú»;
+  - «quedó dado de baja» en masculino;
+  - punto decimal en el PDF;
+  - dos síntomas largos que no caben en su casilla a 1093 de ancho;
+  - al confirmar sin datos se marca solo el primer error;
+  - PA diastólica ≥ sistólica: el botón dice «Complete los signos vitales» y los campos no se marcan;
+  - el indicador «Espera de cama» (esperas ya resueltas) junto a un paciente que lleva horas esperando.
+- **Del segundo triaje, menores:** el aviso final («sigue en la cola de cama») usa el estado leído al buscar; si otra PC le asigna cama justo antes de confirmar, el aviso queda desactualizado (el triaje sí se registra bien). Las pruebas del documento editado llaman al manejador, no producen la tecla (la ventana de pruebas está oculta).
+- **El botón principal deshabilitado se ve igual que el habilitado:** es una decisión ya tomada (su texto dice qué falta, ver `test_triage_view.py`). Se deja así salvo que el equipo decida otra cosa.
+- **Datos de prueba en `sigtac_db`:** «Prueba QA Tester Sigtac» (DNI 48707483), un NN fusionado con ella, un episodio abierto de Rosa Mendoza y una cuenta para el empleado 55555555. Se limpian volviendo a cargar `seed.sql`.
+- **Pendiente del usuario:** `scripts/verificar_controladores.py` contra MySQL.
+
+---
+
 ## [2026-11-04] — Etapa 1: detalles visuales comunes e íconos
 
 ### Cambio
