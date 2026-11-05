@@ -328,7 +328,7 @@ Las vistas:
 
 ### Alcance acordado (2026-10-26)
 
-- Las 5 pantallas de esta lista. Gestión de camas (asignar, alta, fuera de servicio) y limpieza se agregaron después (2026-10-31), y reportes con PDF (2026-11-04). Administración (cuentas, bitácora, baja y reactivación de pacientes) queda para después; su controlador ya existe.
+- Las 5 pantallas de esta lista. Gestión de camas (asignar, alta, fuera de servicio) y limpieza se agregaron después (2026-10-31), y reportes con PDF y administración (2026-11-04). Con ellas, cada permiso tiene su pantalla.
 - Piezas compartidas en `views/componentes/`, antes de las pantallas.
 - Las vistas reciben sus controladores en el constructor (se prueban con controladores falsos, sin MySQL) y solo capturan `SigtacError` y `ValueError`, que muestran con `mostrar_error`.
 
@@ -352,7 +352,7 @@ Las vistas:
 - [x] `limpieza_view.py` (2026-10-31): confirmar la limpieza (RN-08)
 - [x] `TablaDatos(filas=N)` (2026-10-31): el alto fijo de las tablas, extraído de triaje y pacientes
 - [x] `reportes_view.py` (2026-11-04): período con atajos y fechas, 4 indicadores, triajes por nivel, estado de la guardia y exportar PDF. Piezas: `pedir_ruta_pdf` y `Selector.quitar_eleccion`/`repetir`
-- [ ] `admin_view.py` (cuentas, bitácora, baja y reactivación)
+- [x] `admin_view.py` (2026-11-04): cuentas, nueva cuenta, bitácora (con `CamposPeriodo`, extraído de Reportes) y baja o reactivación de pacientes
 - [ ] `assets/` (por ahora no hace falta: la interfaz no usa imágenes)
 
 ### Dashboard

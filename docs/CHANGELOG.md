@@ -5,6 +5,99 @@
 
 ---
 
+## [2026-11-04] — Fase 6: pantalla de Administración (cierre de las pantallas)
+
+### Cambio
+- **`views/admin_view.py`** (`AdminView`, módulo «Administración», permiso ADMINISTRACION: solo el administrador). Es una tarjeta con «Cuentas (N) / Nueva cuenta (N) / Bitácora / Pacientes»:
+  - **Cuentas:** tabla con empleado, cargo, rol y estado (Activa / Bloqueada / Desactivada). Para la cuenta elegida:
+    - «Desactivar» o «Activar»;
+    - «Desbloquear», que también borra intentos fallidos que aún no bloquean;
+    - el rol con «Cambiar rol», que solo responde si el rol elegido es otro;
+    - la clave y su repetición, con «Restablecer clave».
+  - **Nueva cuenta:** los empleados activos sin cuenta, el rol (empieza sin elegir), la clave y su repetición, y «Crear cuenta para X».
+  - **Bitácora:**
+    - el período (al abrir, hoy) y los filtros por tabla y por usuario;
+    - una tabla con fecha y hora, usuario, acción en castellano (Creación, Cambio, Baja…), tabla, registro y detalle;
+    - el detalle completo del registro elegido, bajo la tabla;
+    - si se llega al tope de 200 registros, una línea lo avisa.
+  - **Pacientes:** documento + «Buscar»; muestra nombre, documento y estado, con «Dar de baja» o «Reactivar» (RN-11).
+- **`controllers/periodo.py`:** `rango_de_dias`, la validación del período de días completos (tipos, orden y rango de años de MySQL).
+  - Antes estaba duplicada en `ReporteController.indicadores` y `AdminController.bitacora`, y la bitácora tenía el mismo `OverflowError` con «31/12/9999» que se corrigió en Reportes.
+  - Una regla, un dueño: los dos controladores la usan.
+- **Controladores:**
+  - `PacienteController.buscar_para_administrar` (permiso ADMINISTRACION): el administrador no tiene PACIENTES, pero necesita encontrar el registro que corrige (decisión del usuario);
+  - `AdminController.listar_tablas_auditables`: la lista vive en `AuditoriaDAO`, y una vista no importa `dao`.
+- **Piezas compartidas:**
+  - **`CamposPeriodo`** (`views/componentes/periodo.py`, extracción aprobada): los atajos y las fechas de Reportes, ahora también en la Bitácora. Reportes pasó a usarla sin cambiar lo que ve el usuario;
+  - `CamposDocumento.al_cambiar_tipo`;
+  - `formato.abreviar` («L. Ramos»), que reemplaza tres copias.
+- **Ventana principal:** `MODULOS` suma «Administración» al final. Ahora cada permiso tiene su módulo (hay una prueba que lo exige).
+- **`prototipo/`:**
+  - `AdminDemo`: cuentas y bitácora con las reglas reales (`CuentaUsuario`, `validar_clave_nueva`, `rango_de_dias`);
+  - `PacientesDemo` da de baja y reactiva. Antes perdía el estado «activo» al rearmar un paciente; eso se corrigió;
+  - `PacientesDemo` también consulta las camas, para no dar de baja a quien tiene un episodio abierto.
+  - La bitácora de la demo anota lo que se hace en ella.
+- **Pruebas:**
+  - nuevas: `test_admin_view.py` (47) y `test_periodo.py` (9);
+  - ampliadas: `test_componentes.py` (`CamposPeriodo`, `al_cambiar_tipo`), `test_reportes_view.py`, `test_admin_controller.py`, `test_paciente_controller.py`, `test_formato.py` y `test_app_principal.py`.
+
+### Archivos afectados
+- `views/admin_view.py`, `views/componentes/periodo.py` y `controllers/periodo.py` (nuevos)
+- `views/reportes_view.py`, `views/app_principal.py`, `views/formato.py`, `views/componentes/documento.py` y `views/componentes/__init__.py`
+- `controllers/admin_controller.py`, `controllers/reporte_controller.py` y `controllers/paciente_controller.py`
+- `prototipo/demo.py` y `prototipo/ver.py`
+- Pruebas: `tests/test_admin_view.py` y `tests/test_periodo.py` (nuevos), y los ampliados de arriba
+- `docs/`
+
+### Motivo
+Era la última pantalla de la Fase 6. Las cuentas, la bitácora y la baja de pacientes solo se podían usar desde código. Con esta pantalla, cada permiso de `models/permisos.py` tiene su lugar en la interfaz.
+
+### Impacto
+- Pruebas: **2059 pasan** (antes 1976).
+- Sin cambios de esquema.
+- **Regla nueva en la bitácora:** se rechazan los años fuera de 1000–9998, como en los indicadores.
+- **Cambio de texto:** el mensaje de un período con hora dice «días (date)» en lugar de «fechas (date)».
+- El administrador ve «Tablero de camas», «Reportes» y «Administración».
+
+### Decisiones
+- **Forma de la pantalla (acordada con el usuario):**
+  - una tarjeta con selector, como Gestión de camas;
+  - la búsqueda propia del administrador;
+  - la clave escrita dos veces;
+  - el período de la bitácora igual que el de Reportes.
+- **Nada pide confirmación:** todo se deshace (activar ↔ desactivar, baja ↔ reactivar). En el proyecto solo se confirma lo irreversible.
+- **En «Cuentas» todos los botones son secundarios.** Ninguna acción es la principal. Hay precedente: la ficha de Pacientes, con «Editar datos» y «Abrir episodio».
+- **Que las dos claves coincidan es de la pantalla, no una regla de negocio:** es la forma de escribir sin ver. La política de claves sigue en el modelo.
+- **Seguridad de las claves:**
+  - de una clave rechazada solo se guarda un resumen SHA-256, para saber si cambió;
+  - al elegir otra cuenta, los campos de clave se vacían;
+  - una prueba comprueba que la clave no aparece en diálogos, avisos ni en el log.
+- **Pacientes muestra solo nombre, documento y estado:** el administrador no atiende pacientes (`PRODUCT.md`).
+- **La columna y el filtro «Usuario» usan el nombre completo.** Dos homónimos se distinguen por el número de su cuenta.
+- **Proceso de la interfaz** (skill ui-consistency):
+  - la calibración plantó un `messagebox` propio en lugar de `mostrar_error` en una copia de Gestión de camas, y el revisor lo encontró;
+  - un verificador y un auditor revisaron en paralelo. Encontraron, y quedó corregido:
+    - el resultado que se borraba al soltar Enter;
+    - el borde rojo que seguía tras una búsqueda correcta;
+    - el doble diálogo cuando la BD falla al dar de baja;
+    - la nueva búsqueda tras la baja, que usaba lo escrito y no lo buscado;
+    - el cambio de tipo de documento, que no retiraba el resultado;
+    - la clave en texto plano en un atributo, y una clave que pasaba a otra cuenta;
+    - la bitácora que fallaba sin avisar al abrir;
+    - los homónimos en el filtro;
+    - las tablas que decían «no hay cuentas» cuando la BD no respondía;
+    - en la segunda revisión: cada recarga borraba la clave que se estaba escribiendo para la misma cuenta.
+
+### Pendientes
+- **Un paciente sin identificar (NN) no tiene documento**, así que no se puede dar de baja desde aquí. Si hace falta, se podría agregar la lista de NN, como en Pacientes.
+- **El filtro «Tabla» ofrece las 21 tablas auditables,** también catálogos que hoy nunca se auditan.
+- **«Desactivar» y «Cambiar rol» aparecen habilitados en la propia cuenta.** El controlador los rechaza con un mensaje claro.
+- **Si la recarga tras una operación correcta falla,** la tabla queda con el estado anterior hasta la siguiente lectura.
+- **`PacientesView` tiene el mismo hueco que se corrigió aquí:** cambiar solo el tipo de documento no retira la ficha. Ya puede usar `CamposDocumento.al_cambiar_tipo`.
+- Con la Fase 6 completa, siguen los detalles visuales comunes y la Fase 7.
+
+---
+
 ## [2026-11-04] — Fase 6: pantalla de Reportes
 
 ### Cambio

@@ -37,11 +37,12 @@
 - **Pacientes (2026-10-30):** `views/pacientes_view.py` (buscar, editar, abrir episodio, identificar y fusionar NN). Con ella están las 5 pantallas de la Fase 6; quedan detalles visuales para el final.
 - **Gestión de camas y Limpieza (2026-10-31):** `views/camas_view.py` (asignar, llegada a la cama, cancelar, alta, referir, fuga y mantenimiento) y `views/limpieza_view.py` (confirmar limpieza). El ciclo de la cama completo ya se recorre desde la interfaz. Lógica nueva: `CamaController.pacientes_con_cama()` y `AsignacionDAO.listar_vigentes()`.
 - **Reportes (2026-11-04):** `views/reportes_view.py` muestra los indicadores de un período (atajos y fechas), «Triajes por nivel» y «Ahora en la guardia», y exporta el PDF. Piezas nuevas: `pedir_ruta_pdf`, `Selector.quitar_eleccion` y `repetir`. `ReporteController.indicadores` rechaza los años fuera del rango de MySQL.
-- Pruebas: **1976 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`. Las de las vistas usan una ventana Tk oculta.
+- **Administración (2026-11-04):** `views/admin_view.py` (cuentas, nueva cuenta, bitácora y baja o reactivación de pacientes). Con ella **la Fase 6 tiene todas sus pantallas**. Piezas nuevas: `CamposPeriodo` (compartida con Reportes) y `CamposDocumento.al_cambiar_tipo`. Lógica nueva: `controllers/periodo.py` (`rango_de_dias`, la validación del período de indicadores y bitácora), `PacienteController.buscar_para_administrar` y `AdminController.listar_tablas_auditables`.
+- Pruebas: **2059 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`. Las de las vistas usan una ventana Tk oculta.
 
 ### Tarea actual
 
-Fase 6: las 5 pantallas acordadas, más Gestión de camas, Limpieza y Reportes, están hechas. Quedan administración y los detalles visuales (CHANGELOG, «Pendientes»). Sigue la Fase 7: integración y pruebas desde las vistas. Cada pantalla nueva se registra en `views/app_principal.py` (`PANTALLAS`) y en `prototipo/ver.py` (`PANTALLAS_DEMO`).
+Fase 6: todas las pantallas están hechas (las 5 acordadas, Gestión de camas, Limpieza, Reportes y Administración). Quedan los detalles visuales comunes (CHANGELOG, «Pendientes»). Sigue la Fase 7: integración y pruebas desde las vistas. Cada pantalla nueva se registra en `views/app_principal.py` (`PANTALLAS`) y en `prototipo/ver.py` (`PANTALLAS_DEMO`).
 Falta que el usuario ejecute `scripts/verificar_controladores.py` para confirmar el PDF, los criterios y `pacientes_con_cama` con datos reales.
 
 ---
@@ -56,7 +57,7 @@ Falta que el usuario ejecute `scripts/verificar_controladores.py` para confirmar
 | Fase 3 — DAO | Completada (2026-10-21) |
 | Fase 4 — Controllers | Completada (2026-10-22). Verificada en MySQL 8.0.46 |
 | Fase 5 — Utils | Completada (2026-10-26): `security.py`, `logging_config.py` y `pdf_generator.py` |
-| Fase 6 — Views | Pantallas hechas: login, ventana principal, tablero, triaje y pacientes (2026-10-30); gestión de camas y limpieza (2026-10-31); reportes (2026-11-04). Faltan administración y detalles visuales |
+| Fase 6 — Views | Pantallas hechas: login, ventana principal, tablero, triaje y pacientes (2026-10-30); gestión de camas y limpieza (2026-10-31); reportes y administración (2026-11-04). Todas las pantallas hechas; faltan detalles visuales |
 | Fase 7 — Integración y pruebas | Pendiente |
 
 ---
@@ -171,7 +172,7 @@ Ninguno bloqueante. Las decisiones menores están en "Pendientes conocidos".
 
 1. Validar con el equipo la matriz de permisos (`models/permisos.py`; ver CHANGELOG del 2026-10-21 y 2026-10-26).
 2. Ejecutar `scripts/verificar_controladores.py` para confirmar la exportación a PDF y `pacientes_con_cama` con datos reales.
-3. Pantalla de administración (cuentas, bitácora, baja y reactivación de pacientes); su controlador ya existe.
+3. Detalles visuales comunes de la Fase 6 (borde de `TablaDatos` en oscuro, barra de desplazamiento siempre visible, texto del estado de cama repetido).
 4. Fase 7: repetir desde las vistas la integración ya verificada en los controladores, y las pruebas de `DEVELOPMENT_PLAN.md` (Fase 7). Antes, los detalles visuales pendientes de la Fase 6.
 
 Respecto al plan original, `auditoria_dao.py` se hizo antes que `triaje_dao.py` y `asignacion_dao.py` porque es de una sola tabla y no depende de transacciones (ver `CHANGELOG.md` del 2026-10-12).
