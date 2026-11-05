@@ -23,7 +23,11 @@ MODO_APARIENCIA = "light"  # el claro es el predeterminado; el oscuro es opciona
 TEMA_DE_COLOR = "blue"     # tema incluido en CustomTkinter, para los widgets que no reciben color explícito
 
 TITULO_VENTANA = "SIGTAC"
-TAMANO_MINIMO = (960, 540)  # ancho, alto: una laptop de 1366×768 al 125 % deja unos 1093×560 útiles
+# Ancho y alto, en píxeles lógicos (CustomTkinter los multiplica por el zoom de Windows). Una laptop de 1366×768 al
+# 125 % da 1093 de ancho, para el que están hechas las pantallas: más angosta, se cortan textos y pestañas (p. ej.
+# «En cola» en Triaje). De alto, maximizada deja unos 540 (768 menos la barra de tareas y la de título, ÷ 1,25): con
+# un mínimo mayor no cabría. Lo que no entra a lo alto se desplaza (Desplazable).
+TAMANO_MINIMO = (1093, 540)
 
 # ---- Espaciado y medidas: todo es múltiplo de 4 píxeles
 

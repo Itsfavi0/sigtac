@@ -31,6 +31,13 @@ def test_cada_color_es_un_par_claro_oscuro(par):
         color_texto_sobre(tono)  # valida el formato #RRGGBB
 
 
+def test_el_tamano_minimo_es_el_de_una_laptop_de_1366x768_al_125():
+    # De ancho, las pantallas están hechas para 1366 / 1,25 = 1093: más angosta, se cortan. De alto, maximizada en
+    # esa laptop quedan unos 540 px lógicos: un mínimo mayor la haría más alta que la pantalla
+    ancho, alto = tema.TAMANO_MINIMO
+    assert ancho == round(1366 / 1.25) and alto <= 540
+
+
 def test_el_espaciado_y_las_medidas_son_multiplos_de_4():
     medidas = (tema.ESPACIO_MINIMO, tema.ESPACIO, tema.ESPACIO_MEDIO, tema.ESPACIO_2, tema.ESPACIO_3,
                tema.ALTO_CONTROL, tema.ALTO_NAVEGACION, tema.ANCHO_BARRA, tema.ALTO_ENCABEZADO)
