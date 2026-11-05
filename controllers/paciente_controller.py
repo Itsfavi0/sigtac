@@ -162,6 +162,14 @@ class PacienteController:
             AuditoriaDAO.registrar(sesion.id_usuario, "episodio_emergencia", AccionAuditoria.INSERT, id_episodio)
             return EpisodioDAO.buscar_por_id(id_episodio)
 
+    def episodio_abierto(self, id_paciente: int) -> EpisodioEmergencia | None:
+        """
+        El episodio con el que el paciente sigue en emergencia (espera triaje, espera cama o está en una), con su
+        historial, o None. Triaje lo usa para agregar un triaje nuevo a ese episodio (RN-09) en lugar de abrir otro.
+        """
+        exigir_permiso(self._sesion, Permiso.PACIENTES)
+        return self._episodio_abierto(id_paciente)
+
     @staticmethod
     def _episodio_abierto(id_paciente: int) -> EpisodioEmergencia | None:
         abiertos = [e for e in EpisodioDAO.listar_por_paciente(id_paciente) if not e.cerrado]

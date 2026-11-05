@@ -5,9 +5,11 @@ import customtkinter as ctk
 import pytest
 
 from controllers.triaje_controller import TriajeController
+from models.documento import TipoDocumento
+from models.estados import EstadoEpisodio
 from models.excepciones import PersistenciaError, ReglaNegocioError
-from models.triaje import SignosVitales, Triaje
-from prototipo.demo import PacientesDemo, TriajeDemo
+from models.triaje import EpisodioEmergencia, SignosVitales, Triaje
+from prototipo.demo import CamasDemo, PacientesDemo, TriajeDemo
 from views import tema, triage_view
 from views.componentes.campos import sin_error
 from views.componentes.nivel import texto_nivel
@@ -315,6 +317,172 @@ def test_cambiar_de_modo_no_deja_a_la_vista_una_ficha_olvidada(crear):
     vista._identidad.elegir("nn")
     vista._identidad.elegir("documento")
     assert vista._aviso.winfo_manager() == "pack" and vista._ficha.winfo_manager() == ""
+
+
+# ---- Un paciente que ya está en emergencia: el triaje se agrega a su episodio (RN-09)
+
+@pytest.fixture
+def crear_con_camas(raiz_tk, dialogos):
+    """Como `crear`, con la cola de cama de la demo: quien espera cama también se encuentra por su documento."""
+    def crear():
+        camas = CamasDemo(lambda: AHORA)
+        triaje_demo = TriajeDemo(lambda: AHORA, al_triar=camas.esperar_cama, otro_episodio=camas.episodio)
+        triaje = MagicMock(wraps=triaje_demo)
+        pacientes = MagicMock(wraps=PacientesDemo(triaje_demo, lambda: AHORA, camas=camas))
+        vista = TriageView(raiz_tk, pacientes, triaje, reloj=lambda: AHORA)
+        vista.pacientes, vista.triaje, vista.dialogos, vista.camas = pacientes, triaje, dialogos, camas
+        return vista
+    return crear
+
+
+def buscar(vista, numero, tipo=None):
+    if tipo is not None:
+        vista._documento.fijar(tipo, numero)
+    else:
+        escribir(vista._documento.campo_numero, numero)
+    vista.buscar()
+
+
+def test_quien_espera_cama_recibe_un_triaje_nuevo_en_su_episodio(crear_con_camas):
+    vista = crear_con_camas()
+    buscar(vista, "26874504")  # Jorge Mendoza: espera cama con nivel 2
+    episodio = vista.camas.episodio(2)
+    # No se pide motivo (su episodio ya lo tiene) y se lee dónde está
+    assert vista._marco_motivo.winfo_manager() == ""
+    assert vista._en_emergencia.cget("text") == triage_view.texto_en_emergencia(episodio, AHORA)
+    assert "en espera de cama · nivel 2 · Naranja" in vista._en_emergencia.cget("text")
+    escribir_signos(vista, sato2="88")  # empeora: la saturación lo sube a nivel 1
+    vista.confirmar()
+    vista.pacientes.abrir_episodio.assert_not_called()
+    assert vista.triaje.registrar.call_args.args[0] == 2
+    assert len(episodio.triajes) == 2 and episodio.nivel_actual == 1  # el historial se conserva
+    # Sigue una sola vez en la cola de cama, ahora primero por su nivel
+    cola = [entrada.episodio.id_episodio for entrada in vista.camas.cola_de_espera()]
+    assert cola.count(2) == 1 and cola[0] == 2
+    assert vista.dialogos["info"] == [triage_view.texto_tras_triaje(1, EstadoEpisodio.EN_ESPERA)]
+    assert "sigue en la cola de cama" in vista.dialogos["info"][0]
+
+
+def test_quien_espera_triaje_se_tria_en_su_episodio_sin_abrir_otro(crear):
+    vista = crear()
+    buscar(vista, "70112233")  # Rosa Huamán: admitida, espera su primer triaje
+    assert vista._marco_motivo.winfo_manager() == ""
+    texto = vista._en_emergencia.cget("text")
+    assert "en espera de triaje" in texto and "nivel" not in texto.splitlines()[0]
+    escribir_signos(vista)
+    vista.confirmar()
+    vista.pacientes.abrir_episodio.assert_not_called()
+    assert vista.triaje.registrar.call_args.args[0] == 101
+    assert vista.dialogos["info"][0].endswith(triage_view.PASA_A_COLA_DE_CAMA)
+
+
+def test_al_buscar_a_alguien_sin_episodio_vuelve_a_pedirse_el_motivo(crear):
+    vista = crear()
+    buscar(vista, "70112233")
+    buscar(vista, "41234567")  # Carmen Rojas: registrada, sin episodio abierto
+    assert vista._marco_motivo.winfo_manager() == "pack" and vista._en_emergencia.winfo_manager() == ""
+    assert vista._id_episodio is None
+
+
+def test_texto_de_quien_esta_en_una_cama():
+    episodio = EpisodioEmergencia(7, 7, "Caída", EstadoEpisodio.EN_ATENCION, fecha_ingreso=datetime(2026, 10, 30, 8, 5),
+                                  triajes=[Triaje(1, 1, 1, datetime(2026, 10, 30, 8, 10))])
+    assert triage_view.texto_en_emergencia(episodio, AHORA) == (
+        "En emergencia desde las 08:05 · en atención (con cama) · nivel 1 · Rojo.\n" + triage_view.AGREGA_AL_EPISODIO)
+    assert triage_view.texto_tras_triaje(2, EstadoEpisodio.EN_ATENCION).endswith("sigue en su cama.")
+
+
+def test_si_llego_otro_dia_el_texto_lleva_la_fecha():
+    episodio = EpisodioEmergencia(7, 7, "Caída", EstadoEpisodio.EN_ESPERA, fecha_ingreso=datetime(2026, 10, 29, 23, 50),
+                                  triajes=[Triaje(1, 3, 1, datetime(2026, 10, 29, 23, 55))])
+    assert triage_view.texto_en_emergencia(episodio, AHORA).startswith(
+        "En emergencia desde el 29/10/2026 a las 23:50 · en espera de cama")
+
+
+def test_si_la_bd_falla_al_buscar_otro_documento_no_queda_el_paciente_anterior(crear_con_camas):
+    vista = crear_con_camas()
+    buscar(vista, "26874504")  # Jorge Mendoza, episodio 2
+    con_datos_clinicos(vista)
+    vista.pacientes.episodio_abierto.side_effect = ConexionBDError("No hay conexión con la base de datos.")
+    vista._documento.fijar(TipoDocumento.DNI, "41234567")  # sin la tecla que lo olvida al escribir
+    vista.buscar()
+    assert [str(e) for e in vista.dialogos["error"]] == ["No hay conexión con la base de datos."]
+    # Ni su ficha a la vista ni su episodio como destino del triaje, ni lo medido a él
+    assert vista._ficha.winfo_manager() == "" and vista._id_episodio is None and vista._paciente is None
+    assert sin_datos_clinicos(vista)
+
+
+def test_la_demo_edita_a_quien_espera_cama():
+    camas = CamasDemo(lambda: AHORA)
+    pacientes = PacientesDemo(TriajeDemo(lambda: AHORA), lambda: AHORA, camas=camas)
+    jorge = pacientes.buscar_por_documento("DNI", "26874504")
+    editado = pacientes.actualizar_datos(jorge.id_paciente, "Jorge Luis", jorge.apellidos, jorge.fecha_nac,
+                                         jorge.sexo, jorge.id_seguro)
+    assert editado.nombres == "Jorge Luis"
+    assert pacientes.buscar_por_documento("DNI", "26874504").nombres == "Jorge Luis"
+
+
+# ---- Cambiar de paciente borra lo medido (signos, síntomas, motivo y reclasificación)
+
+def con_datos_clinicos(vista):
+    escribir(vista._motivo, "Dolor en el pecho")
+    escribir_signos(vista)
+    next(iter(vista._casillas.values())).select()
+    vista.alternar_reclasificacion()
+
+
+def sin_datos_clinicos(vista):
+    return (all(campo.get() == "" for campo in vista._campos_signos.values())
+            and not any(caja.get() for caja in vista._casillas.values())
+            and vista._motivo.get() == "" and not vista._reclasificando and vista._sugerencia is None)
+
+
+@pytest.mark.parametrize("cambiar", [
+    lambda vista: vista._identidad.elegir("nn"),
+    lambda vista: vista._modo.elegir("cola"),
+    lambda vista: (escribir(vista._documento.campo_numero, "45566778"), vista._documento_editado()),
+], ids=["sin identificar", "a la cola", "otro documento"])
+def test_cambiar_de_paciente_borra_lo_medido(crear, cambiar):
+    vista = crear()
+    con_paciente_registrado(vista)
+    con_datos_clinicos(vista)
+    cambiar(vista)
+    assert sin_datos_clinicos(vista)
+
+
+def test_buscar_de_nuevo_el_mismo_documento_conserva_lo_medido(crear):
+    vista = crear()
+    escribir_signos(vista)  # medido antes de identificarlo: es de quien se busca
+    con_paciente_registrado(vista)
+    vista.buscar()  # un segundo Enter
+    assert vista._campos_signos["pa_sis"].get() == "120" and vista._sugerencia is not None
+
+
+def test_elegir_otro_paciente_de_la_cola_borra_lo_medido(crear):
+    vista = crear()
+    vista._modo.elegir("cola")
+    vista._tabla.seleccionar(101)
+    vista.update()  # ttk avisa la elección como el clic del usuario
+    escribir_signos(vista)
+    vista._tabla.seleccionar(101)  # el mismo: se conserva
+    vista.update()
+    assert vista._campos_signos["fc"].get() == "80"
+    vista._tabla.seleccionar(102)
+    vista.update()
+    assert sin_datos_clinicos(vista)
+
+
+def test_volver_a_la_cola_y_elegir_otro_paciente_borra_lo_medido(crear):
+    vista = crear()
+    vista._modo.elegir("cola")
+    vista._tabla.seleccionar(101)
+    vista.update()
+    vista._modo.elegir("nuevo")
+    vista._modo.elegir("cola")  # la tabla sigue marcando a 101
+    escribir_signos(vista, sato2="88")
+    vista._tabla.seleccionar(102)
+    vista.update()
+    assert sin_datos_clinicos(vista)
 
 
 def test_la_cola_cabe_en_el_formulario_a_1093x614():

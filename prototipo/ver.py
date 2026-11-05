@@ -25,7 +25,7 @@ from views.app_principal import (AppPrincipal, crear_admin, crear_camas, crear_l
 # aparece en Limpieza. El tablero y «Ahora en la guardia» de Reportes lo cuentan todo; la bitácora de
 # Administración anota lo que se hace en ella y las bajas de pacientes.
 _CAMAS = CamasDemo()
-_TRIAJE = TriajeDemo(al_triar=_CAMAS.esperar_cama)
+_TRIAJE = TriajeDemo(al_triar=_CAMAS.esperar_cama, otro_episodio=_CAMAS.episodio)
 _ADMIN = AdminDemo()
 _PACIENTES = PacientesDemo(_TRIAJE, al_auditar=_ADMIN.anotar, camas=_CAMAS)
 _REPORTES = ReportesDemo(_CAMAS, _TRIAJE)

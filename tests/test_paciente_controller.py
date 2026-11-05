@@ -49,6 +49,7 @@ OPERACIONES = [
     ("registrar", ("DNI", DNI, "Rosa", "Mendoza", NACIMIENTO, "F", 1)),
     ("registrar_no_identificado", ("M", 40, 4)),
     ("abrir_episodio", (1, "Dolor torácico")),
+    ("episodio_abierto", (1,)),
     ("identificar", (5, "DNI", DNI, "Rosa", "Mendoza", NACIMIENTO)),
     ("fusionar", (5, 1)),
     ("actualizar_datos", (1, "Rosa", "Mendoza", NACIMIENTO, "F", 1)),
@@ -182,6 +183,23 @@ def test_un_episodio_anulado_no_cuenta_como_abierto(datos, ctrl):
     datos["EpisodioDAO"].crear.return_value = 9
     ctrl.abrir_episodio(1, "Dolor torácico")
     datos["EpisodioDAO"].crear.assert_called_once()
+
+
+@pytest.mark.parametrize("estado", [EstadoEpisodio.EN_ESPERA_TRIAJE, EstadoEpisodio.EN_ESPERA,
+                                    EstadoEpisodio.EN_ATENCION])
+def test_episodio_abierto_devuelve_aquel_con_el_que_sigue_en_emergencia(datos, ctrl, estado):
+    cerrado = episodio(2, estado=EstadoEpisodio.ALTA)
+    datos["EpisodioDAO"].listar_por_paciente.return_value = [cerrado, episodio(3, estado=estado)]
+    abierto = ctrl.episodio_abierto(1)
+    assert abierto.id_episodio == 3 and abierto.estado == estado
+    assert datos.escrituras() == []  # solo lee
+
+
+def test_sin_episodio_abierto_devuelve_none(datos, ctrl):
+    anulado = episodio(3, estado=EstadoEpisodio.EN_ESPERA)
+    anulado.anular()
+    datos["EpisodioDAO"].listar_por_paciente.return_value = [episodio(2, estado=EstadoEpisodio.REFERIDO), anulado]
+    assert ctrl.episodio_abierto(1) is None
 
 
 def test_abrir_episodio_de_un_paciente_inexistente_o_anulado(datos, ctrl):

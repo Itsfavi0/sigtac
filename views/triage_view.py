@@ -14,6 +14,7 @@ from datetime import datetime
 
 import customtkinter as ctk
 
+from models.estados import EstadoEpisodio
 from models.excepciones import SigtacError
 from models.triaje import SignosVitales, Triaje
 from views import formato, tema
@@ -47,6 +48,13 @@ TEXTO_CONFIRMAR = "Confirmar nivel"
 TEXTO_SIN_SIGNOS = "Complete los signos vitales"   # el botón deshabilitado dice por qué no responde
 TEXTO_RECLASIFICAR = "Reclasificar"
 TEXTO_CANCELAR_RECLASIFICACION = "Cancelar reclasificación"
+AGREGA_AL_EPISODIO = "El triaje se agrega a este episodio; no se abre otro."
+PASA_A_COLA_DE_CAMA = "El paciente pasa a la cola de cama."
+# Un triaje nuevo de quien ya esperaba cama o estaba en una (RN-09): no cambia de lugar
+TRAS_TRIAJE = {
+    EstadoEpisodio.EN_ESPERA: "El paciente sigue en la cola de cama, con este nivel.",
+    EstadoEpisodio.EN_ATENCION: "El paciente sigue en su cama.",
+}
 
 
 def rango_admitido(clave: str) -> str:
@@ -58,6 +66,25 @@ def rango_admitido(clave: str) -> str:
 def texto_faltan(faltan: int) -> str:
     """Lo que dice el botón mientras la justificación no llega al mínimo de RN-10."""
     return f"Faltan {faltan} caracteres (mínimo {Triaje.MIN_JUSTIFICACION})"
+
+
+def texto_en_emergencia(episodio, ahora: datetime) -> str:
+    """
+    Bajo la ficha de quien ya está en emergencia: desde cuándo, dónde está y su nivel vigente (RN-09). Si llegó otro
+    día, con la fecha: solo la hora haría pensar que llegó hoy.
+    """
+    llegada = episodio.fecha_ingreso
+    desde = f"las {formato.hora(llegada)}" if llegada.date() == ahora.date() else \
+        f"el {formato.fecha_numerica(llegada.date())} a las {formato.hora(llegada)}"
+    partes = [f"En emergencia desde {desde}", episodio.estado.texto.lower()]
+    if episodio.nivel_actual is not None:
+        partes.append(f"nivel {texto_nivel(episodio.nivel_actual)}")
+    return " · ".join(partes) + ".\n" + AGREGA_AL_EPISODIO
+
+
+def texto_tras_triaje(nivel: int, estado_previo) -> str:
+    """El aviso al registrar: el nivel y adónde va el paciente (según dónde estaba)."""
+    return f"Triaje registrado: nivel {texto_nivel(nivel)}. {TRAS_TRIAJE.get(estado_previo, PASA_A_COLA_DE_CAMA)}"
 
 
 class TriageView(ctk.CTkFrame):
@@ -76,7 +103,9 @@ class TriageView(ctk.CTkFrame):
         self._buscado = None       # (tipo, número) del documento buscado, para saber si se editó después
         self._documento_con_error = None  # (tipo, número) del documento rechazado por mal escrito
         self._paciente = None      # el paciente buscado o ya registrado en este intento
-        self._id_episodio = None   # el episodio ya abierto en este intento, si el triaje falló después
+        self._id_episodio = None   # el episodio a triar: el que ya tenía abierto, o el abierto en este intento
+        self._episodio_abierto = None  # el episodio con el que el paciente buscado ya estaba en emergencia
+        self._fila_cola = None     # el episodio elegido en la cola: al elegir otro, los datos clínicos se borran
         self._seguros = {}         # nombre del seguro → id_seguro
         self._casillas = {}        # id_sintoma → casilla
         self._tarea = None
@@ -115,12 +144,15 @@ class TriageView(ctk.CTkFrame):
         self._con_documento = self._crear_con_documento(self._identificacion)
         self._sin_documento = self._crear_sin_documento(self._identificacion)
         self._con_documento.pack(fill="x")
-        self._motivo = self._campo(self._nuevo, "Motivo de consulta", "Por qué acude a emergencia")
+        # El motivo es de un episodio nuevo: si el paciente ya está en emergencia, su episodio ya lo tiene y se oculta
+        self._marco_motivo = ctk.CTkFrame(self._nuevo, fg_color="transparent")
+        self._marco_motivo.pack(fill="x")
+        self._motivo = self._campo(self._marco_motivo, "Motivo de consulta", "Por qué acude a emergencia")
         self._enter_confirma(self._motivo)
 
         # Enter o doble clic en un paciente de la cola lleva al paso 2 (brief §4); las flechas solo eligen
         self._tabla = TablaDatos(cuerpo, self.COLUMNAS_COLA, NADIE_ESPERA_TRIAJE, filas=self.FILAS_COLA,
-                                 al_activar=lambda _id: self.enfocar_signos())
+                                 al_seleccionar=self._fila_elegida, al_activar=lambda _id: self.enfocar_signos())
         self._nuevo.pack(fill="x")
 
     def _crear_con_documento(self, padre) -> ctk.CTkFrame:
@@ -140,6 +172,9 @@ class TriageView(ctk.CTkFrame):
         self._aviso = ctk.CTkLabel(self._resultado, text=AVISO_BUSCAR, font=tema.fuente("pequena"),
                                    text_color=tema.COLOR_TEXTO_SECUNDARIO, anchor="w", justify="left")
         self._ficha = FichaPaciente(self._resultado)
+        # Bajo la ficha, si ya está en emergencia: dónde está y que el triaje se agrega a ese episodio (RN-09)
+        self._en_emergencia = ctk.CTkLabel(self._resultado, text="", font=tema.fuente("pequena"),
+                                           text_color=tema.COLOR_TEXTO_SECUNDARIO, anchor="w", justify="left")
 
         self._registro = ctk.CTkFrame(self._resultado, fg_color="transparent")
         ctk.CTkLabel(self._registro, text=NO_REGISTRADO, font=tema.fuente("pequena"),
@@ -170,6 +205,9 @@ class TriageView(ctk.CTkFrame):
 
     def _cambiar_modo(self, modo: str):
         self._olvidar_intento()
+        self._limpiar_clinico()  # otro paciente: lo medido no es suyo
+        # La tabla conserva su fila elegida mientras está oculta: elegir otra al volver también es cambiar de paciente
+        self._fila_cola = self._tabla.seleccionado()
         self._limpiar_errores_paciente()
         self._mostrar_aviso()
         if modo == "cola":
@@ -182,6 +220,7 @@ class TriageView(ctk.CTkFrame):
 
     def _cambiar_identidad(self, identidad: str):
         self._olvidar_intento()
+        self._limpiar_clinico()
         self._limpiar_errores_paciente()
         self._mostrar_aviso()
         self._con_documento.pack_forget()
@@ -197,9 +236,13 @@ class TriageView(ctk.CTkFrame):
 
     def buscar(self, _evento=None):
         """Busca el documento: si el paciente existe muestra su ficha; si no, los campos para registrarlo."""
+        # Si no es el documento ya buscado, ese paciente y lo medido se olvidan antes, aunque esta búsqueda falle:
+        # si no, un error de la BD dejaría a la vista (y como destino del triaje) al paciente anterior
+        self._documento_editado()
         tipo, numero = self._documento.valores()
         try:
             paciente = self._pacientes.buscar_por_documento(tipo.value, numero)
+            episodio = None if paciente is None else self._pacientes.episodio_abierto(paciente.id_paciente)
         except ValueError as error:
             # El documento está mal escrito: se señala junto al campo, sin diálogo (como un signo inválido)
             marcar_error(self._documento.campo_numero)
@@ -221,14 +264,27 @@ class TriageView(ctk.CTkFrame):
         else:
             self._ficha.mostrar(paciente)
             self._mostrar_resultado(self._ficha)
+            if episodio is not None:
+                self._triar_episodio_abierto(episodio)
         return "break"
+
+    def _triar_episodio_abierto(self, episodio):
+        """
+        El paciente ya está en emergencia: el triaje se agrega a ese episodio (RN-09), no se abre otro. Su motivo ya
+        está registrado, así que no se pide; bajo la ficha se lee dónde está.
+        """
+        self._episodio_abierto = episodio
+        self._id_episodio = episodio.id_episodio
+        self._marco_motivo.pack_forget()
+        self._en_emergencia.configure(text=texto_en_emergencia(episodio, self._reloj()))
+        self._en_emergencia.pack(fill="x", pady=(tema.ESPACIO, 0))
 
     def _mostrar_aviso(self, texto: str = AVISO_BUSCAR, error: bool = False):
         self._aviso.configure(text=texto, text_color=tema.COLOR_ERROR if error else tema.COLOR_TEXTO_SECUNDARIO)
         self._mostrar_resultado(self._aviso)
 
     def _mostrar_resultado(self, cual):
-        for parte in (self._aviso, self._ficha, self._registro):
+        for parte in (self._aviso, self._ficha, self._en_emergencia, self._registro):
             parte.pack_forget()
         cual.pack(fill="x")
 
@@ -245,10 +301,20 @@ class TriageView(ctk.CTkFrame):
             tipo, numero = self._documento.valores()
             if (tipo, numero.strip()) != self._buscado:
                 self._olvidar_intento()
+                self._limpiar_clinico()  # lo medido era del paciente buscado, no del que se va a buscar
                 self._mostrar_aviso()
 
     def _olvidar_intento(self):
-        self._buscado = self._paciente = self._id_episodio = None
+        self._buscado = self._paciente = self._id_episodio = self._episodio_abierto = None
+        self._marco_motivo.pack(fill="x")  # el próximo paciente puede llegar recién: su motivo se pide
+
+    def _fila_elegida(self, id_episodio):
+        """Elegir otro paciente en la cola borra lo medido al anterior. Una recarga de la cola (None) no cuenta."""
+        if id_episodio is None:
+            return
+        if self._fila_cola is not None and id_episodio != self._fila_cola:
+            self._limpiar_clinico()
+        self._fila_cola = id_episodio
 
     # ---- Paso 2: signos vitales
 
@@ -503,6 +569,7 @@ class TriageView(ctk.CTkFrame):
         sugerido = self._sugerencia.nivel
         nivel_final = self.nivel_final()
         justificacion = self._texto_justificacion() if nivel_final not in (None, sugerido) else None
+        estado_previo = self._episodio_abierto.estado if self._episodio_abierto is not None else None
         try:
             id_episodio = self._episodio_a_triar()
             self._triaje.registrar(id_episodio, signos, self.sintomas_elegidos(), nivel_final, justificacion)
@@ -510,8 +577,7 @@ class TriageView(ctk.CTkFrame):
             mostrar_error(self, error)
             self._recargar_cola()  # si el episodio llegó a abrirse, ya aparece «En cola»
             return "break"
-        mostrar_info(self, f"Triaje registrado: nivel {texto_nivel(nivel_final or sugerido)}. "
-                           "El paciente pasa a la cola de cama.")
+        mostrar_info(self, texto_tras_triaje(nivel_final or sugerido, estado_previo))
         self.limpiar()
         self._recargar_cola()
         return "break"
@@ -554,20 +620,36 @@ class TriageView(ctk.CTkFrame):
         self._limpiar_errores_paciente()
         self._mostrar_aviso()
         self._datos.limpiar()
-        for campo in (self._edad_nn, self._motivo, *self._campos_signos.values()):
-            campo.delete(0, "end")
-            campo._activate_placeholder()  # CustomTkinter solo lo vuelve a mostrar al perder el foco
-            marcar_error(campo, False)
+        self._vaciar(self._edad_nn)
         for lista in (self._sexo_nn, self._seguro_nn):
             lista.set("")
             marcar_error(lista, False)
+        self._fila_cola = self._tabla.seleccionado()
+        self._limpiar_clinico()
+        self._documento.enfocar()
+
+    def _limpiar_clinico(self):
+        """
+        Borra lo escrito sobre el paciente que se estaba triando: motivo, signos, síntomas y reclasificación. Se
+        llama también al cambiar de paciente, para que lo medido a uno no quede en el triaje de otro.
+        """
+        if self._tarea is not None:
+            self.after_cancel(self._tarea)
+            self._tarea = None
+        for campo in (self._motivo, *self._campos_signos.values()):
+            self._vaciar(campo)
         for caja in self._casillas.values():
             caja.deselect()
         if self._reclasificando:
             self.alternar_reclasificacion()
         self._avisar_signos(None)
         self._mostrar_sugerencia(None)
-        self._documento.enfocar()
+
+    @staticmethod
+    def _vaciar(campo):
+        campo.delete(0, "end")
+        campo._activate_placeholder()  # CustomTkinter solo lo vuelve a mostrar al perder el foco
+        marcar_error(campo, False)
 
     # ---- Datos
 

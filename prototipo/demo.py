@@ -156,6 +156,14 @@ class CamasDemo:
         """Lo que hace el primer triaje: el paciente pasa a la cola de cama."""
         self._cola.append((episodio, paciente))
 
+    def abiertos(self) -> list:
+        """(episodio, paciente) de quienes esperan cama o están en una: siguen en emergencia."""
+        return list(self._cola) + [(episodio, paciente) for episodio, paciente, _ in self._con_cama.values()]
+
+    def episodio(self, id_episodio: int) -> EpisodioEmergencia | None:
+        """El episodio que espera cama o está en una, para un triaje nuevo (RN-09); None si no está aquí."""
+        return next((e for e, _ in self.abiertos() if e.id_episodio == id_episodio), None)
+
     # ---- Ciclo de la cama
 
     def asignar(self, id_episodio: int, id_cama: int) -> int:
@@ -268,12 +276,14 @@ class TriajeDemo:
     """
     La cola de triaje y el triaje, con la estrategia real (Manchester) y el catálogo de síntomas del seed. Recuerda
     lo que se registra mientras la ventana está abierta: un paciente triado sale de la cola y, si hay
-    `al_triar(episodio, paciente)` (p. ej. CamasDemo.esperar_cama), pasa a esperar cama.
+    `al_triar(episodio, paciente)` (p. ej. CamasDemo.esperar_cama), pasa a esperar cama. Con `otro_episodio(id)`
+    (p. ej. CamasDemo.episodio) también se tria de nuevo a quien ya espera cama o está en una (RN-09).
     """
 
-    def __init__(self, ahora=datetime.now, al_triar=None):
+    def __init__(self, ahora=datetime.now, al_triar=None, otro_episodio=None):
         self._ahora = ahora
         self._al_triar = al_triar
+        self._otro_episodio = otro_episodio
         self._estrategia = ReglaManchester()
         self._cola = None  # (episodio, paciente) en orden de llegada; se arma la primera vez
         self._id_triaje = 0
@@ -295,6 +305,10 @@ class TriajeDemo:
     def agregar(self, episodio: EpisodioEmergencia, paciente: Paciente):
         """Lo que hace abrir un episodio: el paciente pasa a esperar triaje."""
         self._entradas().append((episodio, paciente))
+
+    def abiertos(self) -> list:
+        """(episodio, paciente) de quienes esperan su primer triaje."""
+        return list(self._entradas())
 
     def en_cola(self, id_paciente: int) -> bool:
         return any(paciente.id_paciente == id_paciente for _, paciente in self._entradas())
@@ -327,7 +341,13 @@ class TriajeDemo:
         entradas = self._entradas()
         triado = next(((e, p) for e, p in entradas if e.id_episodio == id_episodio), None)
         if triado is None:
-            raise ReglaNegocioError("El episodio no existe o ya fue triado.")
+            # Un triaje nuevo de quien ya espera cama o está en una: se agrega a su historial y sigue donde estaba
+            episodio = self._otro_episodio(id_episodio) if self._otro_episodio is not None else None
+            if episodio is None:
+                raise ReglaNegocioError("El episodio no existe o está cerrado.")
+            episodio.agregar_triaje(triaje)
+            self._id_triaje += 1
+            return self._id_triaje
         episodio, paciente = triado
         episodio.agregar_triaje(triaje)  # pasa a esperar cama, como en el modelo real
         entradas.remove(triado)
@@ -365,8 +385,19 @@ class PacientesDemo:
 
     def buscar_por_documento(self, tipo_documento: str, num_documento: str):
         documento = DocumentoIdentidad(tipo_documento, num_documento)  # ValueError si no es válido
-        conocidos = self._pacientes + self._triaje.pacientes_en_cola()
-        return next((p for p in conocidos if p.documento == documento), None)
+        return next((p for p in self._conocidos() if p.documento == documento), None)
+
+    def _conocidos(self) -> list[Paciente]:
+        """Los registrados aquí y los que siguen en emergencia (cola de triaje, cola de cama o en una cama)."""
+        en_camas = [p for _, p in self._camas.abiertos()] if self._camas is not None else []
+        return self._pacientes + self._triaje.pacientes_en_cola() + en_camas
+
+    def episodio_abierto(self, id_paciente: int):
+        """Como el controlador: el episodio con el que sigue en emergencia (espera triaje, cama o está en una)."""
+        en_cola = next((e for e, p in self._triaje.abiertos() if p.id_paciente == id_paciente), None)
+        if en_cola is not None or self._camas is None:
+            return en_cola
+        return next((e for e, p in self._camas.abiertos() if p.id_paciente == id_paciente), None)
 
     def registrar(self, tipo_documento, num_documento, nombres, apellidos, fecha_nac, sexo, id_seguro):
         documento = DocumentoIdentidad(tipo_documento, num_documento)
@@ -435,22 +466,14 @@ class PacientesDemo:
         return self._reemplazar(paciente)
 
     def _episodio_abierto(self, id_paciente: int) -> bool:
-        """Como el controlador: espera triaje, espera cama o está en una."""
-        if self._triaje.en_cola(id_paciente):
-            return True
-        if self._camas is None:
-            return False
-        en_camas = [e.paciente for e in self._camas.cola_de_espera()] + \
-                   [p.paciente for p in self._camas.pacientes_con_cama()]
-        return any(p is not None and p.id_paciente == id_paciente for p in en_camas)
+        return self.episodio_abierto(id_paciente) is not None
 
     def _auditar(self, tabla, accion, id_registro):
         if self._al_auditar is not None:
             self._al_auditar(tabla, accion, id_registro)
 
     def _cargar(self, id_paciente: int) -> Paciente:
-        conocidos = self._pacientes + self._triaje.pacientes_en_cola()
-        paciente = next((p for p in conocidos if p.id_paciente == id_paciente), None)
+        paciente = next((p for p in self._conocidos() if p.id_paciente == id_paciente), None)
         if paciente is None:
             raise ReglaNegocioError("El paciente no existe.")
         return paciente
