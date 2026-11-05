@@ -5,6 +5,91 @@
 
 ---
 
+## [2026-11-04] — Etapa 1: detalles visuales comunes e íconos
+
+### Cambio
+- **Piezas compartidas** (extracciones aprobadas por el usuario):
+  - **`Desplazable`** (`views/componentes/desplazable.py`), el contenedor de las 6 pantallas que se desplazan:
+    - su barra solo aparece si el contenido no cabe, separada del contenido por `ESPACIO_MINIMO`; sin barra, el contenido llega al borde (no queda un margen vacío);
+    - `mostrar_al_pie()` reemplaza el `_parent_canvas` de Pacientes;
+    - `reacomodar()` vuelve arriba al cambiar de panel;
+    - `al_cambiar_barra` avisa a la pantalla, y el Triaje lo usa para ajustar el margen entre el formulario y el panel.
+    - Los atributos internos de CustomTkinter quedan solo en este archivo.
+  - **`TablaDatos`:**
+    - el borde se pinta con el color de las tarjetas en los dos modos (en oscuro era blanco);
+    - la barra solo aparece si no se ven todas las filas. Lo decide Tk por la fracción visible (`yscrollcommand`), sin estimar altos;
+    - `sin_lectura()` muestra «No se pudieron leer los datos.» hasta la próxima carga;
+    - `al_activar`: Enter, o doble clic sobre la fila elegida.
+  - **El texto de un estado** («En limpieza») tiene un solo dueño, `EstadoCama.texto` y `EstadoEpisodio.texto` (`models/estados.py`). Lo usan `formato.texto_estado_cama` (tablero, casillas, Gestión de camas, Reportes) y el PDF.
+  - **Medidas a `tema.py`:** `ANCHO_TIPO_DOCUMENTO`, `GROSOR_BORDE`, `DENTRO_DE_TARJETA`, `MUESTRA_LEYENDA`, `RADIO_MUESTRA`, `LADO_ICONO`, `LADO_ICONO_KPI` y `LADO_MARCADOR_KPI`. Se corrigió además el comentario de `ESPACIO`.
+- **Pantallas:**
+  - **Cuando falla la carga,** las tablas de Camas, Limpieza, Triaje (cola) y Pacientes (NN) dicen que no se pudieron leer los datos, en lugar de «Nadie espera cama». Los contadores del selector van sin cifra («Esperan cama», no «(0)»). Reportes y Administración usan la misma pieza.
+  - **Pacientes:**
+    - cambiar solo el tipo de documento retira la ficha (`CamposDocumento.al_cambiar_tipo`);
+    - después de identificar, el foco vuelve al documento;
+    - al elegir el primer NN, la pantalla baja hasta «Identificar», pero no al recorrer la lista con las flechas. Baja solo lo justo (`Desplazable.mostrar_hasta`, con `TablaDatos.y_elegida`): se ven el botón y la fila elegida, sin cortarse. Al volver al panel, elegir otro NN vuelve a bajar.
+  - **Triaje:**
+    - el mismo arreglo del tipo de documento;
+    - Enter o doble clic en un paciente de la cola llevan el foco al primer signo vital (brief §4).
+  - **Administración:** en la propia cuenta no se ofrecen «Desactivar» ni «Cambiar rol», y el título explica por qué. La regla sigue en el controlador.
+- **Íconos** (aprobados por el usuario): Tabler Icons 2.47 en PNG, licencia MIT (`views/assets/icons/`, con `LICENSE-tabler-icons.txt`).
+  - `views/componentes/iconos.py` pinta cada PNG con un par de colores del tema, uno para claro y otro para oscuro.
+  - **Menú:** un ícono por módulo, gris y azul en el ítem activo.
+  - **Logo:** una línea de pulso blanca sobre el cuadro azul.
+  - **Indicadores:** el ícono va dentro del marcador, del color del dato.
+  - **El azul de íconos y marcadores** es `COLOR_PRIMARIO_GRAFICO` (`#3D8BF2` en oscuro): el primario daba 2,7–2,8:1 sobre las tarjetas y el ítem activo, y ahora llega a 3,9–4,2:1. `test_tema.py` lo comprueba sobre la tarjeta, el ítem activo, el fondo y la barra.
+  - **El borde de foco** (`views/componentes/foco.py`) usa el mismo azul: en oscuro daba 2,84:1 sobre las tarjetas (campos, listas y botones secundarios). Lo encontró el verificador; venía de antes de esta etapa.
+  - `requirements.txt` fija Pillow, que la interfaz ahora usa directamente.
+- **Pruebas:** nuevas en `test_componentes.py` (tabla, `Desplazable`, íconos), `test_tema.py`, `test_formato.py`, `test_pacientes_view.py`, `test_triage_view.py`, `test_admin_view.py`, `test_camas_view.py`, `test_limpieza_view.py`, `test_reportes_view.py` y `test_app_principal.py`.
+
+### Archivos afectados
+- `views/componentes/desplazable.py`, `views/componentes/iconos.py` y `views/assets/icons/` (nuevos)
+- `views/componentes/` (`tabla.py`, `tarjetas.py`, `marca.py`, `documento.py`, `foco.py`, `__init__.py`), `views/tema.py` y `views/formato.py`
+- Las 7 pantallas de `views/` y `views/app_principal.py`
+- `models/estados.py`, `utils/pdf_generator.py` y `requirements.txt`
+- Pruebas: las 10 nombradas arriba
+- `docs/`
+
+### Motivo
+Cerrar la Fase 6: los detalles que dejaron anotados las revisiones de cada pantalla, hechos de una vez y de la misma forma en todas. También los íconos que el Figma tenía como marcadores.
+
+### Impacto
+- Pruebas: **2115 pasan** (antes 2059).
+- Sin cambios de esquema ni de controladores.
+- **Una dependencia fijada:** Pillow, que ya venía instalada con reportlab y matplotlib.
+- **Cambios visibles:**
+  - las barras de desplazamiento solo aparecen cuando hacen falta;
+  - el borde de las tablas en oscuro;
+  - los íconos, los marcadores y el borde de foco, con el azul algo más claro en modo oscuro.
+
+### Decisiones
+- **Un azul propio para íconos y marcadores, no aclarar el primario:** sobre el primario va el texto blanco de los botones, que necesita 4,5:1 y lo perdería con un tono más claro. Separados, cada uno cumple su mínimo (4,5:1 el texto, 3:1 el gráfico). En claro los dos son el mismo azul.
+- **«Lo justo» conserva la fila elegida, no la lista entera:** a 1093×614 la lista de NN (5 filas y el encabezado, 192 px) más el formulario hasta «Identificar» miden 540 px, y se ven 518. Conservando la lista, el botón quedaba cortado; lo encontró el verificador midiendo en una ventana real. Desde la fila elegida hasta el pie del botón hay 516 px: caben, pero sin el aire de 8 px en los dos extremos, así que cede primero el aire de arriba. Medido en ventana real (claro y oscuro): fila y botón completos.
+- **El cálculo es una función aparte** (`desplazamiento_justo`), sin ventana: las pruebas cubren sus límites con números. La ventana de pruebas está oculta y `Treeview.bbox` no da la fila; por eso `y_elegida` vuelve al borde de la tabla cuando Tk no la dibujó.
+- **El indicador lateral del ítem activo** usa el mismo azul que su ícono (antes `COLOR_PRIMARIO`, 3,27:1, ya cumplía).
+- **«No se pudieron leer los datos», no «no hay»:** una lista vacía por un fallo diría algo falso (que nadie espera cama). Por lo mismo, el contador va sin cifra.
+- **El texto de los estados vive en el modelo** porque lo usan las vistas y el PDF, y `utils/` no puede importar `views/`. Una regla, un dueño.
+- **Íconos en PNG:** CustomTkinter no dibuja SVG y no hay en el proyecto cómo convertirlo. Tabler publica sus PNG con licencia MIT, y un ícono siempre va junto a su texto.
+- **Proceso de la interfaz** (skill ui-consistency):
+  - la calibración plantó un rol tipográfico cambiado («fuerte» en lugar de «pequena» en un aviso), y el revisor lo encontró;
+  - un verificador y un auditor revisaron en paralelo. Lo que encontraron está corregido:
+    - Pacientes saltaba con cada flecha;
+    - quedaba un margen de 4 px reservado para una barra oculta;
+    - la línea de la leyenda había cambiado 1 px sin querer;
+    - los contadores decían «(0)» al fallar;
+    - un doble clic en el encabezado activaba la fila;
+    - una prueba de Camas no probaba lo que decía;
+    - la barra de las tablas se estimaba con un alto de encabezado equivocado;
+    - el contenido podía quedar en blanco al acortarse.
+  - En el camino apareció un error que no llegó a producirse: `CTkScrollableFrame` no redirige `grid_configure()` a su marco exterior. El Triaje usa `grid()`.
+
+### Pendientes
+- **La casilla marcada** (`campos.py`) se rellena de `#0A6CDE`, a 2,84:1 sobre la tarjeta en oscuro. Se reconoce por su marca blanca (4,98:1), así que se dejó igual.
+- **Las pruebas de Enter y doble clic llaman al manejador, no producen el evento:** la ventana de pruebas está oculta y no recibe el foco.
+- **Fase 7:** integración y pruebas desde las vistas.
+
+---
+
 ## [2026-11-04] — Fase 6: pantalla de Administración (cierre de las pantallas)
 
 ### Cambio

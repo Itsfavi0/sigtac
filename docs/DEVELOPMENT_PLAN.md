@@ -353,7 +353,8 @@ Las vistas:
 - [x] `TablaDatos(filas=N)` (2026-10-31): el alto fijo de las tablas, extraído de triaje y pacientes
 - [x] `reportes_view.py` (2026-11-04): período con atajos y fechas, 4 indicadores, triajes por nivel, estado de la guardia y exportar PDF. Piezas: `pedir_ruta_pdf` y `Selector.quitar_eleccion`/`repetir`
 - [x] `admin_view.py` (2026-11-04): cuentas, nueva cuenta, bitácora (con `CamposPeriodo`, extraído de Reportes) y baja o reactivación de pacientes
-- [ ] `assets/` (por ahora no hace falta: la interfaz no usa imágenes)
+- [x] `assets/icons/` (2026-11-04): íconos de Tabler (MIT) para el menú, el logo y los indicadores (`views/componentes/iconos.py`)
+- [x] Detalles visuales comunes (2026-11-04): `Desplazable`, `TablaDatos` (borde en oscuro, `sin_lectura`), medidas en `tema.py`
 
 ### Dashboard
 
