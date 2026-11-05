@@ -1,6 +1,6 @@
 """
 Foco visible para los campos, los botones y los interruptores. CustomTkinter no dibuja un anillo de foco: al
-entrar a un campo con el teclado o el mouse, su borde pasa a 2 px del color principal, y al salir vuelve a 1 px del
+entrar a un campo con el teclado o el mouse, su borde pasa a 2 px del azul de foco, y al salir vuelve a 1 px del
 color del campo. Los botones e interruptores, además, no aceptan el foco por sí solos (ver marcar_foco_control).
 """
 from views import tema
@@ -11,7 +11,7 @@ TECLAS_ACTIVAR = ("<Return>", "<space>")
 
 def al_entrar(campo):
     if not getattr(campo, "_sigtac_error", False):  # el foco no tapa un error
-        campo.configure(border_width=GROSOR_FOCO, border_color=tema.COLOR_PRIMARIO)
+        campo.configure(border_width=GROSOR_FOCO, border_color=tema.COLOR_PRIMARIO_GRAFICO)
 
 
 def al_salir(campo):
@@ -40,10 +40,10 @@ def marcar_foco_control(control, accion, color_foco=None):
     """
     Hace que un botón o un interruptor de CustomTkinter se alcance con Tab y se active con Enter o espacio, como
     pide el brief. Esos widgets son un lienzo que Tk salta al tabular: aquí el lienzo acepta el foco, y al tenerlo
-    el borde pasa a 2 px de `color_foco` (el principal; sobre un botón azul, el del texto). Devuelve el control.
+    el borde pasa a 2 px de `color_foco` (el azul de foco; sobre un botón azul, el del texto). Devuelve el control.
     """
     control._sigtac_borde = (control.cget("border_width"), control.cget("border_color"))
-    control._sigtac_color_foco = color_foco or tema.COLOR_PRIMARIO
+    control._sigtac_color_foco = color_foco or tema.COLOR_PRIMARIO_GRAFICO
     control._sigtac_enfocado = False
     control._sigtac_accion = accion
     lienzo = control._canvas

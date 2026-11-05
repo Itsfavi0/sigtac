@@ -165,7 +165,7 @@ def test_el_foco_engrosa_el_borde_y_el_error_lo_mantiene(raiz_tk):
     campo = marcar_foco(ctk.CTkEntry(raiz_tk, border_width=1, border_color=tema.COLOR_BORDE_CAMPO))
     assert {"<FocusIn>", "<FocusOut>"} <= set(campo._entry.bind())  # CTkEntry recibe el foco en su Entry interno
     al_entrar(campo)
-    assert campo.cget("border_width") == 2 and tuple(campo.cget("border_color")) == tema.COLOR_PRIMARIO
+    assert campo.cget("border_width") == 2 and tuple(campo.cget("border_color")) == tema.COLOR_PRIMARIO_GRAFICO
     al_salir(campo)
     assert campo.cget("border_width") == 1 and tuple(campo.cget("border_color")) == tema.COLOR_BORDE_CAMPO
     marcar_error(campo)
@@ -352,7 +352,7 @@ def test_campo_texto_con_el_estilo_del_tema_y_foco(raiz_tk):
     assert campo.cget("height") == tema.ALTO_CONTROL
     assert tuple(campo.cget("border_color")) == tema.COLOR_BORDE_CAMPO
     al_entrar(campo)
-    assert tuple(campo.cget("border_color")) == tema.COLOR_PRIMARIO  # el foco se ve
+    assert tuple(campo.cget("border_color")) == tema.COLOR_PRIMARIO_GRAFICO  # el foco se ve
 
 
 def test_campo_texto_acepta_opciones_propias(raiz_tk):
@@ -383,7 +383,7 @@ def test_un_boton_acepta_el_foco_y_se_activa_con_enter_o_espacio(raiz_tk):
 
 
 @pytest.mark.parametrize("clase, color_foco", [
-    (BotonSecundario, tema.COLOR_PRIMARIO), (BotonPrimario, tema.COLOR_TEXTO),  # sobre el azul, el del texto
+    (BotonSecundario, tema.COLOR_PRIMARIO_GRAFICO), (BotonPrimario, tema.COLOR_TEXTO),  # sobre el azul, el del texto
 ])
 def test_el_foco_de_un_boton_se_ve_y_al_salir_vuelve_su_borde(raiz_tk, clase, color_foco):
     from views.componentes.foco import GROSOR_FOCO, al_entrar_control, al_salir_control
@@ -429,7 +429,7 @@ def test_el_tipo_de_documento_muestra_el_foco(raiz_tk):
     from views.componentes.foco import al_entrar
     campos = CamposDocumento(raiz_tk)
     al_entrar(campos._tipo)
-    assert tuple(campos._tipo.cget("border_color")) == tema.COLOR_PRIMARIO
+    assert tuple(campos._tipo.cget("border_color")) == tema.COLOR_PRIMARIO_GRAFICO
 
 
 # ---- Tarjeta (sección con título)
@@ -572,7 +572,7 @@ def test_quitar_el_error_a_un_campo_con_foco_deja_el_borde_de_foco(raiz_tk, monk
     # Tk no da el foco a una ventana oculta: se simula que el campo lo tiene
     monkeypatch.setattr(campo, "focus_get", lambda: campo._entry)
     marcar_error(campo, False)
-    assert campo.cget("border_width") == GROSOR_FOCO and tuple(campo.cget("border_color")) == tema.COLOR_PRIMARIO
+    assert campo.cget("border_width") == GROSOR_FOCO and tuple(campo.cget("border_color")) == tema.COLOR_PRIMARIO_GRAFICO
 
 
 # ---- Datos del paciente (CamposPaciente, FichaPaciente)
@@ -769,3 +769,217 @@ def test_rechazar_marca_las_dos_y_al_corregir_se_van(raiz_tk):
     assert periodo.desde._sigtac_error and periodo.hasta._sigtac_error
     escribir_fecha(periodo, periodo.desde, "02/10/2026")
     assert not periodo.desde._sigtac_error and not periodo.hasta._sigtac_error
+
+
+# ---- TablaDatos: barra, sin lectura, activar y borde
+
+def test_la_barra_de_la_tabla_sigue_lo_que_tk_dice_que_se_ve(raiz_tk):
+    # Tk avisa la fracción visible de las filas (yscrollcommand); la barra solo aparece si no se ve todo
+    tabla = TablaDatos(raiz_tk, [("A", 80)], "Vacía", filas=2)
+    assert "_desplazada" in str(tabla._arbol.cget("yscrollcommand"))  # Tk avisa a este método
+    assert not tabla.muestra_barra
+    for vista, barra in (((0.0, 0.6), True), ((0.4, 1.0), True), ((0.0, 1.0), False)):
+        tabla._arbol.yview = lambda v=vista: v  # lo que Tk ve al terminar de acomodar
+        tabla._desplazada(*map(str, vista))
+        raiz_tk.update_idletasks()  # la decisión espera a que Tk termine
+        assert tabla.muestra_barra is barra
+
+
+def test_sin_lectura_dice_que_no_se_pudo_leer_hasta_la_proxima_carga(raiz_tk):
+    from views.componentes.tabla import SIN_LECTURA
+    tabla = TablaDatos(raiz_tk, [("A", 80)], "Nadie espera.", filas=2)
+    tabla.cargar([(1, ("x",))])
+    tabla.sin_lectura()
+    assert tabla.cantidad == 0 and tabla._vacio.cget("text") == SIN_LECTURA
+    tabla.cargar([])
+    assert tabla._vacio.cget("text") == "Nadie espera."
+    tabla.cambiar_texto_vacio("Elija un paciente.")
+    tabla.sin_lectura()
+    tabla.cargar([])
+    assert tabla._vacio.cget("text") == "Elija un paciente."  # vuelve al último texto pedido
+
+
+def test_enter_o_doble_clic_activan_la_fila_elegida(raiz_tk):
+    activadas = []
+    tabla = TablaDatos(raiz_tk, [("A", 80)], "Vacía", filas=2, al_activar=activadas.append)
+    tabla.cargar([(7, ("x",))])
+    assert tabla._activada(None) is None and activadas == []  # sin elección no hace nada
+    tabla.seleccionar(7)
+    assert tabla._activada(None) == "break" and activadas == [7]
+    assert "_activada" in tabla._arbol.bind("<Return>") and "_doble_clic" in tabla._arbol.bind("<Double-1>")
+
+
+def test_el_doble_clic_solo_activa_sobre_la_fila_elegida(raiz_tk, monkeypatch):
+    from types import SimpleNamespace
+    activadas = []
+    tabla = TablaDatos(raiz_tk, [("A", 80)], "Vacía", filas=2, al_activar=activadas.append)
+    tabla.cargar([(7, ("x",)), (8, ("y",))])
+    tabla.seleccionar(7)
+    elegida = tabla._arbol.selection()[0]
+    otra = [iid for iid in tabla._arbol.get_children() if iid != elegida][0]
+    clic = SimpleNamespace(x=10, y=10)
+    for region, fila in (("heading", ""), ("nothing", ""), ("cell", otra)):  # encabezado, vacío, otra fila
+        monkeypatch.setattr(tabla._arbol, "identify_region", lambda x, y, r=region: r)
+        monkeypatch.setattr(tabla._arbol, "identify_row", lambda y, f=fila: f)
+        assert tabla._doble_clic(clic) is None
+    monkeypatch.setattr(tabla._arbol, "identify_region", lambda x, y: "cell")
+    monkeypatch.setattr(tabla._arbol, "identify_row", lambda y: elegida)
+    assert tabla._doble_clic(clic) == "break" and activadas == [7]
+
+
+def test_sin_al_activar_enter_no_se_asocia(raiz_tk):
+    tabla = TablaDatos(raiz_tk, [("A", 80)], "Vacía")
+    assert not tabla._arbol.bind("<Return>")
+
+
+@pytest.mark.parametrize("oscuro, i", [(False, 0), (True, 1)])
+def test_el_borde_de_la_tabla_es_el_de_las_tarjetas(raiz_tk, oscuro, i):
+    from tkinter import ttk
+    from views.componentes.tabla import ESTILO, _configurar_estilo
+    _configurar_estilo(raiz_tk, oscuro=oscuro)
+    estilo = ttk.Style(raiz_tk)
+    # «clam» pintaba un relieve blanco en modo oscuro: los tres tonos del borde son el de las tarjetas
+    for opcion in ("bordercolor", "lightcolor", "darkcolor"):
+        assert str(estilo.lookup(ESTILO, opcion)) == tema.COLOR_BORDE[i]
+
+
+# ---- Desplazable
+
+def test_desplazable_muestra_la_barra_solo_si_el_contenido_no_cabe(raiz_tk):
+    from views.componentes import Desplazable
+    contenido = Desplazable(raiz_tk)
+    ctk.CTkFrame(contenido, height=300).pack()
+    raiz_tk.update_idletasks()
+    alto = contenido.winfo_reqheight()
+    assert contenido.ajustar_barra(alto_visible=alto + 50) is False and not contenido.muestra_barra
+    assert contenido.ajustar_barra(alto_visible=alto - 50) is True and contenido.muestra_barra
+    contenido.mostrar_al_pie()  # no falla aunque la ventana esté oculta
+    contenido.destroy()
+
+
+@pytest.mark.parametrize("actual, y_conservar, y_abajo, esperado", [
+    (0, 100, 380, 0),      # el pie ya se ve (380 + 10 = 390 < 400): no se mueve
+    (0, 100, 390, 0),      # justo en el borde (390 + 10 = 400): tampoco
+    (0, 100, 391, 1),      # un píxel más: baja solo ese píxel
+    (0, 100, 450, 60),     # baja lo justo para ver el pie con su margen
+    (0, 100, 490, 90),     # justo caben los dos con su aire (90 + 400 = 490 + 10)
+    (0, 100, 495, 95),     # con aire no caben: cede el de arriba y se ven los dos (fila en 100, pie en 495)
+    (0, 100, 500, 100),    # sin aire caben exacto: lo conservado queda en el borde de arriba
+    (0, 100, 600, 100),    # ni así caben: gana lo que se conserva (el pie queda cortado)
+    (200, 150, 300, 140),  # lo conservado quedó arriba de lo visible: sube hasta verlo, con su aire
+    (0, 5, 30, 0),         # nunca por encima del inicio del contenido
+])
+def test_desplazamiento_justo(actual, y_conservar, y_abajo, esperado):
+    from views.componentes.desplazable import desplazamiento_justo
+    assert desplazamiento_justo(actual, 400, y_conservar, y_abajo, margen=10) == esperado
+
+
+def test_mostrar_hasta_desplaza_lo_justo(raiz_tk, monkeypatch):
+    from views.componentes import Desplazable
+    from views.componentes import desplazable
+    contenido = Desplazable(raiz_tk)
+    ctk.CTkFrame(contenido, height=200).pack()
+    marco = ctk.CTkFrame(contenido, fg_color="transparent")
+    marco.pack()
+    lista = ctk.CTkFrame(marco, height=100)
+    lista.pack()
+    boton = ctk.CTkButton(marco, text="Identificar")
+    boton.pack()
+    raiz_tk.update_idletasks()
+    # El cálculo recibe la altura de cada widget medida desde el inicio del contenido, sumando la de su marco
+    assert contenido._y_dentro(lista) == marco.winfo_y() + lista.winfo_y()
+    pedidos, movimientos = [], []
+    monkeypatch.setattr(desplazable, "desplazamiento_justo", lambda *a: pedidos.append(a) or 120)
+    monkeypatch.setattr(contenido._parent_canvas, "yview_moveto", movimientos.append)
+    contenido.mostrar_hasta(boton, conservar=lista)
+    _, _, y_conservar, y_abajo, _ = pedidos[0]
+    assert y_conservar == contenido._y_dentro(lista)
+    assert y_abajo == contenido._y_dentro(boton) + boton.winfo_height()
+    assert movimientos == [120 / contenido.winfo_reqheight()]
+    contenido.mostrar_hasta(boton, conservar=lista, desde=40)  # p. ej. la fila elegida, 40 px dentro de la lista
+    assert pedidos[1][2] == contenido._y_dentro(lista) + 40
+    contenido.destroy()
+
+
+def test_y_elegida_sin_fila_elegida_es_el_borde_de_la_tabla(raiz_tk):
+    tabla = TablaDatos(raiz_tk, [("Nombre", 100)], "Vacía", filas=3)
+    assert tabla.y_elegida() == 0
+    tabla.cargar([(1, ["Ana"]), (2, ["Luis"])])
+    tabla.seleccionar(2)
+    assert tabla.y_elegida() >= 0  # con la ventana oculta Tk no la dibuja: queda el borde de la tabla
+    tabla.destroy()
+
+
+def test_mostrar_hasta_rechaza_un_widget_de_afuera(raiz_tk):
+    from views.componentes import Desplazable
+    contenido = Desplazable(raiz_tk)
+    adentro = ctk.CTkFrame(contenido, height=50)
+    adentro.pack()
+    afuera = ctk.CTkFrame(raiz_tk)
+    with pytest.raises(ValueError):
+        contenido.mostrar_hasta(adentro, conservar=afuera)
+    afuera.destroy()
+    contenido.destroy()
+
+
+def test_desplazable_avisa_solo_cuando_la_barra_cambia(raiz_tk):
+    from views.componentes import Desplazable
+    avisos = []
+    contenido = Desplazable(raiz_tk, al_cambiar_barra=avisos.append)
+    ctk.CTkFrame(contenido, height=300).pack()
+    raiz_tk.update_idletasks()
+    avisos.clear()  # el primer ajuste real (con la ventana oculta) ya avisó algo: se empieza de cero
+    contenido._con_barra = None
+    alto = contenido.winfo_reqheight()
+    contenido.ajustar_barra(alto_visible=alto + 50)
+    contenido.ajustar_barra(alto_visible=alto + 60)  # sigue sin barra: no avisa otra vez
+    contenido.ajustar_barra(alto_visible=alto - 50)
+    assert avisos == [False, True]
+    contenido.destroy()
+
+
+def test_reacomodar_vuelve_arriba_y_programa_la_revision(raiz_tk):
+    from views.componentes import Desplazable
+    contenido = Desplazable(raiz_tk)
+    ctk.CTkFrame(contenido, height=300).pack()
+    contenido._tarea and contenido.after_cancel(contenido._tarea)
+    contenido._tarea = None
+    contenido.reacomodar()
+    assert contenido._tarea is not None and contenido._parent_canvas.yview()[0] == 0
+    contenido.destroy()  # cancela la revisión pendiente sin error
+
+
+# ---- iconos.py
+
+def test_cada_icono_que_se_usa_existe_con_su_licencia():
+    from views.componentes import iconos
+    from views.app_principal import MODULOS
+    assert {m.clave for m in MODULOS} == set(iconos.MENU)  # cada módulo del menú tiene su ícono
+    usados = {*iconos.MENU.values(), iconos.LOGO, "bed", "spray", "first-aid-kit", "hourglass", "heartbeat",
+              "bed-off", "users", "clock"}
+    for nombre in usados:
+        assert iconos.ruta(nombre).is_file()
+    assert (iconos.CARPETA / "LICENSE-tabler-icons.txt").is_file()
+
+
+def test_un_icono_desconocido_es_un_error():
+    from views.componentes import iconos
+    with pytest.raises(ValueError, match="desconocido"):
+        iconos.ruta("no-existe")
+
+
+def test_el_icono_se_pinta_del_color_de_cada_modo(raiz_tk):
+    from views.componentes import iconos
+    imagen = iconos.icono("bed", tema.COLOR_PRIMARIO, 16)
+    assert imagen.cget("size") == (16, 16)
+    claro, oscuro = imagen.cget("light_image"), imagen.cget("dark_image")
+    # Donde el ícono es opaco, el color es el del modo; la forma (alfa) es la del PNG
+    x, y = next((x, y) for x in range(claro.width) for y in range(claro.height) if claro.getpixel((x, y))[3] == 255)
+    assert claro.getpixel((x, y))[:3] == tuple(int(tema.COLOR_PRIMARIO[0][i:i + 2], 16) for i in (1, 3, 5))
+    assert oscuro.getchannel("A").tobytes() == claro.getchannel("A").tobytes()
+
+
+def test_tarjeta_kpi_con_icono(raiz_tk):
+    tarjeta = TarjetaKPI(raiz_tk, "Camas libres", tema.COLOR_ESTADO_CAMA[EstadoCama.DISPONIBLE], "bed")
+    assert tarjeta.icono == "bed"
+    assert TarjetaKPI(raiz_tk, "Sin ícono").icono is None

@@ -7,6 +7,7 @@ nivel y si se excede vienen de models/triaje.py; aquí solo se decide cómo se l
 """
 from datetime import date, datetime
 
+from models.estados import EstadoCama
 from models.persona import Paciente
 from models.triaje import TIEMPO_MAXIMO_POR_NIVEL
 
@@ -70,6 +71,11 @@ def fecha_numerica(dia: date) -> str:
 
 def hora(momento: datetime, con_segundos: bool = False) -> str:
     return momento.strftime("%H:%M:%S" if con_segundos else "%H:%M")
+
+
+def texto_estado_cama(estado: EstadoCama) -> str:
+    """EstadoCama.EN_LIMPIEZA → «En limpieza»: el estado escrito como lo lee el usuario (tablas, leyenda, casillas)."""
+    return EstadoCama(estado).texto
 
 
 def porcentaje(parte: int, total: int) -> str:

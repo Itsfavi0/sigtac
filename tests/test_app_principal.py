@@ -83,7 +83,7 @@ def test_el_item_activo_se_distingue(raiz_tk, sesion_de):
     activo, indicador = vista._items["triaje"]
     inactivo, indicador_inactivo = vista._items["tablero"]
     assert tuple(activo.cget("fg_color")) == tema.COLOR_ACTIVO and activo.cget("border_width") == 1
-    assert tuple(indicador.cget("fg_color")) == tema.COLOR_PRIMARIO
+    assert tuple(indicador.cget("fg_color")) == tema.COLOR_PRIMARIO_GRAFICO
     assert inactivo.cget("fg_color") == "transparent" and inactivo.cget("border_width") == 0
     assert indicador_inactivo.cget("fg_color") == "transparent"
 
@@ -165,9 +165,9 @@ def test_crear_admin_usa_los_controladores_de_la_sesion(raiz_tk, sesion_de, monk
     recibidos = {}
 
     class AdminFalsa(ctk.CTkFrame):
-        def __init__(self, padre, admin, pacientes):
+        def __init__(self, padre, admin, pacientes, id_usuario_propio):
             super().__init__(padre)
-            recibidos.update(admin=admin, pacientes=pacientes)
+            recibidos.update(admin=admin, pacientes=pacientes, propio=id_usuario_propio)
 
     monkeypatch.setattr(app_principal, "AdminView", AdminFalsa)
     sesion = sesion_de(Rol.ADMINISTRADOR)
@@ -175,6 +175,7 @@ def test_crear_admin_usa_los_controladores_de_la_sesion(raiz_tk, sesion_de, monk
     pantalla = app_principal.crear_admin(vista._contenido, sesion, vista)
     assert isinstance(recibidos["admin"], AdminController) and recibidos["admin"]._sesion is sesion
     assert isinstance(recibidos["pacientes"], PacienteController) and recibidos["pacientes"]._sesion is sesion
+    assert recibidos["propio"] == sesion.id_usuario
     pantalla.destroy()
 
 
@@ -341,3 +342,15 @@ def test_el_circulo_del_interruptor_se_distingue_de_la_barra(raiz_tk, sesion_de,
     assert tuple(interruptor.cget("button_color")) == tema.COLOR_TEXTO_SECUNDARIO
     interruptor.toggle()
     assert tuple(interruptor.cget("button_color")) == tema.COLOR_TEXTO_SOBRE_PRIMARIO
+
+
+def test_el_menu_lleva_iconos_y_el_activo_cambia_de_color(raiz_tk, sesion_de, monkeypatch):
+    from views import app_principal as ap
+    pedidos = []
+    original = ap.icono
+    monkeypatch.setattr(ap, "icono", lambda nombre, color, *a: pedidos.append((nombre, color)) or original(nombre, color))
+    vista, _, _ = crear(raiz_tk, sesion_de(Rol.JEFE_GUARDIA))
+    assert all(boton.cget("image") is not None for boton, _ in vista._items.values())
+    pedidos.clear()
+    vista.mostrar("triaje")
+    assert ("heartbeat", tema.COLOR_PRIMARIO_GRAFICO) in pedidos and ("layout-dashboard", tema.COLOR_TEXTO_SECUNDARIO) in pedidos

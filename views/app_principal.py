@@ -23,6 +23,7 @@ from models.permisos import Permiso
 from views import formato, tema
 from views.componentes import BotonSecundario, Marca
 from views.componentes.foco import GROSOR_FOCO, fijar_borde, marcar_foco_control
+from views.componentes.iconos import MENU, icono
 from views.admin_view import AdminView
 from views.camas_view import GestionCamasView
 from views.dashboard_view import DashboardView
@@ -103,7 +104,8 @@ def crear_admin(padre, sesion: Sesion, principal: "AppPrincipal", admin=None, pa
     Administración con los controladores reales; el prototipo pasa los de demostración. Pacientes solo se usa para
     buscar, dar de baja y reactivar (permiso ADMINISTRACION).
     """
-    return AdminView(padre, admin or AdminController(sesion), pacientes or PacienteController(sesion))
+    return AdminView(padre, admin or AdminController(sesion), pacientes or PacienteController(sesion),
+                     id_usuario_propio=sesion.id_usuario)
 
 
 # clave del módulo → crear(padre, sesion, principal). Cada pantalla de la Fase 6 se agrega aquí al crearse.
@@ -208,10 +210,12 @@ class AppPrincipal(ctk.CTkFrame):
 
     def _crear_item(self, barra, modulo: Modulo) -> ctk.CTkFrame:
         fila = ctk.CTkFrame(barra, fg_color="transparent", corner_radius=0)
+        # El ícono, a la izquierda del nombre, del color del texto secundario (azul en el ítem activo)
         boton = ctk.CTkButton(
             fila, text=modulo.nombre, anchor="w", height=tema.ALTO_NAVEGACION, corner_radius=tema.RADIO_CONTROL,
             font=tema.fuente("normal"), fg_color="transparent", hover_color=tema.COLOR_ACTIVO,
             text_color=tema.COLOR_TEXTO, border_width=0, border_color=tema.COLOR_BORDE,
+            image=icono(MENU[modulo.clave], tema.COLOR_TEXTO_SECUNDARIO), compound="left",
             command=lambda: self.mostrar(modulo.clave))
         marcar_foco_control(boton, boton.invoke)
         # El alto explícito importa: un CTkFrame mide 200 px por defecto y estiraría la fila
@@ -308,10 +312,11 @@ class AppPrincipal(ctk.CTkFrame):
 
     def _marcar_item(self, clave: str, activo: bool):
         boton, indicador = self._items[clave]
+        color_icono = tema.COLOR_PRIMARIO_GRAFICO if activo else tema.COLOR_TEXTO_SECUNDARIO
         boton.configure(fg_color=tema.COLOR_ACTIVO if activo else "transparent",
-                        font=tema.fuente("fuerte" if activo else "normal"))
+                        font=tema.fuente("fuerte" if activo else "normal"), image=icono(MENU[clave], color_icono))
         fijar_borde(boton, 1 if activo else 0, tema.COLOR_BORDE)  # respeta el borde de foco si lo tiene
-        indicador.configure(fg_color=tema.COLOR_PRIMARIO if activo else "transparent")
+        indicador.configure(fg_color=tema.COLOR_PRIMARIO_GRAFICO if activo else "transparent")  # el azul del ícono
 
     def _mostrar_aviso(self, texto: str):
         self._colocar(ctk.CTkLabel(self._contenido, text=texto, font=tema.fuente("normal"),

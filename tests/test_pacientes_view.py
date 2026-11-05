@@ -70,7 +70,7 @@ def test_si_la_bd_falla_al_abrir_hay_un_solo_aviso(crear):
     pacientes.listar_no_identificados.side_effect = PersistenciaError("No se pudo leer la lista.")
     vista = crear(pacientes=pacientes)
     assert [str(e) for e in vista.dialogos["error"]] == ["No se pudo leer la lista."]
-    assert vista._modo.texto("nn") == "Sin identificar (0)"
+    assert vista._modo.texto("nn") == "Sin identificar"  # sin «(0)»: no se sabe
 
 
 def test_destruir_cancela_el_foco_pendiente(crear):
@@ -406,3 +406,81 @@ def test_pacientes_registrada_y_triaje_recibe_el_documento(raiz_tk, sesion_de, m
     assert principal.modulo_actual == "triaje"
     assert principal.pantalla_actual.buscados == [(TipoDocumento.DNI, "48123456")]
     assert app_principal.PANTALLAS["pacientes"] is app_principal.crear_pacientes
+
+
+# ---- Detalles de la Etapa 1
+
+def test_si_la_bd_falla_al_abrir_la_lista_no_dice_que_no_hay_nn(crear):
+    from views.componentes.tabla import SIN_LECTURA
+    pacientes = MagicMock()
+    pacientes.listar_no_identificados.side_effect = PersistenciaError("No se pudo leer la lista.")
+    vista = crear(pacientes=pacientes)
+    assert vista._tabla._vacio.cget("text") == SIN_LECTURA
+
+
+def test_cambiar_solo_el_tipo_de_documento_retira_la_ficha(crear):
+    from views.componentes.campos import mover_opcion
+    vista = crear()
+    buscar(vista)
+    assert visible(vista._encontrado)
+    mover_opcion(vista._documento._tipo, 1)  # el mismo número con otro tipo es otro documento
+    assert not visible(vista._encontrado) and vista._paciente is None
+
+
+def test_cambiar_de_opcion_y_cancelar_reacomodan_el_contenido(crear, monkeypatch):
+    vista = crear()
+    pedidos = []
+    monkeypatch.setattr(vista._contenido, "reacomodar", lambda: pedidos.append(True))
+    vista._modo.elegir("nn")
+    buscar(vista)
+    vista.abrir_edicion()
+    vista.cancelar()
+    assert pedidos == [True, True]
+
+
+def test_al_elegir_un_nn_se_desplaza_hasta_identificar(crear, monkeypatch):
+    vista = crear()
+    al_pie = []
+    monkeypatch.setattr(vista._tabla, "y_elegida", lambda: 64)
+    monkeypatch.setattr(vista._contenido, "mostrar_hasta",
+                        lambda abajo, conservar, desde: al_pie.append((abajo, conservar, desde)))
+    vista._tabla.seleccionar(250)
+    vista.update()  # ttk avisa la elección como el clic del usuario
+    # Lo justo para ver «Identificar» sin cortar la fila elegida por arriba (no hasta el final)
+    assert al_pie == [(vista._boton_identificar, vista._tabla, 64)]
+    vista._tabla.seleccionar(251)  # recorrer la lista con las flechas no hace saltar la pantalla
+    vista.update()
+    assert len(al_pie) == 1
+
+
+def test_al_volver_al_panel_de_nn_elegir_otro_desplaza_de_nuevo(crear, monkeypatch):
+    vista = crear()
+    al_pie = []
+    monkeypatch.setattr(vista._contenido, "mostrar_hasta", lambda *a, **k: al_pie.append(True))
+    vista._tabla.seleccionar(250)
+    vista.update()
+    vista._cambiar_modo("buscar")  # cambiar de panel vuelve arriba
+    vista._cambiar_modo("nn")
+    vista._tabla.seleccionar(251)  # el NN anterior sigue elegido; elegir otro vuelve a bajar
+    vista.update()
+    assert al_pie == [True, True]
+
+
+def test_despues_de_identificar_el_foco_vuelve_al_documento(crear, monkeypatch):
+    vista = crear()
+    enfocados = []
+    monkeypatch.setattr(vista._documento_nn, "enfocar", lambda: enfocados.append(True))
+    vista._tabla.seleccionar(250)
+    vista._documento_nn.fijar(TipoDocumento.DNI, "45678912")
+    escribir(vista._datos_nn.nombres, "Jorge")
+    escribir(vista._datos_nn.apellidos, "Paredes Soto")
+    escribir(vista._datos_nn.fecha_nac, "01/02/1980")
+    vista.identificar()
+    assert vista.dialogos["info"] and enfocados == [True]
+
+
+def test_si_la_bd_falla_al_abrir_el_contador_no_dice_cero(crear):
+    pacientes = MagicMock()
+    pacientes.listar_no_identificados.side_effect = PersistenciaError("No se pudo leer la lista.")
+    vista = crear(pacientes=pacientes)
+    assert vista._modo.texto("nn") == "Sin identificar"

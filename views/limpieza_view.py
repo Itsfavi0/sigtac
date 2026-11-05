@@ -12,7 +12,7 @@ import customtkinter as ctk
 
 from models.excepciones import SigtacError
 from views import formato, tema
-from views.componentes import BotonPrimario, TablaDatos, Tarjeta, mostrar_error, mostrar_info
+from views.componentes import BotonPrimario, Desplazable, TablaDatos, Tarjeta, mostrar_error, mostrar_info
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +30,10 @@ class LimpiezaView(ctk.CTkFrame):
         self._solicitudes = {}   # id_solicitud → SolicitudLimpieza
 
         # Como las demás pantallas de trabajo: la tarjeta se desplaza en vertical si no cabe (1093×614)
-        contenido = ctk.CTkScrollableFrame(self, fg_color="transparent", corner_radius=0)
+        contenido = Desplazable(self)
         contenido.pack(fill="both", expand=True)
         tarjeta = Tarjeta(contenido, "Camas por limpiar", "De la más antigua a la más reciente")
-        tarjeta.pack(fill="x", padx=(0, tema.ESPACIO_MINIMO))
+        tarjeta.pack(fill="x")
         cuerpo = ctk.CTkFrame(tarjeta, fg_color="transparent")
         cuerpo.pack(fill="both", expand=True, padx=tema.ESPACIO_2, pady=(0, tema.ESPACIO_2))
 
@@ -78,7 +78,9 @@ class LimpiezaView(ctk.CTkFrame):
         except (SigtacError, ValueError) as error:
             logger.warning("No se pudieron leer las camas por limpiar (%s).", type(error).__name__)
             mostrar_error(self, error)
-            datos = [], {}
+            self._mostrar([], {})
+            self._tabla.sin_lectura()  # no «No hay camas por limpiar»: no se sabe
+            return
         self._mostrar(*datos)
 
     def _recargar(self):

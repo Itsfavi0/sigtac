@@ -9,9 +9,10 @@ from models.permisos import Rol
 from prototipo.demo import AdminDemo, PacientesDemo, TriajeDemo
 from views import admin_view
 from views.admin_view import (AVISO_BUSCAR, CLAVES_DISTINTAS, ELIJA_CUENTA, FALTA_ROL, LIMITE_BITACORA, NO_ENCONTRADO,
-                              SIN_LECTURA, TEXTO_ELEGIR_EMPLEADO, AdminView, estado_cuenta, nombres_de_cuentas,
+                              CUENTA_PROPIA, TEXTO_ELEGIR_EMPLEADO, AdminView, estado_cuenta, nombres_de_cuentas,
                               texto_detalles, texto_tabla)
 from views.componentes.campos import mover_opcion
+from views.componentes.tabla import SIN_LECTURA
 
 HOY = date(2026, 11, 4)
 AHORA = datetime(2026, 11, 4, 12, 0)
@@ -111,7 +112,8 @@ def test_si_la_bd_falla_al_abrir_hay_un_solo_aviso(crear):
     admin.listar_cuentas.side_effect = ConexionBDError("No hay conexión con la base de datos.")
     vista = crear(admin=admin)
     assert [str(e) for e in vista.dialogos["error"]] == ["No hay conexión con la base de datos."]
-    assert vista._tabla_cuentas.cantidad == 0 and vista._modo.texto("cuentas") == "Cuentas (0)"
+    assert vista._tabla_cuentas.cantidad == 0 and vista._modo.texto("cuentas") == "Cuentas"  # sin «(0)»
+    assert vista._modo.texto("nueva") == "Nueva cuenta"
     # las tablas no dicen «no hay cuentas»: no se pudieron leer
     assert vista._tabla_cuentas._vacio.cget("text") == SIN_LECTURA
     assert vista._tabla_empleados._vacio.cget("text") == SIN_LECTURA
@@ -520,3 +522,20 @@ def test_tras_la_baja_se_relee_el_documento_buscado(crear):
     vista.cambiar_paciente()
     vista.pacientes.buscar_para_administrar.assert_called_with("DNI", "41234567")
     assert vista._boton_paciente.cget("text") == "Reactivar"
+
+
+# ---- La propia cuenta
+
+def test_la_propia_cuenta_no_ofrece_desactivar_ni_cambiar_el_rol(raiz_tk, dialogos):
+    demo = AdminDemo(ahora=lambda: AHORA)
+    vista = AdminView(raiz_tk, MagicMock(wraps=demo), MagicMock(), hoy=lambda: HOY, id_usuario_propio=1)
+    vista._tabla_cuentas.seleccionar(1)
+    raiz_tk.update()
+    assert vista._cuenta_titulo.cget("text") == CUENTA_PROPIA
+    assert vista._boton_acceso.cget("state") == "disabled"
+    mover_opcion(vista._rol, 1)  # otro rol en la lista
+    assert vista._boton_rol.cget("state") == "disabled"
+    assert vista._boton_clave.cget("state") == "normal"  # su clave sí la puede restablecer
+    vista._tabla_cuentas.seleccionar(2)
+    raiz_tk.update()
+    assert vista._boton_acceso.cget("state") == "normal"

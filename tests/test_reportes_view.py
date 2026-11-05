@@ -85,7 +85,7 @@ def test_los_indicadores_llevan_el_marcador_azul_del_tablero(crear):
         return [hijo for hijo in widget.winfo_children() if isinstance(hijo, ctk.CTkFrame)]
 
     marcadores = [marcos(marcos(tarjeta)[0])[0] for tarjeta in vista.kpis]  # la fila de arriba, su primer cuadro
-    assert all(tuple(m.cget("border_color")) == tema.COLOR_PRIMARIO for m in marcadores)
+    assert all(tuple(m.cget("border_color")) == tema.COLOR_PRIMARIO_GRAFICO for m in marcadores)
 
 
 def test_ahora_en_la_guardia(crear):

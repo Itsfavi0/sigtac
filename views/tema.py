@@ -27,8 +27,8 @@ TAMANO_MINIMO = (960, 540)  # ancho, alto: una laptop de 1366×768 al 125 % deja
 
 # ---- Espaciado y medidas: todo es múltiplo de 4 píxeles
 
-ESPACIO_MINIMO = 4   # entre un texto y su línea secundaria
-ESPACIO = 8          # entre elementos de un mismo grupo (etiqueta y su campo, casillas)
+ESPACIO_MINIMO = 4   # entre un texto y su línea secundaria, y entre una etiqueta y su campo
+ESPACIO = 8          # entre elementos de un mismo grupo (botones de una fila, columnas de campos, casillas)
 ESPACIO_MEDIO = 12   # entre tarjetas de una fila
 ESPACIO_2 = 16       # márgenes interiores de una tarjeta y entre secciones
 ESPACIO_3 = 24       # bordes de la pantalla
@@ -39,6 +39,15 @@ ALTO_CONTROL = 36    # botones y campos
 ALTO_NAVEGACION = 40
 ANCHO_BARRA = 200
 ALTO_ENCABEZADO = 72
+ANCHO_TIPO_DOCUMENTO = 200  # la lista del tipo: cabe «Permiso temporal (CPP)» con su flecha
+GROSOR_BORDE = 1            # el borde de tarjetas, campos y casillas
+DENTRO_DE_TARJETA = 2       # lo que va a ras de una tarjeta queda dentro de su borde y su esquina redondeada
+# La muestra de la leyenda del mapa: una casilla en miniatura, con su proporción (fuera de la base de 4 a propósito)
+MUESTRA_LEYENDA = (14, 10)  # ancho, alto
+RADIO_MUESTRA = 3
+LADO_ICONO = 20             # el ícono del menú y el del logo
+LADO_ICONO_KPI = 16         # el ícono dentro del marcador de un indicador
+LADO_MARCADOR_KPI = 22      # el marcador: el ícono con aire y su borde de 1 px
 
 # ---- Colores: (claro, oscuro)
 
@@ -56,6 +65,10 @@ COLOR_TEXTO_SECUNDARIO = ("#5F6368", "#A3A3A3")
 COLOR_PLACEHOLDER = ("#6B6B70", "#959595")
 COLOR_PRIMARIO = ("#0A6CDE", "#0A6CDE")        # solo la acción principal y el ítem activo
 COLOR_PRIMARIO_HOVER = ("#0A5CC0", "#0B5FC2")
+# El azul de un ícono, un marcador o el borde de foco (menú activo, indicadores, campos y botones): el primario,
+# aclarado en oscuro para llegar a 3:1 sobre las superficies y el ítem activo. Lo que lleva texto blanco encima
+# (botones, fila elegida) sigue con COLOR_PRIMARIO: ese texto necesita el tono oscuro.
+COLOR_PRIMARIO_GRAFICO = ("#0A6CDE", "#3D8BF2")
 COLOR_TEXTO_SOBRE_PRIMARIO = ("#FFFFFF", "#FFFFFF")
 COLOR_ERROR = ("#C5221F", "#FF6B61")
 COLOR_EXITO = ("#137333", "#34C759")           # «Actualizado», conexión correcta

@@ -17,8 +17,8 @@ import customtkinter as ctk
 from models.excepciones import SigtacError
 from views import formato, tema
 from views.componentes import (BotonPrimario, BotonSecundario, CamposDocumento, CamposPaciente, FichaPaciente,
-                               Selector, TablaDatos, Tarjeta, campo_texto, confirmar, etiqueta_campo, marcar_error,
-                               mostrar_error, mostrar_info)
+                               Desplazable, Selector, TablaDatos, Tarjeta, campo_texto, confirmar, etiqueta_campo,
+                               marcar_error, mostrar_error, mostrar_info)
 from views.componentes.campos import sin_error
 from views.componentes.documento import ETIQUETAS
 
@@ -51,12 +51,13 @@ class PacientesView(ctk.CTkFrame):
         self._buscado = None               # (tipo, número) que se buscó: la ficha o «no encontrado» son de él
         self._documento_con_error = {}     # CamposDocumento → (tipo, número) rechazado por mal escrito
         self._motivo_rechazado = None      # el motivo tal como se rechazó: su aviso sigue hasta que cambie
+        self._nn_mostrado = None           # el NN elegido en la lista (para desplazar solo al elegir el primero)
 
         # Como el formulario del triaje: se desplaza en vertical si no cabe (1093×614)
-        self._contenido = contenido = ctk.CTkScrollableFrame(self, fg_color="transparent", corner_radius=0)
+        self._contenido = contenido = Desplazable(self)
         contenido.pack(fill="both", expand=True)
         self._tarjeta = Tarjeta(contenido, *TITULOS["buscar"])
-        self._tarjeta.pack(fill="x", padx=(0, tema.ESPACIO_MINIMO))
+        self._tarjeta.pack(fill="x")
         self._modo = Selector(self._tarjeta.cabecera, [("buscar", "Buscar"), ("nn", "Sin identificar")],
                               self._cambiar_modo)
         self._modo.pack(side="right")
@@ -178,12 +179,12 @@ class PacientesView(ctk.CTkFrame):
 
     def _mostrar_al_pie(self):
         """Desplaza el contenido hasta el final, para que el formulario recién abierto y su botón queden a la vista."""
-        self.update_idletasks()
-        self._contenido._parent_canvas.yview_moveto(1.0)
+        self._contenido.mostrar_al_pie()
 
     def cancelar(self):
         """«Cancelar»: cierra el formulario sin guardar y el foco vuelve al documento (no a un campo oculto)."""
         self.cerrar_formularios()
+        self._contenido.reacomodar()  # sin el formulario el contenido se acorta
         self._documento.enfocar()
 
     def _motivo_editado(self):
@@ -264,6 +265,13 @@ class PacientesView(ctk.CTkFrame):
             self._boton_identificar.configure(text=TEXTO_ELEGIR_NN, state="disabled")
         else:
             self._boton_identificar.configure(text="Identificar", state="normal")
+            if self._nn_mostrado is None:
+                # A 1093×614, «Identificar» queda bajo la lista: se baja una vez, al elegir el primero (no al
+                # recorrer la lista con las flechas, que haría saltar la pantalla con cada fila), y solo lo justo
+                # para que la fila elegida no se corte por arriba (la lista entera más el botón no caben)
+                self._contenido.mostrar_hasta(self._boton_identificar, conservar=self._tabla,
+                                              desde=self._tabla.y_elegida())
+        self._nn_mostrado = id_paciente
 
     def identificar(self, _evento=None):
         """
@@ -306,6 +314,7 @@ class PacientesView(ctk.CTkFrame):
         self._datos_nn.limpiar()
         self._recargar_nn()
         mostrar_info(self, mensaje)
+        self._documento_nn.enfocar()  # listo para el siguiente; el botón ya está deshabilitado
         return "break"
 
     def _fusionar(self, id_nn, existente, tipo, numero) -> str | None:
@@ -329,7 +338,11 @@ class PacientesView(ctk.CTkFrame):
         except (SigtacError, ValueError) as error:
             logger.warning("No se pudieron leer los datos de pacientes (%s).", type(error).__name__)
             mostrar_error(self, error)
-            seguros, nn = [], []
+            self._datos.cargar_seguros([])
+            self._mostrar_nn([])
+            self._tabla.sin_lectura()  # no «No hay pacientes sin identificar»: no se sabe
+            self._modo.cambiar_texto("nn", "Sin identificar")  # sin «(0)», por lo mismo
+            return
         self._datos.cargar_seguros(seguros)
         self._mostrar_nn(nn)
 
@@ -355,6 +368,8 @@ class PacientesView(ctk.CTkFrame):
         else:
             self._nn.pack_forget()
             self._buscar.pack(fill="x")
+        self._contenido.reacomodar()  # el otro panel puede ser más corto: arriba, y la barra solo si hace falta
+        self._nn_mostrado = None  # se volvió arriba: la próxima elección de un NN vuelve a bajar hasta «Identificar»
 
     # ---- Piezas de la pantalla
 
@@ -370,6 +385,7 @@ class PacientesView(ctk.CTkFrame):
         aviso = ctk.CTkLabel(padre, text="", font=tema.fuente("pequena"), text_color=tema.COLOR_TEXTO_SECUNDARIO,
                              anchor="w", justify="left")
         documento.campo_numero.bind("<KeyRelease>", lambda _e: self._documento_editado(documento, aviso), add="+")
+        documento.al_cambiar_tipo(lambda: self._documento_editado(documento, aviso))  # otro tipo, otro documento
         return documento, aviso
 
     @staticmethod

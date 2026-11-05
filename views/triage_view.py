@@ -18,8 +18,9 @@ from models.excepciones import SigtacError
 from models.triaje import SignosVitales, Triaje
 from views import formato, tema
 from views.componentes import (BotonPrimario, BotonSecundario, CamposDocumento, CamposPaciente, FichaPaciente,
-                               InsigniaNivel, Selector, TablaDatos, Tarjeta, campo_texto, casilla, etiqueta_campo,
-                               lista_opciones, marcar_error, marcar_foco, mostrar_error, mostrar_info, texto_nivel)
+                               Desplazable, InsigniaNivel, Selector, TablaDatos, Tarjeta, campo_texto, casilla,
+                               etiqueta_campo, lista_opciones, marcar_error, marcar_foco, mostrar_error, mostrar_info,
+                               texto_nivel)
 from views.componentes.campos import (campo_en_rejilla, leer_campo, leer_opcion, limpiar_al_corregir, lista_en_rejilla,
                                       sin_error)
 from views.componentes.paciente import SEXOS
@@ -82,10 +83,12 @@ class TriageView(ctk.CTkFrame):
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
-        # El formulario se desplaza en vertical si no cabe (1093×614); el panel no se mueve. Entre los dos queda la
-        # barra de desplazamiento, con ESPACIO_MINIMO a cada lado.
-        self._formulario = ctk.CTkScrollableFrame(self, fg_color="transparent", corner_radius=0)
-        self._formulario.grid(row=0, column=0, sticky="nsew", padx=(0, tema.ESPACIO_MINIMO))
+        # El formulario se desplaza en vertical si no cabe (1093×614); el panel no se mueve. Con la barra a la vista,
+        # queda entre los dos con ESPACIO_MINIMO a cada lado; sin ella, entre los dos hay ESPACIO_MEDIO, como entre
+        # las tarjetas de una fila
+        self._formulario = Desplazable(self, al_cambiar_barra=self._separar_panel)
+        self._formulario.grid(row=0, column=0, sticky="nsew")
+        self._separar_panel(False)
         self._crear_paso_paciente()
         self._crear_paso_signos()
         self._crear_paso_sintomas()
@@ -115,7 +118,9 @@ class TriageView(ctk.CTkFrame):
         self._motivo = self._campo(self._nuevo, "Motivo de consulta", "Por qué acude a emergencia")
         self._enter_confirma(self._motivo)
 
-        self._tabla = TablaDatos(cuerpo, self.COLUMNAS_COLA, NADIE_ESPERA_TRIAJE, filas=self.FILAS_COLA)
+        # Enter o doble clic en un paciente de la cola lleva al paso 2 (brief §4); las flechas solo eligen
+        self._tabla = TablaDatos(cuerpo, self.COLUMNAS_COLA, NADIE_ESPERA_TRIAJE, filas=self.FILAS_COLA,
+                                 al_activar=lambda _id: self.enfocar_signos())
         self._nuevo.pack(fill="x")
 
     def _crear_con_documento(self, padre) -> ctk.CTkFrame:
@@ -127,6 +132,7 @@ class TriageView(ctk.CTkFrame):
         BotonSecundario(fila, "Buscar", self.buscar).pack(side="left", anchor="s", padx=(tema.ESPACIO, 0))
         self._documento.campo_numero.bind("<Return>", self.buscar, add="+")
         self._documento.campo_numero.bind("<KeyRelease>", self._documento_editado, add="+")
+        self._documento.al_cambiar_tipo(self._documento_editado)  # otro tipo con el mismo número es otro documento
 
         self._resultado = ctk.CTkFrame(marco, fg_color="transparent")
         self._resultado.pack(fill="x", pady=(tema.ESPACIO_2, 0))
@@ -172,6 +178,7 @@ class TriageView(ctk.CTkFrame):
         else:
             self._tabla.pack_forget()
             self._nuevo.pack(fill="x")
+        self._formulario.reacomodar()  # el otro panel puede ser más corto: arriba, y la barra solo si hace falta
 
     def _cambiar_identidad(self, identidad: str):
         self._olvidar_intento()
@@ -375,6 +382,14 @@ class TriageView(ctk.CTkFrame):
         cuerpo.pack(fill="both", expand=True, padx=tema.ESPACIO_2, pady=(0, tema.ESPACIO_2))
         return panel
 
+    def _separar_panel(self, con_barra: bool):
+        # grid(), no grid_configure(): CTkScrollableFrame solo redirige grid() a su marco exterior
+        self._formulario.grid(padx=(0, tema.ESPACIO_MINIMO if con_barra else tema.ESPACIO_MEDIO))
+
+    def enfocar_signos(self):
+        """El foco al primer signo vital (paso 2)."""
+        next(iter(self._campos_signos.values())).focus_set()
+
     @staticmethod
     def _enfocar(widget) -> str:
         if widget is not None:
@@ -565,12 +580,15 @@ class TriageView(ctk.CTkFrame):
         except (SigtacError, ValueError) as error:
             logger.warning("No se pudieron leer los datos del triaje (%s).", type(error).__name__)
             mostrar_error(self, error)
-            seguros, sintomas, cola = [], [], []
+            seguros, sintomas, cola = [], [], None
         self._seguros = {s["nombre_seguro"]: s["id_seguro"] for s in seguros}
         self._datos.cargar_seguros(seguros)
         self._seguro_nn.configure(values=list(self._seguros))
         self._mostrar_sintomas(sintomas)
-        self._mostrar_cola(cola)
+        self._mostrar_cola(cola or [])
+        if cola is None:
+            self._tabla.sin_lectura()  # no «Nadie espera triaje»: no se sabe
+            self._modo.cambiar_texto("cola", "En cola")  # sin «(0)», por lo mismo
 
     def _recargar_cola(self):
         try:
@@ -597,8 +615,7 @@ class TriageView(ctk.CTkFrame):
 
     def _seccion(self, titulo: str, subtitulo: str) -> Tarjeta:
         tarjeta = Tarjeta(self._formulario, titulo, subtitulo)
-        # A la derecha deja lugar a la barra de desplazamiento del formulario
-        tarjeta.pack(fill="x", padx=(0, tema.ESPACIO_MINIMO), pady=(0, tema.ESPACIO_MEDIO))
+        tarjeta.pack(fill="x", pady=(0, tema.ESPACIO_MEDIO))
         return tarjeta
 
     @staticmethod

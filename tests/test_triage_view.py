@@ -88,7 +88,7 @@ def test_si_la_bd_falla_al_abrir_hay_un_solo_aviso_y_la_pantalla_se_usa(crear):
     triaje.listar_sintomas.side_effect = PersistenciaError("No se pudo leer el catálogo.")
     vista = crear(triaje=triaje)
     assert [str(e) for e in vista.dialogos["error"]] == ["No se pudo leer el catálogo."]
-    assert vista._tabla.cantidad == 0 and vista._modo.texto("cola") == "En cola (0)"
+    assert vista._tabla.cantidad == 0 and vista._modo.texto("cola") == "En cola"  # sin «(0)»: no se sabe
 
 
 def test_la_cola_vacia_lo_dice(crear):
@@ -601,3 +601,66 @@ def test_el_triaje_esta_registrado_con_los_controladores_de_la_sesion(raiz_tk, s
     app_principal.crear_triaje(raiz_tk, sesion_de(Rol.ENFERMERO), None)
     assert isinstance(recibidos["pacientes"], PacienteController)
     assert isinstance(recibidos["triaje"], TriajeController)
+
+
+# ---- Detalles de la Etapa 1
+
+def test_si_la_bd_falla_al_abrir_la_cola_no_dice_que_nadie_espera(crear):
+    from views.componentes.tabla import SIN_LECTURA
+    triaje = MagicMock(wraps=TriajeDemo(lambda: AHORA))
+    triaje.cola_de_triaje.side_effect = PersistenciaError("No se pudo leer la cola.")
+    vista = crear(triaje=triaje)
+    assert vista._tabla._vacio.cget("text") == SIN_LECTURA
+
+
+def test_enter_o_doble_clic_en_la_cola_llevan_a_los_signos(crear, monkeypatch):
+    vista = crear()
+    enfocados = []
+    monkeypatch.setattr(vista, "enfocar_signos", lambda: enfocados.append(True))
+    vista._modo.elegir("cola")
+    vista._tabla.seleccionar(vista._tabla._ids[vista._tabla._arbol.get_children()[0]])
+    vista._tabla._activada(None)
+    assert enfocados == [True]
+
+
+def test_enfocar_signos_va_al_primer_signo(crear, monkeypatch):
+    vista = crear()
+    primero = next(iter(vista._campos_signos.values()))
+    enfocados = []
+    monkeypatch.setattr(primero, "focus_set", lambda: enfocados.append(True))
+    vista.enfocar_signos()
+    assert enfocados == [True]
+
+
+def test_cambiar_solo_el_tipo_de_documento_olvida_la_ficha(crear):
+    from views.componentes.campos import mover_opcion
+    vista = crear()
+    con_paciente_registrado(vista)
+    assert vista._paciente is not None
+    mover_opcion(vista._documento._tipo, 1)
+    assert vista._paciente is None and vista._buscado is None
+
+
+def test_cambiar_entre_nuevo_y_cola_reacomoda_el_formulario(crear, monkeypatch):
+    vista = crear()
+    pedidos = []
+    monkeypatch.setattr(vista._formulario, "reacomodar", lambda: pedidos.append(True))
+    vista._modo.elegir("cola")
+    vista._modo.elegir("nuevo")
+    assert pedidos == [True, True]
+
+
+def test_sin_barra_el_formulario_y_el_panel_se_separan_como_dos_tarjetas(crear):
+    from views import tema
+    vista = crear()
+    vista._separar_panel(False)
+    assert vista._formulario.grid_info()["padx"] in ((0, tema.ESPACIO_MEDIO), "0 12")
+    vista._separar_panel(True)  # la barra queda entre los dos, con ESPACIO_MINIMO a cada lado
+    assert vista._formulario.grid_info()["padx"] in ((0, tema.ESPACIO_MINIMO), "0 4")
+
+
+def test_si_la_bd_falla_al_abrir_la_cola_el_contador_no_dice_cero(crear):
+    triaje = MagicMock(wraps=TriajeDemo(lambda: AHORA))
+    triaje.cola_de_triaje.side_effect = PersistenciaError("No se pudo leer la cola.")
+    vista = crear(triaje=triaje)
+    assert vista._modo.texto("cola") == "En cola"

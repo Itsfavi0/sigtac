@@ -88,7 +88,7 @@ def filas_indicadores(indicadores: "IndicadoresPeriodo") -> list[tuple[str, str]
 
 def filas_camas(estado: "EstadoGuardia") -> list[tuple[str, str]]:
     """Camas por estado (todos los estados, en el orden del Enum), el total y la ocupación."""
-    filas = [(e.value.capitalize(), str(estado.camas_por_estado.get(e, 0))) for e in EstadoCama]
+    filas = [(e.texto, str(estado.camas_por_estado.get(e, 0))) for e in EstadoCama]
     filas.append(("Total de camas", str(sum(estado.camas_por_estado.values()))))
     filas.append(("Ocupación", formatear_porcentaje(estado.porcentaje_ocupacion, "Sin camas en servicio")))
     return filas
@@ -97,7 +97,7 @@ def filas_camas(estado: "EstadoGuardia") -> list[tuple[str, str]]:
 def filas_pacientes(estado: "EstadoGuardia") -> list[tuple[str, str]]:
     """Pacientes en emergencia por estado (solo los estados abiertos) y el total."""
     abiertos = [e for e in EstadoEpisodio if e not in EpisodioEmergencia.ESTADOS_CERRADOS]
-    filas = [(e.value.capitalize(), str(estado.pacientes_por_estado.get(e, 0))) for e in abiertos]
+    filas = [(e.texto, str(estado.pacientes_por_estado.get(e, 0))) for e in abiertos]
     filas.append(("Pacientes en emergencia", str(estado.pacientes_en_emergencia)))
     return filas
 

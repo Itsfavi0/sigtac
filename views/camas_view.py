@@ -20,8 +20,8 @@ import customtkinter as ctk
 from models.estados import EstadoCama
 from models.excepciones import SigtacError
 from views import formato, tema
-from views.componentes import (BotonPrimario, BotonSecundario, Selector, TablaDatos, Tarjeta, campo_texto, confirmar,
-                               etiqueta_campo, marcar_error, mostrar_error, mostrar_info, texto_nivel)
+from views.componentes import (BotonPrimario, BotonSecundario, Desplazable, Selector, TablaDatos, Tarjeta, campo_texto,
+                               confirmar, etiqueta_campo, marcar_error, mostrar_error, mostrar_info, texto_nivel)
 from views.componentes.campos import sin_error
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ NADIE_ESPERA = "Nadie espera cama."
 NADIE_CON_CAMA = "Ninguna cama tiene un paciente asignado."
 SIN_CAMAS_MANTENIMIENTO = "No hay camas disponibles ni fuera de servicio."
 ELIJA_PACIENTE = "Elija un paciente de la cola para ver sus camas."
-SIN_LECTURA = "No se pudieron leer sus camas compatibles. Elíjalo de nuevo."
+SIN_LECTURA_COMPATIBLES = "No se pudieron leer sus camas compatibles. Elíjalo de nuevo."
 SIN_DATOS = "Paciente sin datos"
 # El botón principal deshabilitado dice por qué no responde
 TEXTO_ELEGIR_PACIENTE = "Elija un paciente de la cola"
@@ -58,10 +58,6 @@ def nombre(paciente) -> str:
     return formato.nombre_corto(paciente) if paciente else SIN_DATOS
 
 
-def texto_estado(estado: EstadoCama) -> str:
-    return estado.value.capitalize()
-
-
 class GestionCamasView(ctk.CTkFrame):
     FILAS_LISTA = 5          # filas visibles de cada lista (más se desplazan dentro de la tabla)
     FILAS_COMPATIBLES = 3
@@ -82,10 +78,10 @@ class GestionCamasView(ctk.CTkFrame):
         self._motivo_rechazado = None    # el motivo tal como se rechazó: su aviso sigue hasta que cambie
 
         # Como Pacientes: la tarjeta se desplaza en vertical si no cabe (1093×614)
-        self._contenido = contenido = ctk.CTkScrollableFrame(self, fg_color="transparent", corner_radius=0)
+        self._contenido = contenido = Desplazable(self)
         contenido.pack(fill="both", expand=True)
         self._tarjeta = Tarjeta(contenido, *TITULOS["espera"])
-        self._tarjeta.pack(fill="x", padx=(0, tema.ESPACIO_MINIMO))
+        self._tarjeta.pack(fill="x")
         self._modo = Selector(self._tarjeta.cabecera, [("espera", "Esperan cama"), ("con_cama", "Con cama"),
                                                        ("mantenimiento", "Mantenimiento")], self._cambiar_modo)
         self._modo.pack(side="right")
@@ -139,7 +135,7 @@ class GestionCamasView(ctk.CTkFrame):
                     mostrar_error(self, error)  # p. ej. otra PC ya le asignó cama: se recarga la cola
                     self._recargar()
                     return
-                self._tabla_compatibles.cambiar_texto_vacio(SIN_LECTURA)
+                self._tabla_compatibles.cambiar_texto_vacio(SIN_LECTURA_COMPATIBLES)
             else:
                 self._tabla_compatibles.cambiar_texto_vacio(sin_compatibles(entrada.nivel))
         self._tabla_compatibles.cargar([(c.id_cama, (c.codigo, type(c).NOMBRE_CORTO, c.area))
@@ -366,7 +362,14 @@ class GestionCamasView(ctk.CTkFrame):
         except (SigtacError, ValueError) as error:
             logger.warning("No se pudieron leer las camas (%s).", type(error).__name__)
             mostrar_error(self, error)
-            datos = [], [], []
+            self._mostrar([], [], [])
+            # Las listas no dicen «Nadie espera cama»: no se pudieron leer
+            for tabla in (self._tabla_cola, self._tabla_con_cama, self._tabla_mantenimiento):
+                tabla.sin_lectura()
+            # Sin cifra: «(0)» diría que nadie espera, y no se sabe
+            self._modo.cambiar_texto("espera", "Esperan cama")
+            self._modo.cambiar_texto("con_cama", "Con cama")
+            return
         self._mostrar(*datos)
 
     def _recargar(self, conservar: bool = False):
@@ -404,11 +407,12 @@ class GestionCamasView(ctk.CTkFrame):
             for id_episodio, e in self._cola.items()])
         self._con_cama = {p.episodio.id_episodio: p for p in con_cama}
         self._tabla_con_cama.cargar([(id_episodio, (
-            p.cama.codigo, texto_estado(p.cama.estado), texto_nivel(p.nivel), nombre(p.paciente),
+            p.cama.codigo, formato.texto_estado_cama(p.cama.estado), texto_nivel(p.nivel), nombre(p.paciente),
             formato.hora(p.fecha_asignacion))) for id_episodio, p in self._con_cama.items()])
         self._mantenimiento = {c.id_cama: c for c in mantenimiento}
-        self._tabla_mantenimiento.cargar([(c.id_cama, (c.codigo, type(c).NOMBRE_CORTO, c.area, texto_estado(c.estado)))
-                                          for c in mantenimiento])
+        self._tabla_mantenimiento.cargar([
+            (c.id_cama, (c.codigo, type(c).NOMBRE_CORTO, c.area, formato.texto_estado_cama(c.estado)))
+            for c in mantenimiento])
         self._modo.cambiar_texto("espera", f"Esperan cama ({len(cola)})")
         self._modo.cambiar_texto("con_cama", f"Con cama ({len(con_cama)})")
         # Las tablas recargadas no tienen elección: se vacían las camas compatibles y se deshabilitan las acciones
@@ -422,6 +426,7 @@ class GestionCamasView(ctk.CTkFrame):
             if clave != modo:
                 panel.pack_forget()
         self._paneles[modo].pack(fill="x")
+        self._contenido.reacomodar()
         self._recargar(conservar=True)
 
     # ---- Piezas de la pantalla

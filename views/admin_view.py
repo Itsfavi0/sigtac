@@ -25,8 +25,8 @@ from models.auditoria import AccionAuditoria
 from models.excepciones import SigtacError
 from models.permisos import Rol
 from views import formato, tema
-from views.componentes import (BotonPrimario, BotonSecundario, CamposDocumento, CamposPeriodo, Selector, TablaDatos,
-                               Tarjeta, lista_opciones, marcar_error, mostrar_error, mostrar_info)
+from views.componentes import (BotonPrimario, BotonSecundario, CamposDocumento, CamposPeriodo, Desplazable, Selector,
+                               TablaDatos, Tarjeta, lista_opciones, marcar_error, mostrar_error, mostrar_info)
 from views.componentes.campos import celda, campo_texto, leer_opcion, lista_en_rejilla
 from views.componentes.documento import ETIQUETAS
 from views.componentes.periodo import texto_periodo
@@ -42,8 +42,8 @@ TITULOS = {
 SIN_CUENTAS = "No hay cuentas registradas."
 SIN_EMPLEADOS = "Todos los empleados activos tienen cuenta."
 SIN_REGISTROS = "No hay registros en este período."
-SIN_LECTURA = "No se pudieron leer los datos."   # el mismo texto que Reportes
 ELIJA_CUENTA = "Elija una cuenta de la lista para cambiarla."
+CUENTA_PROPIA = "Su cuenta: otro administrador puede desactivarla o cambiar su rol."
 TEXTO_ELEGIR_EMPLEADO = "Elija un empleado de la lista"   # el botón deshabilitado dice por qué no responde
 CLAVES_DISTINTAS = "Las dos claves no coinciden."
 FALTA_ROL = "Elija el rol de la cuenta."
@@ -173,9 +173,12 @@ class AdminView(ctk.CTkFrame):
     COLUMNAS_BITACORA = (("Fecha y hora", 128), ("Usuario", 176), ("Acción", 112), ("Tabla", 144),
                          ("Registro", 72), ("Detalle", 128))
 
-    def __init__(self, padre, admin, pacientes, hoy: Callable[[], date] = date.today):
+    def __init__(self, padre, admin, pacientes, hoy: Callable[[], date] = date.today,
+                 id_usuario_propio: int | None = None):
+        """`id_usuario_propio`: la cuenta de la sesión, para no ofrecer lo que el controlador le va a rechazar."""
         super().__init__(padre, fg_color="transparent")
         self._admin, self._pacientes, self._hoy = admin, pacientes, hoy
+        self._id_propio = id_usuario_propio
         self._cuentas = {}       # id_usuario → CuentaUsuario
         self._nombres = {}       # id_usuario → nombre en la bitácora y su filtro
         self._empleados = {}     # id_empleado → {"nombres", "apellidos", "nombre_cargo"}
@@ -187,10 +190,10 @@ class AdminView(ctk.CTkFrame):
         self._documento_rechazado = None
 
         # Como las demás pantallas de trabajo: la tarjeta se desplaza en vertical si no cabe (1093×614)
-        contenido = ctk.CTkScrollableFrame(self, fg_color="transparent", corner_radius=0)
+        self._contenido = contenido = Desplazable(self)
         contenido.pack(fill="both", expand=True)
         self._tarjeta = Tarjeta(contenido, *TITULOS["cuentas"])
-        self._tarjeta.pack(fill="x", padx=(0, tema.ESPACIO_MINIMO))
+        self._tarjeta.pack(fill="x")
         self._modo = Selector(self._tarjeta.cabecera, [("cuentas", "Cuentas"), ("nueva", "Nueva cuenta"),
                                                        ("bitacora", "Bitácora"), ("pacientes", "Pacientes")],
                               self._cambiar_modo)
@@ -256,18 +259,22 @@ class AdminView(ctk.CTkFrame):
             self._boton_acceso.configure(text="Desactivar")
             self._boton_desbloquear.configure(state="disabled")
         else:
-            self._cuenta_titulo.configure(text=f"Cuenta de {cuenta.nombre_completo}")
-            self._boton_acceso.configure(text="Desactivar" if cuenta.activo else "Activar")
+            propia = cuenta.id_usuario == self._id_propio
+            # La propia cuenta no se desactiva ni cambia de rol (lo decide AdminController): lo dice el título
+            self._cuenta_titulo.configure(text=CUENTA_PROPIA if propia else f"Cuenta de {cuenta.nombre_completo}")
+            self._boton_acceso.configure(text="Desactivar" if cuenta.activo else "Activar",
+                                         state="disabled" if propia else "normal")
             # Desbloquear sirve también para borrar intentos fallidos que aún no llegan al bloqueo
             bloqueo = cuenta.bloqueada or cuenta.intentos_fallidos > 0
             self._boton_desbloquear.configure(state="normal" if bloqueo else "disabled")
         self._actualizar_boton_rol()
 
     def _actualizar_boton_rol(self):
-        """«Cambiar rol» solo responde si el rol elegido en la lista es otro que el de la cuenta."""
+        """«Cambiar rol» solo responde si el rol elegido en la lista es otro que el de la cuenta (y no es la propia)."""
         cuenta = self._elegida()
         distinto = cuenta is not None and self._rol.get() not in ("", cuenta.rol.value)
-        self._boton_rol.configure(state="normal" if distinto else "disabled")
+        propia = cuenta is not None and cuenta.id_usuario == self._id_propio
+        self._boton_rol.configure(state="normal" if distinto and not propia else "disabled")
 
     def cambiar_acceso(self):
         """Desactiva la cuenta (deja de poder iniciar sesión) o la vuelve a activar."""
@@ -441,7 +448,7 @@ class AdminView(ctk.CTkFrame):
             else:
                 logger.warning("No se pudo leer la bitácora (%s).", type(error).__name__)
                 if not self._registros:
-                    self._tabla_bitacora.cambiar_texto_vacio(SIN_LECTURA)  # no decir «no hay registros»
+                    self._tabla_bitacora.sin_lectura()  # no decir «no hay registros»
             if avisar_error:
                 mostrar_error(self, error)
             return "break"
@@ -451,7 +458,6 @@ class AdminView(ctk.CTkFrame):
     def _mostrar_bitacora(self, registros, desde: date, hasta: date):
         self._registros = {r["id_bitacora"]: r for r in registros}
         self._registro_elegido(None)
-        self._tabla_bitacora.cambiar_texto_vacio(SIN_REGISTROS)
         self._tabla_bitacora.cargar([(r["id_bitacora"], (
             fecha_hora(r["fecha_hora"]), self._nombres.get(r["id_usuario"], f"Cuenta {r['id_usuario']}"),
             ACCIONES.get(r["accion"], str(r["accion"])), texto_tabla(r["tabla_afectada"]),
@@ -610,14 +616,18 @@ class AdminView(ctk.CTkFrame):
         except (SigtacError, ValueError) as error:
             logger.warning("No se pudieron leer los datos de administración (%s).", type(error).__name__)
             mostrar_error(self, error)
+            self._mostrar([], [], [])
+            self._cuenta_elegida()
+            self._empleado_elegido()
             for tabla in (self._tabla_cuentas, self._tabla_empleados, self._tabla_bitacora):
-                tabla.cambiar_texto_vacio(SIN_LECTURA)
-            datos = [], [], []
+                tabla.sin_lectura()
+            # Sin cifra: «(0)» diría que no hay, y no se sabe
+            self._modo.cambiar_texto("cuentas", "Cuentas")
+            self._modo.cambiar_texto("nueva", "Nueva cuenta")
+            return
         self._mostrar(*datos)
         self._cuenta_elegida()
         self._empleado_elegido()
-        if not self._cuentas:
-            return
         self.ver_bitacora()  # las cuentas se leyeron: si solo falla la bitácora, es el único aviso
 
     def _recargar(self, conservar: bool = False):
@@ -629,8 +639,6 @@ class AdminView(ctk.CTkFrame):
         except (SigtacError, ValueError) as error:
             logger.warning("No se pudieron actualizar los datos de administración (%s).", type(error).__name__)
             return
-        self._tabla_cuentas.cambiar_texto_vacio(SIN_CUENTAS)
-        self._tabla_empleados.cambiar_texto_vacio(SIN_EMPLEADOS)
         self._mostrar(*datos)
         for tabla, elegido in zip(tablas, elegidos):
             if elegido is not None:
@@ -662,6 +670,7 @@ class AdminView(ctk.CTkFrame):
             if clave != modo:
                 panel.pack_forget()
         self._paneles[modo].pack(fill="x")
+        self._contenido.reacomodar()
         if modo in ("cuentas", "nueva"):
             self._recargar(conservar=True)
         elif modo == "bitacora":

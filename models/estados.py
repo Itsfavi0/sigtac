@@ -9,6 +9,11 @@ class EstadoCama(StrEnum):
     EN_LIMPIEZA = "EN LIMPIEZA"
     FUERA_SERVICIO = "FUERA DE SERVICIO"
 
+    @property
+    def texto(self) -> str:
+        """Cómo se lee en pantalla y en el PDF: «En limpieza» (el valor es el de la BD, en mayúsculas)."""
+        return self.value.capitalize()
+
 
 class EstadoEpisodio(StrEnum):
     """Estados de un episodio de emergencia. Los valores coinciden con la tabla estado_episodio de la BD."""
@@ -18,3 +23,8 @@ class EstadoEpisodio(StrEnum):
     ALTA = "ALTA MÉDICA"
     REFERIDO = "REFERIDO"
     FUGADO = "FUGADO / ABANDONO"
+
+    @property
+    def texto(self) -> str:
+        """Cómo se lee en pantalla y en el PDF: «En espera de cama»."""
+        return self.value.capitalize()

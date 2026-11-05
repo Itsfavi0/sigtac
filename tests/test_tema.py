@@ -12,7 +12,7 @@ TEXTOS = {"texto": tema.COLOR_TEXTO, "etiqueta": tema.COLOR_ETIQUETA, "secundari
 FONDOS = {"superficie": tema.COLOR_SUPERFICIE, "fondo": tema.COLOR_FONDO, "barra": tema.COLOR_BARRA}
 PARES = [tema.COLOR_FONDO, tema.COLOR_BARRA, tema.COLOR_SUPERFICIE, tema.COLOR_CASILLA, tema.COLOR_ACTIVO,
          tema.COLOR_BORDE, tema.COLOR_BORDE_CAMPO, tema.COLOR_DIVISOR, *TEXTOS.values(), tema.COLOR_PRIMARIO,
-         tema.COLOR_PRIMARIO_HOVER, tema.COLOR_ALERTA_FONDO, tema.COLOR_SIN_DATO, *tema.COLOR_NIVEL.values(),
+         tema.COLOR_PRIMARIO_HOVER, tema.COLOR_PRIMARIO_GRAFICO, tema.COLOR_ALERTA_FONDO, tema.COLOR_SIN_DATO, *tema.COLOR_NIVEL.values(),
          *tema.COLOR_ESTADO_CAMA.values()]
 
 
@@ -55,6 +55,13 @@ def test_el_borde_de_los_campos_se_ve(i, modo):
 @pytest.mark.parametrize("estado", list(EstadoCama))
 def test_el_borde_de_cada_estado_de_cama_se_ve(i, modo, estado):
     assert _contraste(tema.COLOR_ESTADO_CAMA[estado][i], tema.COLOR_CASILLA[i]) >= 3
+
+
+@pytest.mark.parametrize("i, modo", MODOS)
+@pytest.mark.parametrize("fondo", [tema.COLOR_SUPERFICIE, tema.COLOR_ACTIVO, tema.COLOR_FONDO, tema.COLOR_BARRA],
+                         ids=["tarjeta", "ítem activo", "fondo", "barra"])
+def test_el_azul_de_iconos_marcadores_y_foco_se_ve(i, modo, fondo):
+    assert _contraste(tema.COLOR_PRIMARIO_GRAFICO[i], fondo[i]) >= 3
 
 
 @pytest.mark.parametrize("i, modo", MODOS)

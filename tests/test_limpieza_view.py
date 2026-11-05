@@ -7,6 +7,7 @@ from models.estados import EstadoCama
 from models.excepciones import PersistenciaError, ReglaNegocioError
 from prototipo.demo import CamasDemo
 from views import limpieza_view
+from views.componentes.tabla import SIN_LECTURA
 from views.limpieza_view import NADA_POR_LIMPIAR, TEXTO_ELEGIR, LimpiezaView
 
 AHORA = datetime(2026, 10, 30, 10, 0)
@@ -56,7 +57,7 @@ def test_si_la_bd_falla_al_abrir_hay_un_solo_aviso(crear):
     camas.solicitudes_limpieza.side_effect = PersistenciaError("No se pudo leer la lista.")
     vista = crear(camas=camas)
     assert [str(e) for e in vista.dialogos["error"]] == ["No se pudo leer la lista."]
-    assert vista._tabla.cantidad == 0 and vista._tabla._vacio.cget("text") == NADA_POR_LIMPIAR
+    assert vista._tabla.cantidad == 0 and vista._tabla._vacio.cget("text") == SIN_LECTURA  # no «no hay»: no se sabe
 
 
 def test_confirmar_la_limpieza_deja_la_cama_libre(crear):  # RN-08

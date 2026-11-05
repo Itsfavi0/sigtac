@@ -3,7 +3,8 @@ import customtkinter as ctk
 
 from models.cama import Cama
 from models.estados import EstadoCama
-from views import tema
+from views import formato, tema
+from views.componentes.iconos import icono as imagen_icono
 
 SIN_VALOR = "—"
 
@@ -53,17 +54,28 @@ class Tarjeta(ctk.CTkFrame):
 
 class TarjetaKPI(ctk.CTkFrame):
     """
-    Un indicador, como en el Figma: arriba un marcador del color del dato y el título; abajo el valor grande y,
-    a la derecha, una nota breve («42 % disponible»). El marcador es el lugar del ícono cuando se agreguen.
+    Un indicador, como en el Figma: arriba un marcador del color del dato, con su ícono, y el título; abajo el valor
+    grande y, a la derecha, una nota breve («42 % disponible»). El ícono va del color del marcador.
     """
 
-    def __init__(self, padre, titulo: str, color=None):
+    def __init__(self, padre, titulo: str, color=None, icono: str | None = None):
         super().__init__(padre, fg_color=tema.COLOR_SUPERFICIE, corner_radius=tema.RADIO_TARJETA, border_width=1,
                          border_color=tema.COLOR_BORDE)
         arriba = ctk.CTkFrame(self, fg_color="transparent")
         arriba.pack(fill="x", padx=tema.ESPACIO_2 - 2, pady=(tema.ESPACIO_MEDIO - 2, 0))
-        ctk.CTkFrame(arriba, width=22, height=22, corner_radius=tema.RADIO_CONTROL, fg_color="transparent",
-                     border_width=1, border_color=color or tema.COLOR_BORDE_CAMPO).pack(side="left")
+        color = color or tema.COLOR_BORDE_CAMPO
+        marcador = ctk.CTkFrame(arriba, width=tema.LADO_MARCADOR_KPI, height=tema.LADO_MARCADOR_KPI,
+                                corner_radius=tema.RADIO_CONTROL, fg_color="transparent", border_width=1,
+                                border_color=color)
+        marcador.pack(side="left")
+        marcador.pack_propagate(False)
+        self.icono = None
+        if icono is not None:
+            self.icono = icono
+            # Del tamaño del ícono: una etiqueta mide 28 px por omisión y taparía el borde del marcador
+            ctk.CTkLabel(marcador, text="", image=imagen_icono(icono, color, tema.LADO_ICONO_KPI),
+                         width=tema.LADO_ICONO_KPI, height=tema.LADO_ICONO_KPI).place(relx=0.5, rely=0.5,
+                                                                                    anchor="center")
         ctk.CTkLabel(arriba, text=titulo, font=tema.fuente("etiqueta"), text_color=tema.COLOR_ETIQUETA).pack(
             side="left", padx=tema.ESPACIO)
         abajo = ctk.CTkFrame(self, fg_color="transparent")
@@ -111,7 +123,7 @@ class TarjetaCama(ctk.CTkFrame):
     @staticmethod
     def texto_estado(estado: EstadoCama) -> str:
         """«Disponible», «En limpieza»... con la forma corta donde el término completo no cabe."""
-        return TEXTO_CASILLA.get(estado, estado.value.capitalize())
+        return TEXTO_CASILLA.get(estado, formato.texto_estado_cama(estado))
 
     @property
     def cama(self) -> Cama:

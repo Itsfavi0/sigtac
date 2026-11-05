@@ -49,14 +49,13 @@ class DashboardView(ctk.CTkFrame):
         kpis = ctk.CTkFrame(self, fg_color="transparent")
         # Los márgenes exteriores los pone AppPrincipal: el tablero se alinea con el título del encabezado
         kpis.pack(fill="x", pady=(tema.ESPACIO_2, 0))
-        cuarto_titulo, cuarto_color = self._cuarto_indicador_titulo()
-        datos = (("Camas libres", tema.COLOR_ESTADO_CAMA[EstadoCama.DISPONIBLE]),
-                 ("En limpieza", tema.COLOR_ESTADO_CAMA[EstadoCama.EN_LIMPIEZA]),
-                 ("Prioridad 1–2 sin cama", tema.COLOR_NIVEL[1]),
-                 (cuarto_titulo, cuarto_color))
+        datos = (("Camas libres", tema.COLOR_ESTADO_CAMA[EstadoCama.DISPONIBLE], "bed"),
+                 ("En limpieza", tema.COLOR_ESTADO_CAMA[EstadoCama.EN_LIMPIEZA], "spray"),
+                 ("Prioridad 1–2 sin cama", tema.COLOR_NIVEL[1], "first-aid-kit"),
+                 self._cuarto_indicador_titulo())
         self.kpis = []
-        for i, (titulo, color) in enumerate(datos):
-            tarjeta = TarjetaKPI(kpis, titulo, color)
+        for i, (titulo, color, icono) in enumerate(datos):
+            tarjeta = TarjetaKPI(kpis, titulo, color, icono)
             tarjeta.grid(row=0, column=i, sticky="ew", padx=(0 if i == 0 else tema.ESPACIO_MEDIO, 0))
             kpis.grid_columnconfigure(i, weight=1, uniform="kpi")
             self.kpis.append(tarjeta)
@@ -73,7 +72,7 @@ class DashboardView(ctk.CTkFrame):
         mapa = self._tarjeta(self, "Matriz de camas", "Estado de cada cama por tipo", leyenda=True)
         mapa.pack(fill="both", expand=True, pady=tema.ESPACIO_MEDIO if self.muestra_cola else (tema.ESPACIO_MEDIO, 0))
         self.matriz = MatrizCamas(mapa)
-        self.matriz.pack(fill="both", expand=True, padx=2, pady=(0, 2))
+        self.matriz.pack(fill="both", expand=True, padx=tema.DENTRO_DE_TARJETA, pady=(0, tema.DENTRO_DE_TARJETA))
 
     def _tarjeta(self, padre, titulo, subtitulo, leyenda=False):
         tarjeta = Tarjeta(padre, titulo, subtitulo)
@@ -81,20 +80,27 @@ class DashboardView(ctk.CTkFrame):
             caja = ctk.CTkFrame(tarjeta.cabecera, fg_color="transparent")
             caja.pack(side="right")
             for estado in EstadoCama:
-                ctk.CTkFrame(caja, width=14, height=10, corner_radius=3, fg_color="transparent", border_width=1,
-                             border_color=tema.COLOR_ESTADO_CAMA[estado]).pack(side="left", padx=(12, 5))
-                ctk.CTkLabel(caja, text=estado.value.capitalize(), font=tema.fuente("pequena"),
+                ctk.CTkFrame(caja, width=tema.MUESTRA_LEYENDA[0], height=tema.MUESTRA_LEYENDA[1],
+                             corner_radius=tema.RADIO_MUESTRA,
+                             fg_color="transparent", border_width=1, border_color=tema.COLOR_ESTADO_CAMA[estado]).pack(
+                    side="left", padx=(tema.ESPACIO_MEDIO, tema.ESPACIO_MINIMO))
+                ctk.CTkLabel(caja, text=formato.texto_estado_cama(estado), font=tema.fuente("pequena"),
                              text_color=tema.COLOR_TEXTO_SECUNDARIO).pack(side="left")
-            ctk.CTkFrame(tarjeta, height=1, fg_color=tema.COLOR_DIVISOR, corner_radius=0).pack(fill="x", padx=1)
+            # La línea bajo la cabecera, de borde a borde por dentro del borde de la tarjeta
+            ctk.CTkFrame(tarjeta, height=1, fg_color=tema.COLOR_DIVISOR, corner_radius=0).pack(
+                fill="x", padx=tema.GROSOR_BORDE)
         return tarjeta
 
     def _cuarto_indicador_titulo(self):
-        """El cuarto indicador depende del rol: la espera promedio pide REPORTES; si no, lo que el rol sí ve."""
+        """
+        El cuarto indicador depende del rol: la espera promedio pide REPORTES; si no, lo que el rol sí ve. Devuelve el
+        título, el color y el ícono.
+        """
         if self._reportes is not None and self._sesion.puede(Permiso.REPORTES):
-            return "Espera de cama", tema.COLOR_PRIMARIO
+            return "Espera de cama", tema.COLOR_PRIMARIO_GRAFICO, "hourglass"
         if self._triaje is not None and self._sesion.puede(Permiso.TRIAJE):
-            return "Esperan triaje", tema.COLOR_PRIMARIO
-        return "Fuera de servicio", tema.COLOR_ESTADO_CAMA[EstadoCama.FUERA_SERVICIO]
+            return "Esperan triaje", tema.COLOR_PRIMARIO_GRAFICO, "heartbeat"
+        return "Fuera de servicio", tema.COLOR_ESTADO_CAMA[EstadoCama.FUERA_SERVICIO], "bed-off"
 
     # ---- datos
 

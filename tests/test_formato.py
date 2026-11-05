@@ -113,3 +113,18 @@ def test_leer_fecha():
 def test_leer_fecha_invalida(texto):
     with pytest.raises(ValueError, match="La fecha debe tener la forma dd/mm/aaaa"):
         formato.leer_fecha(texto, "La fecha")
+
+
+def test_texto_del_estado_de_cama():
+    from models.estados import EstadoCama
+    assert formato.texto_estado_cama(EstadoCama.EN_LIMPIEZA) == "En limpieza"
+    assert formato.texto_estado_cama("FUERA DE SERVICIO") == "Fuera de servicio"
+    with pytest.raises(ValueError):
+        formato.texto_estado_cama("ROTA")
+
+
+def test_el_texto_de_los_estados_lo_dan_los_estados():
+    from models.estados import EstadoCama, EstadoEpisodio
+    assert EstadoCama.FUERA_SERVICIO.texto == "Fuera de servicio"
+    assert EstadoEpisodio.EN_ATENCION.texto == "En atención (con cama)"
+    assert formato.texto_estado_cama(EstadoCama.OCUPADA) == EstadoCama.OCUPADA.texto

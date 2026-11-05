@@ -28,7 +28,7 @@ class CamposDocumento(ctk.CTkFrame):
         etiqueta_campo(self, "Documento de identidad").grid(row=0, column=0, columnspan=2, sticky="w",
                                                             pady=(0, tema.ESPACIO_MINIMO))
         # La lista empieza en DNI y se maneja con el teclado (ver lista_opciones)
-        self._tipo = lista_opciones(self, list(ETIQUETAS.values()), width=200)
+        self._tipo = lista_opciones(self, list(ETIQUETAS.values()), width=tema.ANCHO_TIPO_DOCUMENTO)
         self._tipo.grid(row=1, column=0, sticky="w", padx=(0, tema.ESPACIO))
         self._numero = campo_texto(self, "Número")
         self._numero.grid(row=1, column=1, sticky="ew")

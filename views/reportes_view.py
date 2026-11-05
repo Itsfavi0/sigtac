@@ -23,14 +23,14 @@ from models.estados import EstadoCama, EstadoEpisodio
 from models.excepciones import PersistenciaError, SigtacError
 from models.triaje import COLOR_POR_NIVEL
 from views import formato, tema
-from views.componentes import (BotonPrimario, BotonSecundario, CamposPeriodo, TablaDatos, Tarjeta, TarjetaKPI,
-                               etiqueta_campo, mostrar_error, mostrar_info, pedir_ruta_pdf, texto_nivel)
+from views.componentes import (BotonPrimario, BotonSecundario, CamposPeriodo, Desplazable, TablaDatos, Tarjeta,
+                               TarjetaKPI, etiqueta_campo, mostrar_error, mostrar_info, pedir_ruta_pdf, texto_nivel)
 from views.componentes.periodo import texto_periodo
+from views.componentes.tabla import SIN_LECTURA
 
 logger = logging.getLogger(__name__)
 
 AVISO_PROTOTIPO = "Prototipo académico: los indicadores no tienen validez clínica."
-SIN_LECTURA = "No se pudieron leer los datos."
 SIN_DATOS = "sin datos"
 NIVELES = tuple(sorted(COLOR_POR_NIVEL))
 # Los pacientes que siguen en emergencia, en el orden en que avanzan
@@ -67,11 +67,11 @@ class ReportesView(ctk.CTkFrame):
         self._hoy, self._reloj = hoy, reloj
 
         # Como las demás pantallas de trabajo: el contenido se desplaza en vertical si no cabe (1093×614)
-        contenido = ctk.CTkScrollableFrame(self, fg_color="transparent", corner_radius=0)
+        contenido = Desplazable(self)
         contenido.pack(fill="both", expand=True)
-        self._crear_periodo(contenido).pack(fill="x", padx=(0, tema.ESPACIO_MINIMO))
-        self._crear_indicadores(contenido).pack(fill="x", padx=(0, tema.ESPACIO_MINIMO))
-        self._crear_detalle(contenido).pack(fill="x", padx=(0, tema.ESPACIO_MINIMO), pady=(tema.ESPACIO_MEDIO, 0))
+        self._crear_periodo(contenido).pack(fill="x")
+        self._crear_indicadores(contenido).pack(fill="x")
+        self._crear_detalle(contenido).pack(fill="x", pady=(tema.ESPACIO_MEDIO, 0))
         ctk.CTkLabel(contenido, text=AVISO_PROTOTIPO, font=tema.fuente("pequena"),
                      text_color=tema.COLOR_TEXTO_SECUNDARIO, anchor="w").pack(anchor="w", pady=(tema.ESPACIO_MEDIO, 0))
 
@@ -105,11 +105,12 @@ class ReportesView(ctk.CTkFrame):
         self._periodo_mostrado.pack(anchor="w", pady=(tema.ESPACIO_2, tema.ESPACIO_MINIMO))
         fila = ctk.CTkFrame(marco, fg_color="transparent")
         fila.pack(fill="x")
-        titulos = ("Ingresos", "Espera de triaje", "Espera de cama", "Estancia")
+        datos = (("Ingresos", "users"), ("Espera de triaje", "heartbeat"), ("Espera de cama", "hourglass"),
+                 ("Estancia", "clock"))
         self.kpis = []
-        for i, titulo in enumerate(titulos):
-            # El marcador azul, como «Espera de cama» en el tablero: el mismo dato, el mismo marcador
-            tarjeta = TarjetaKPI(fila, titulo, tema.COLOR_PRIMARIO)
+        for i, (titulo, icono) in enumerate(datos):
+            # El marcador azul, como «Espera de cama» en el tablero: el mismo dato, el mismo marcador e ícono
+            tarjeta = TarjetaKPI(fila, titulo, tema.COLOR_PRIMARIO_GRAFICO, icono)
             tarjeta.grid(row=0, column=i, sticky="ew", padx=(0 if i == 0 else tema.ESPACIO_MEDIO, 0))
             fila.grid_columnconfigure(i, weight=1, uniform="kpi")
             self.kpis.append(tarjeta)
@@ -233,7 +234,8 @@ class ReportesView(ctk.CTkFrame):
         self._reclasificacion.configure(text=texto)
 
     def _mostrar_guardia(self, estado):
-        self._tabla_camas.cargar([(e, (e.value.capitalize(), estado.camas_por_estado.get(e, 0))) for e in EstadoCama])
+        self._tabla_camas.cargar([(e, (formato.texto_estado_cama(e), estado.camas_por_estado.get(e, 0)))
+                                  for e in EstadoCama])
         if estado.porcentaje_ocupacion is None:
             self._ocupacion.configure(text="Ocupación: sin camas en servicio")
         else:

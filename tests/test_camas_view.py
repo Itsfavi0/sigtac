@@ -7,7 +7,8 @@ from models.estados import EstadoCama
 from models.excepciones import PersistenciaError, ReglaNegocioError
 from prototipo.demo import CamasDemo, TriajeDemo
 from views import camas_view
-from views.camas_view import (ELIJA_PACIENTE, NADIE_ESPERA, SIN_LECTURA, TEXTO_ELEGIR_CAMA, TEXTO_ELEGIR_CON_CAMA,
+from views.componentes.tabla import SIN_LECTURA
+from views.camas_view import (ELIJA_PACIENTE, NADIE_ESPERA, SIN_LECTURA_COMPATIBLES, TEXTO_ELEGIR_CAMA, TEXTO_ELEGIR_CON_CAMA,
                               TEXTO_ELEGIR_MANTENIMIENTO, TEXTO_ELEGIR_PACIENTE, TITULOS, GestionCamasView,
                               sin_compatibles)
 
@@ -81,8 +82,17 @@ def test_si_la_bd_falla_al_abrir_hay_un_solo_aviso(crear):
     camas.cola_de_espera.side_effect = PersistenciaError("No se pudo leer la cola.")
     vista = crear(camas=camas)
     assert [str(e) for e in vista.dialogos["error"]] == ["No se pudo leer la cola."]
+    # ni «(0)» ni «Nadie espera cama»: no se pudo leer
+    assert vista._modo.texto("espera") == "Esperan cama" and vista._modo.texto("con_cama") == "Con cama"
+    for tabla in (vista._tabla_cola, vista._tabla_con_cama, vista._tabla_mantenimiento):
+        assert tabla.cantidad == 0 and tabla._vacio.cget("text") == SIN_LECTURA
+    camas.cola_de_espera.side_effect = None  # la BD volvió
+    camas.cola_de_espera.return_value = []
+    camas.pacientes_con_cama.return_value = []
+    camas.mapa_camas.return_value = []
+    vista._recargar()
+    assert vista._tabla_cola._vacio.cget("text") == NADIE_ESPERA
     assert vista._modo.texto("espera") == "Esperan cama (0)"
-    assert vista._tabla_cola.cantidad == 0 and vista._tabla_cola._vacio.cget("text") == NADIE_ESPERA
 
 
 # ---- Esperan cama
@@ -330,7 +340,7 @@ def test_si_una_recarga_no_puede_leer_las_camas_compatibles_no_abre_dialogo(crea
     vista._modo.elegir("espera")
     vista.raiz.update()
     assert vista.dialogos["error"] == []
-    assert vista._tabla_compatibles._vacio.cget("text") == SIN_LECTURA
+    assert vista._tabla_compatibles._vacio.cget("text") == SIN_LECTURA_COMPATIBLES
 
 
 def test_si_la_bd_falla_el_motivo_escrito_se_conserva(crear):
