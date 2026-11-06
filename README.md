@@ -10,10 +10,28 @@ Objetos II** (Universidad Nacional del Callao).
 
 ## Estado
 
-En desarrollo. Ya existen la base de datos, los modelos del dominio y el DAO de
-autenticación. Los controladores y la interfaz gráfica están pendientes. Todavía no hay
-punto de entrada (`main.py`). Detalle en [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md)
-y registro de cambios en [`docs/CHANGELOG.md`](docs/CHANGELOG.md).
+La aplicación está completa: base de datos, modelos, acceso a datos, controladores e interfaz gráfica
+(CustomTkinter). Está en la fase final de integración y pruebas: pasó una revisión de tester con los 13 casos
+del plan y la verificación contra MySQL real. Detalle en [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md),
+resumen para el equipo en [`docs/ESTADO_EQUIPO.md`](docs/ESTADO_EQUIPO.md) y registro de cambios en
+[`docs/CHANGELOG.md`](docs/CHANGELOG.md).
+
+### Pantallas
+
+Cada rol ve solo los módulos que su rol permite.
+
+| Pantalla | Qué hace |
+|---|---|
+| Inicio de sesión | Documento y clave; bloquea la cuenta tras 5 intentos fallidos durante 15 minutos |
+| Tablero de camas | Indicadores, mapa de camas por tipo y quién espera cama; se actualiza cada 30 s |
+| Triaje | Registra al paciente (con documento o sin identificar), sugiere el nivel y permite reclasificar con justificación |
+| Gestión de camas | Asigna una cama compatible, registra la llegada, el alta, la referencia o la fuga, y el mantenimiento |
+| Pacientes | Busca, corrige datos, abre un episodio e identifica a los pacientes sin identificar |
+| Limpieza | Confirma que una cama dada de alta quedó limpia |
+| Reportes | Indicadores de un período y exportación a PDF |
+| Administración | Cuentas de usuario, roles, claves, bitácora y baja o reactivación de pacientes |
+
+Tiene modo claro y oscuro, y se puede usar con el teclado.
 
 ## Requisitos
 
@@ -74,6 +92,15 @@ mysql -u <usuario_admin> -p < db_scripts/seed.sql
 Los usuarios de prueba del seed (documento, rol y clave de desarrollo) están en el comentario sobre
 `INSERT INTO usuario` de [`db_scripts/seed.sql`](db_scripts/seed.sql). Nunca uses esas claves fuera de un entorno local.
 
+## Abrir la aplicación
+
+```bash
+python main.py              # la aplicación real: necesita el .env y MySQL
+python -m prototipo.ver     # una demostración con datos inventados, sin MySQL ni .env
+```
+
+La demostración acepta `--rol` (p. ej. `--rol "Enfermero de Triaje"`), `--modo oscuro` y `--tamano 1093x614`.
+
 ## Pruebas
 
 Las pruebas usan `pytest` y **no necesitan MySQL ni un `.env`**: la base de datos se simula.
@@ -83,16 +110,28 @@ pip install -r requirements-dev.txt
 python -m pytest
 ```
 
+Para comprobar el flujo completo contra MySQL real, en una base temporal que se crea y se borra (no toca
+`sigtac_db`; pide la clave de una cuenta de administrador):
+
+```bash
+python scripts/verificar_controladores.py
+```
+
 ## Estructura
 
 ```text
 SIGTAC/
-├── dao/           Acceso a datos (conexión Singleton y DAOs)
+├── main.py        Punto de entrada: el inicio de sesión y la ventana principal
+├── views/         Interfaz (CustomTkinter): las pantallas, sus piezas compartidas y el tema
+├── controllers/   Casos de uso y permisos por rol
 ├── models/        Modelos del dominio, estrategias de triaje y excepciones
-├── utils/         Seguridad (bcrypt) y configuración de logging
+├── dao/           Acceso a datos (conexión Singleton y DAOs)
+├── utils/         Seguridad (bcrypt), logging, reporte PDF y colores compartidos
+├── prototipo/     Controladores de demostración para abrir la app sin MySQL
 ├── db_scripts/    Esquema, datos de prueba y diagrama de la BD
+├── scripts/       Verificación del flujo completo contra MySQL real
 ├── tests/         Pruebas automáticas (pytest)
-├── docs/          Contexto, plan de desarrollo, estado y changelog
+├── docs/          Contexto, plan de desarrollo, estado, changelog y diseño
 └── requirements.txt
 ```
 

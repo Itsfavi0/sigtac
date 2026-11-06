@@ -19,7 +19,7 @@
 | 6. Pantallas | ✅ Completada el 04/11 |
 | 7. Integración y pruebas | 🔄 En curso: pruebas y correcciones hechas; falta la sustentación |
 
-**2197 pruebas automáticas** pasan (`python -m pytest`). No necesitan MySQL.
+**2227 pruebas automáticas** pasan (`python -m pytest`). No necesitan MySQL.
 Además, la verificación contra MySQL real (`scripts/verificar_controladores.py`) dio **97 de 97 comprobaciones correctas** (06/11).
 
 ## Qué hay en la aplicación
@@ -74,6 +74,7 @@ También funcionan el ciclo completo de la cama (reservada → ocupada → limpi
 - El modo claro es más suave: gris azulado, sin blanco puro.
 - Las casillas del mapa de camas tienen el fondo teñido del color de su estado y una franja a la izquierda.
 - Cambiar de módulo es casi instantáneo: cada pantalla se arma una vez al entrar y se conserva como se dejó.
+- Gestión de camas, rediseñada: un resumen arriba, la cola con el color de cada nivel y la espera en rojo si pasó el plazo, la ficha del paciente elegido y sus camas compatibles como casillas. Se maneja también con el teclado.
 
 **Para decidir en equipo:** el botón principal deshabilitado se ve igual que el habilitado. Es una decisión de diseño de octubre: su texto dice qué falta («Complete los signos vitales»). Cambiarlo afecta a todas las pantallas.
 

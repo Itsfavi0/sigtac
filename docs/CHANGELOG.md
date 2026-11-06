@@ -5,6 +5,84 @@
 
 ---
 
+## [2026-11-06] — Gestión de camas rediseñada y lista elegible compartida (ListaSeleccion)
+
+### Cambio
+- **Gestión de camas** (`views/camas_view.py`), con el diseño aprobado por el usuario a partir de una vista previa:
+  - **resumen** bajo el título: «4 esperan cama · 2 con prioridad 1–2 · 15 camas libres» (etiquetas grises como las del tablero; la de prioridad y la de camas libres, con un punto de color). Si la carga falla, no se muestra;
+  - cada pestaña tiene **dos columnas**: a la izquierda la lista para elegir y a la derecha lo elegido y sus acciones;
+  - **«Esperan cama»:**
+    - la cola como en el tablero: el cuadro del nivel, nombre, motivo y la espera, en rojo si pasó el plazo;
+    - a la derecha, la ficha del paciente: el nivel en grande, «Nivel 1 · Rojo · Inmediato», documento y motivo;
+    - debajo, sus camas compatibles como casillas, con el tipo en el segundo renglón;
+    - el botón dice la acción completa: «Asignar TS-03 a M. Salazar»;
+  - **«Con cama»:**
+    - cada paciente con su nivel, el estado de la cama desde cuándo («Ocupada desde las 12:36») y el código de la cama con el tinte de su estado;
+    - a la derecha, la ficha del paciente, la casilla de su cama junto a la acción principal y las otras acciones;
+  - **«Mantenimiento»:** las camas libres o fuera de servicio como casillas; a la derecha, la cama elegida, el motivo (si está libre) y la acción.
+- **`ListaSeleccion`** (`views/componentes/seleccion.py`), pieza compartida nueva (extracción aprobada por el usuario):
+  - una lista de filas o casillas que se eligen con un clic o con el teclado (Tab entra, las flechas eligen y Enter activa), con el borde de foco alrededor;
+  - se usa como `TablaDatos`: `cargar`, `seleccionado`, `seleccionar`, `sin_lectura`, `cambiar_texto_vacio`. Además tiene `elegir` (como el usuario, avisa) y `elemento(id)`.
+- **`TarjetaCama(detalle=...)`:** un segundo renglón opcional en lugar del estado.
+
+### Archivos afectados
+- `views/componentes/seleccion.py` (nuevo), `views/componentes/tarjetas.py`, `views/componentes/__init__.py`
+- `views/camas_view.py`
+- Pruebas: `tests/test_seleccion.py` (nuevo), `tests/test_camas_view.py`, `tests/test_componentes.py`
+- `docs/`
+
+### Motivo
+El usuario veía Gestión de camas «algo simple», sin vida: eran dos tablas grises y un botón. Hoy se ve quién es el más urgente, cuánto lleva esperando y qué camas le sirven, con los mismos colores y piezas del tablero.
+
+### Impacto
+- Pruebas: **2227 pasan** (antes 2197).
+- Sin cambios de controladores, modelos ni esquema: las reglas y los mensajes siguen igual (RN-01, RN-05, RN-07).
+- **Tiempos medidos en la demo** (hasta que se ve, en 1093×614):
+  - cambiar de pestaña: de 0,35 a 0,6 s, como la versión anterior con tablas (0,2–0,6 s);
+  - elegir: de 0,05 a 0,2 s;
+  - recargar al volver a la pantalla: 0,2–0,4 s.
+
+### Decisiones
+- **Rendimiento:**
+  - **Lo que costaba:** una fila o casilla de CustomTkinter tarda de 60 a 100 ms en construirse en esta PC, y la primera versión tardaba de 1,5 a 2,5 s en cada cambio. Se midió cada paso y se perfiló.
+  - **Reutilizar:** la lista repinta las filas que siguen (`actualizar`) y solo crea las nuevas. Una fila o casilla que no cambió no se repinta.
+  - **De a pocos:** se crean al instante las que se ven (5 filas o 12 casillas); el resto, de a 2 por turno, con la ventana respondiendo. Las listas de las pestañas ocultas se preparan de fondo, así al abrirlas ya existen.
+  - **La barra de cada lista** se mueve cuando la ventana termina de acomodarse, y solo si cambió: `CTkScrollbar` redibuja toda la ventana cada vez que se mueve.
+  - **El alto de la tarjeta no cambia al elegir.** Si crecía, aparecía la barra de la pantalla, cambiaba el ancho y todo se volvía a acomodar varias veces (1,8 s). Por eso:
+    - la ficha de «Esperan cama» ocupa su lugar aunque no haya paciente (dice qué hacer);
+    - se ven 2 filas de camas compatibles;
+    - en «Con cama», la casilla va junto al botón principal.
+  - **Lo que se descartó:** se probó escribir los textos de las filas con `tk.Label` (solo un 35 % más rápido, con colores a mano en cada modo) y quitar las esquinas de los marcos invisibles (15 %).
+- **La lista elegida y la elegida en la lista:**
+  - la fila elegida lleva el borde del azul de foco y el fondo gris de lo activo; la casilla, solo el borde (su fondo es el de su estado);
+  - el foco de teclado es un borde alrededor de toda la lista, como en los campos.
+- **Teclado:**
+  - Enter en la cola lleva a las camas, y Enter en una cama la asigna;
+  - en Mantenimiento, Enter en una cama libre lleva al motivo (es obligatorio) y en una fuera de servicio la devuelve.
+- **El texto de la columna derecha sin nada elegido** dice qué hacer («Elija un paciente de la lista para ver su cama y sus acciones.»).
+- **Proceso de la interfaz** (skill ui-consistency):
+  - checklist de 11 puntos a partir de la vista previa y de la fila del tablero;
+  - la revisión la hizo un agente que no escribió el código. Antes se probó con otro agente y una diferencia plantada (un color escrito a mano), que encontró;
+  - el revisor marcó 17 puntos. Corregidos:
+    - las camas compatibles se rehacían enteras en cada recarga, porque la pantalla vaciaba la lista antes de volver a elegir al paciente; ahora se repintan;
+    - su título decía «(0)» cuando no se pudieron leer, y el nivel sin su color («nivel 1» → «nivel 1 · Rojo»);
+    - sin paciente elegido, la ficha repetía la instrucción de la lista y del botón; ahora dice «Ningún paciente elegido»;
+    - las etiquetas de «Con cama» y Mantenimiento repetían el título de la tarjeta («Reservadas u ocupadas», «Por tipo de cama»);
+    - la espera, alineada a la derecha y con ancho fijo, como en el tablero;
+    - `ListaSeleccion` usa `tema.escala` y no un método interno de CustomTkinter; una lista oculta no calcula su desplazamiento (no tiene alto); su docstring dice que `seleccionar` no avisa.
+  - Dejados así, con su motivo:
+    - la fila mide 52 px y su nivel 28, como en la vista previa, con aire para el borde de la fila elegida;
+    - las etiquetas del resumen miden 28 px (el 26 de la píldora del tablero no es múltiplo de 4);
+    - en «Con cama», cada fila lleva el código de la cama teñido: una casilla entera no cabe en una fila;
+    - la elegida se marca con el borde azul, y el foco con otro borde alrededor de toda la lista.
+  - No son de este cambio, porque ya estaban: «espera limpieza» frente a «pasa a limpieza» en los avisos, y «Cama X…» frente a «La cama X…».
+
+### Pendientes
+- Limpieza y el Tablero podrían usar `ListaSeleccion` (casillas elegibles), si se quiere el mismo estilo.
+- Las pruebas de foco comprueban que se pide (la ventana de pruebas está oculta y no recibe el foco).
+
+---
+
 ## [2026-11-06] — Paleta fría en claro, casillas de cama con tinte y cambio de pantalla sin reconstruir
 
 ### Cambio
