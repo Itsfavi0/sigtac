@@ -19,7 +19,7 @@
 | 6. Pantallas | ✅ Completada el 04/11 |
 | 7. Integración y pruebas | 🔄 En curso: pruebas y correcciones hechas; falta la sustentación |
 
-**2161 pruebas automáticas** pasan (`python -m pytest`). No necesitan MySQL.
+**2197 pruebas automáticas** pasan (`python -m pytest`). No necesitan MySQL.
 Además, la verificación contra MySQL real (`scripts/verificar_controladores.py`) dio **97 de 97 comprobaciones correctas** (06/11).
 
 ## Qué hay en la aplicación
@@ -69,6 +69,11 @@ También funcionan el ciclo completo de la cama (reservada → ocupada → limpi
 - Al confirmar con datos que faltan, se marcan todos los campos con error a la vez.
 - Si la PA diastólica no es menor que la sistólica, se marcan los dos campos y el botón dice «Corrija los signos vitales».
 - En el tablero, el indicador del tiempo hasta la cama se llama «Asignación de cama», para no confundirlo con la espera de quien sigue en la cola.
+
+**Aspecto y fluidez** (6/11)
+- El modo claro es más suave: gris azulado, sin blanco puro.
+- Las casillas del mapa de camas tienen el fondo teñido del color de su estado y una franja a la izquierda.
+- Cambiar de módulo es casi instantáneo: cada pantalla se arma una vez al entrar y se conserva como se dejó.
 
 **Para decidir en equipo:** el botón principal deshabilitado se ve igual que el habilitado. Es una decisión de diseño de octubre: su texto dice qué falta («Complete los signos vitales»). Cambiarlo afecta a todas las pantallas.
 

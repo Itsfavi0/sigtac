@@ -5,6 +5,60 @@
 
 ---
 
+## [2026-11-06] — Paleta fría en claro, casillas de cama con tinte y cambio de pantalla sin reconstruir
+
+### Cambio
+- **Paleta del modo claro** (pedido del usuario: «demasiado fuerte a la vista»), en `views/tema.py`:
+  - sin blanco puro ni negro puro: superficies `#FAFBFC` sobre un fondo gris azulado `#ECEFF3`, barra `#F6F8FA` y texto `#252A31`;
+  - grises fríos para bordes, divisores, etiquetas y textos secundarios;
+  - el azul principal, algo menos saturado (`#2563B8`);
+  - el modo oscuro no cambia.
+- **Casillas de la matriz de camas** (`TarjetaCama`): un fondo teñido del color del estado, un borde suavizado y, a la izquierda, una franja del color del estado. Los colores están en `tema.py` (`COLOR_FONDO_ESTADO_CAMA`, `COLOR_BORDE_ESTADO_CAMA`). El gris de «Fuera de servicio» en claro pasa a `#7A7F87`. La leyenda del tablero usa la misma muestra.
+- **Cambio de pantalla** (`AppPrincipal`):
+  - cada pantalla se construye una sola vez por sesión; al cambiar de módulo se oculta y al volver se muestra como quedó;
+  - al volver, la pantalla relee sus datos sin diálogo (`al_mostrar()`); el tablero deja de actualizarse mientras está oculto (`al_ocultar()`);
+  - con `precargar=True` (`main.py` y la demo), después de abrir la primera pantalla se construyen las demás, ocultas, una por vez.
+- **El tablero ya no rehace sus 36 casillas al releer:** si las camas son las mismas, `MatrizCamas.cargar` repinta las que ya tiene (`TarjetaCama.mostrar`), y una cama que no cambió no se repinta. Vale también para la actualización cada 30 s.
+
+### Archivos afectados
+- `views/tema.py`, `utils/colores.py` (el gris de «Fuera de servicio»)
+- `views/app_principal.py`, `main.py`, `prototipo/ver.py`
+- `views/componentes/tarjetas.py`, `views/componentes/matriz.py`
+- Las 7 pantallas de `views/` (`al_mostrar`; el tablero, también `al_ocultar` y la leyenda)
+- Pruebas: `test_tema.py`, `test_app_principal.py`, `test_componentes.py`, `test_matriz.py` y una por pantalla
+- `docs/`
+
+### Motivo
+Pedidos del usuario tras revisar la app: el modo claro cansaba la vista, el mapa de camas se veía «flojo» y el cambio de pantalla era brusco.
+
+### Impacto
+- Pruebas: **2197 pasan** (antes 2161).
+- Sin cambios de esquema ni de controladores.
+- **Cambio de pantalla, medido en la demo** (de pulsar el menú a terminar de dibujar):
+  - antes, de 0,4 a 1,3 s;
+  - ahora, al volver a un módulo, de 0,1 a 0,4 s: construir pasa de 300–760 ms a 11–53 ms;
+  - el tablero pasa de 1,3 s a 0,39 s.
+- **Cambios visibles:**
+  - el modo claro, más suave;
+  - las casillas de cama, teñidas;
+  - al volver a un módulo se encuentra como se dejó (p. ej. un triaje a medio escribir).
+
+### Decisiones
+- **Tono frío** (elegido por el usuario entre frío y cálido, con capturas de ambos): se ve clínico y descansa la vista.
+- **Contrastes de la paleta:**
+  - el texto de ejemplo de los campos quedaba en 4,02:1 sobre el fondo nuevo; se oscureció a `#626974` (4,8:1), y sigue más claro que el texto secundario para no confundirse con un dato escrito;
+  - el texto del estado en la casilla va en el color de texto principal: el secundario bajaba a 3,8:1 sobre el tinte oscuro de «En limpieza».
+- **Tinte de las casillas, «franja + tinte»** (aprobado por el usuario con vista previa; también se probó un borde de 2 px): el estado se indica con la franja (3:1 sobre su tinte, comprobado en `test_tema.py`) y con el texto, nunca solo con el color.
+- **Sin animaciones:** CustomTkinter no las hace bien y `PRODUCT.md` pide que navegar sea inmediato. Lo que molestaba era la espera, no la falta de transición.
+- **La precarga se detiene si la BD no respondió:** si no, cada pantalla abriría su propio diálogo de error. Mientras se construye una pantalla oculta, su aviso de actualización no cambia el encabezado de la visible. Si una pantalla oculta pone el foco en su primer campo, la ventana se lo devuelve a la visible.
+- **`precargar` es opcional:** en las pruebas, una precarga pendiente construiría pantallas cuando otra prueba procese eventos.
+- **La pantalla nueva se construye antes de ocultar la anterior:** mientras tanto se sigue viendo la anterior, no un hueco.
+
+### Pendientes
+- **Gestión de camas con más vida** (cola con la etiqueta del nivel, camas compatibles como casillas, resumen y estados vacíos): la propuesta va primero como vista previa.
+
+---
+
 ## [2026-11-06] — Fase 7: detalles menores de la revisión de tester
 
 ### Cambio

@@ -38,7 +38,8 @@ python scripts/verificar_controladores.py
   `rm -rf .venv && python -m venv .venv && python -m pip install -r requirements-dev.txt`.
 - `python main.py` abre la aplicación (login → ventana principal); necesita el `.env` y MySQL. Cada pantalla nueva se
   registra en `PANTALLAS` de `views/app_principal.py` y, con los controladores de demostración, en `PANTALLAS_DEMO`
-  de `prototipo/ver.py`.
+  de `prototipo/ver.py`. Las pantallas se construyen una vez por sesión y se ocultan al cambiar de módulo: si una lee
+  datos, implementa `al_mostrar()` (relee sin diálogo) y, si se actualiza sola, `al_ocultar()` (la detiene).
   `python -m prototipo.ver` abre la aplicación con datos de demostración, sin MySQL (`--rol`, `--modo oscuro`,
   `--tamano 1093x614`, `--captura archivo.png`).
   Aún no hay linter configurado; si se añade, documentar aquí su comando.

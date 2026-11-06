@@ -41,11 +41,12 @@
 - **Etapa 1, detalles visuales e íconos (2026-11-04):** `Desplazable` (barras solo cuando hacen falta), `TablaDatos` (borde en oscuro, `sin_lectura`, `al_activar`), el texto de los estados en `models/estados.py`, medidas en `tema.py`, arreglos en Pacientes, Triaje y Administración, e íconos de Tabler (MIT) en el menú, el logo y los indicadores. **La Fase 6 queda cerrada.**
 - **Fase 7, revisión de tester (2026-11-05):** pasan las 13 pruebas del plan (app real contra MySQL y recorrido de la demo). Corregido: segundo triaje desde Triaje (RN-09, `PacienteController.episodio_abierto`), los datos clínicos se borran al cambiar de paciente y el tamaño mínimo pasa a 1093×540. Resumen para el equipo en `docs/ESTADO_EQUIPO.md`.
 - **Fase 7, detalles menores (2026-11-06):** mensajes sin nombres técnicos ni «tú», coma decimal en toda la app y el PDF (`utils/numeros.py`), síntomas largos en dos líneas, todos los campos con error marcados a la vez (`leer_todos`), la PA marcada en sus dos campos (`SignosVitales.validar_presion`) y el indicador «Asignación de cama» en el tablero.
-- Pruebas: **2161 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`. Las de las vistas usan una ventana Tk oculta.
+- **Aspecto y fluidez (2026-11-06):** paleta fría y más suave en el modo claro, casillas de cama con tinte y franja del estado, y pantallas que se construyen una vez por sesión (precargadas tras el login): cambiar de módulo pasa de 0,4–1,3 s a 0,1–0,4 s.
+- Pruebas: **2197 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`. Las de las vistas usan una ventana Tk oculta.
 
 ### Tarea actual
 
-Fase 7 en curso: revisión de tester hecha, y corregidos sus 3 problemas y sus detalles menores. Queda decidir en equipo el aspecto del botón deshabilitado y preparar la sustentación. Cada pantalla nueva se registra en `views/app_principal.py` (`PANTALLAS`) y en `prototipo/ver.py` (`PANTALLAS_DEMO`).
+Fase 7 en curso: revisión de tester hecha, y corregidos sus 3 problemas y sus detalles menores. Hechos además la paleta más suave, las casillas de cama con tinte y el cambio de pantalla rápido. Siguen: la vista previa de Gestión de camas con más vida, decidir en equipo el aspecto del botón deshabilitado y preparar la sustentación. Cada pantalla nueva se registra en `views/app_principal.py` (`PANTALLAS`) y en `prototipo/ver.py` (`PANTALLAS_DEMO`).
 `scripts/verificar_controladores.py` contra MySQL (2026-11-06, ejecutado por el usuario): **97 de 97 comprobaciones correctas**, con el PDF, los criterios y `pacientes_con_cama`.
 
 ---
