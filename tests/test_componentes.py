@@ -142,6 +142,12 @@ def test_tarjeta_cama_con_los_colores_de_su_estado(raiz_tk, estado):
     assert tarjeta.cama is cama
 
 
+def test_tarjeta_cama_con_detalle_lo_dice_en_lugar_del_estado(raiz_tk):
+    # En una lista donde todas están disponibles, el tipo de cama dice más que el estado
+    tarjeta = TarjetaCama(raiz_tk, CamaObservacion(7, "OBS-07", "Obs", EstadoCama.DISPONIBLE), detalle="Observación")
+    assert textos(tarjeta) == ["OBS-07", "Observación"]
+
+
 def test_tarjeta_cama_se_vuelve_a_pintar_sin_rehacerse(raiz_tk):
     tarjeta = TarjetaCama(raiz_tk, CamaObservacion(7, "OBS-07", "Obs", EstadoCama.DISPONIBLE))
     hijos = tarjeta.winfo_children()

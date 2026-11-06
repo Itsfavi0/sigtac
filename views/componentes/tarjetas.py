@@ -105,7 +105,8 @@ class TarjetaCama(ctk.CTkFrame):
     """
     Una casilla del mapa: el código y el estado escritos, sobre un fondo teñido del color del estado y con una franja
     de ese color a la izquierda, para leer el mapa de un vistazo. Una cama fuera de servicio lleva el código tachado.
-    El ancho lo decide la matriz que la contiene.
+    El ancho lo decide la matriz que la contiene. Con `detalle`, el segundo renglón dice eso en lugar del estado (p. ej.
+    el tipo de cama, donde todas las de la lista están disponibles).
     """
 
     ALTO = 40
@@ -113,10 +114,11 @@ class TarjetaCama(ctk.CTkFrame):
     X_FRANJA = 3   # dentro del borde, con 2 px de aire
     TEXTO_X = tema.ESPACIO + 5  # después de la franja, con el mismo aire que antes tenía el texto junto al borde
 
-    def __init__(self, padre, cama: Cama):
+    def __init__(self, padre, cama: Cama, detalle: str | None = None):
         super().__init__(padre, height=self.ALTO, corner_radius=tema.RADIO_CONTROL, border_width=tema.GROSOR_BORDE)
         self.pack_propagate(False)
         self._cama = None
+        self._detalle = detalle
         self._franja = ctk.CTkFrame(self, width=self.ANCHO_FRANJA, corner_radius=self.ANCHO_FRANJA // 2)
         self._franja.place(x=self.X_FRANJA, rely=0.15, relheight=0.7)
         self._codigo = ctk.CTkLabel(self, text="", font=tema.fuente("codigo"), text_color=tema.COLOR_TEXTO, height=16)
@@ -139,7 +141,7 @@ class TarjetaCama(ctk.CTkFrame):
         self._franja.configure(fg_color=tema.COLOR_ESTADO_CAMA[cama.estado])
         fuera = cama.estado == EstadoCama.FUERA_SERVICIO
         self._codigo.configure(text=cama.codigo, font=tema.fuente("codigo", tachada=fuera))
-        self._estado.configure(text=self.texto_estado(cama.estado))
+        self._estado.configure(text=self._detalle or self.texto_estado(cama.estado))
 
     @staticmethod
     def texto_estado(estado: EstadoCama) -> str:
