@@ -3,8 +3,9 @@ Ventana principal (docs/diseno/BRIEF.md §2 y el tablero aprobado): a la izquier
 menú de los módulos que el rol puede usar y, al pie, el usuario, el modo oscuro y «Cerrar sesión»; a la derecha el
 encabezado del módulo (título, qué muestra, hora de actualización, fecha y reloj) y su contenido.
 
-Cada pantalla se registra en PANTALLAS con una función crear(padre, sesion, principal) que devuelve su marco. Un
-módulo sin pantalla todavía muestra un aviso: las pantallas de la Fase 6 se agregan una por una.
+Cada pantalla se registra en PANTALLAS con una función crear(padre, sesion, principal) que devuelve su marco. Todos
+los módulos tienen la suya (hay una prueba que lo exige); un módulo sin pantalla, como en las pruebas que pasan
+`pantallas`, muestra un aviso.
 """
 import tkinter as tk
 from collections.abc import Callable
@@ -108,14 +109,14 @@ def crear_admin(padre, sesion: Sesion, principal: "AppPrincipal", admin=None, pa
                      id_usuario_propio=sesion.id_usuario)
 
 
-# clave del módulo → crear(padre, sesion, principal). Cada pantalla de la Fase 6 se agrega aquí al crearse.
+# clave del módulo → crear(padre, sesion, principal). Una pantalla nueva se agrega aquí y en PANTALLAS_DEMO.
 PANTALLAS: dict[str, Callable] = {"tablero": crear_tablero, "triaje": crear_triaje, "camas": crear_camas,
                                   "pacientes": crear_pacientes, "limpieza": crear_limpieza,
                                   "reportes": crear_reportes, "admin": crear_admin}
 
 PUNTO = "●"  # delante de «Actualizado», como en el tablero aprobado
 SIN_CONEXION = "Sin conexión"
-TEXTO_PENDIENTE ="Esta pantalla se agrega en el siguiente paso de la Fase 6."
+TEXTO_PENDIENTE = "Esta pantalla no está disponible."
 TEXTO_SIN_MODULOS = "Su rol no tiene módulos disponibles. Consulte con el administrador."
 
 

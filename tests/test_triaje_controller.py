@@ -103,7 +103,7 @@ def test_cola_de_triaje_es_la_de_episodios_sin_triaje(monkeypatch, ctrl):
 def test_sugerir_usa_la_estrategia_y_no_guarda_nada(datos, sesion_de):
     ctrl = TriajeController(sesion_de(Rol.ENFERMERO), ReglaManchester())
     sugerencia = ctrl.sugerir(SIGNOS, [2])  # dolor torácico (8.5) → Manchester nivel 2
-    assert sugerencia == Sugerencia(2, ReglaManchester().justificar(), ("Peso de los síntomas 8.5 ≥ 7",))
+    assert sugerencia == Sugerencia(2, ReglaManchester().justificar(), ("Peso de los síntomas 8,5 ≥ 7",))
     assert datos.llamadas() == ["TriajeDAO.listar_sintomas"]
 
 

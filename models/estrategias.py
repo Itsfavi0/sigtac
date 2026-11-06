@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from models.excepciones import SignosVitalesIncompletosError
+from utils.numeros import texto_decimal
 
 # Comparaciones que usan las reglas; la clave es también el símbolo que se muestra en el criterio
 _OPERADORES = {"<": operator.lt, ">": operator.gt, "≥": operator.ge}
@@ -22,9 +23,9 @@ def condicion(etiqueta: str, valor, simbolo: str, umbral, unidad: str = "") -> t
     """
     Una condición de una regla: si se cumple y su texto («SatO₂ 89 % < 90 %»). El umbral se escribe una sola
     vez, así el texto que ve el profesional no puede quedar distinto del valor que decide. Los números se muestran
-    sin ceros de sobra (8.5, no 8.50), aunque lleguen como Decimal.
+    con coma decimal y sin ceros de sobra (8,5, no 8,50), aunque lleguen como Decimal.
     """
-    texto = f"{etiqueta} {float(valor):g}{unidad} {simbolo} {float(umbral):g}{unidad}"
+    texto = f"{etiqueta} {texto_decimal(valor)}{unidad} {simbolo} {texto_decimal(umbral)}{unidad}"
     return _OPERADORES[simbolo](valor, umbral), texto
 
 

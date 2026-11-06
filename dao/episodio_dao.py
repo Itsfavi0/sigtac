@@ -165,6 +165,6 @@ class EpisodioDAO(BaseDAO):
             logger.warning("Cambio de estado rechazado: el episodio ya no está en %s (id_episodio=%s).",
                            estado_anterior.value, id_episodio)
             raise ReglaNegocioError(
-                f"El episodio ya no está en estado {estado_anterior.value}: otro usuario lo cambió."
+                f"El episodio ya no está en estado «{estado_anterior.texto}»: otro usuario lo cambió."
             )
         logger.info("Episodio %s: %s -> %s.", id_episodio, estado_anterior.value, estado_nuevo.value)

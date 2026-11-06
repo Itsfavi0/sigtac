@@ -45,6 +45,12 @@ def test_reservar_solo_si_esta_disponible(estado):  # RN-05
         nueva_cama(estado).reservar()
 
 
+def test_el_error_de_estado_lo_nombra_como_lo_lee_el_usuario():
+    with pytest.raises(CamaEstadoInvalidoError) as error:
+        nueva_cama(Cama.ESTADO_FUERA_SERVICIO).reservar()
+    assert str(error.value) == "No se puede reservar la cama OBS-01 desde el estado «Fuera de servicio»."
+
+
 @pytest.mark.parametrize("estado", [Cama.ESTADO_OCUPADA, Cama.ESTADO_EN_LIMPIEZA, Cama.ESTADO_FUERA_SERVICIO])
 def test_ocupar_solo_desde_disponible_o_reservada(estado):
     with pytest.raises(CamaEstadoInvalidoError):

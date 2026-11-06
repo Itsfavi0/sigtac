@@ -98,15 +98,15 @@ def test_un_nivel_urgente_no_muestra_criterios_de_niveles_menores():
 
 def test_el_peso_de_varios_sintomas_se_muestra_sumado():
     varios = [Sintoma(1, "a", 2.5), Sintoma(2, "b", 2)]
-    assert ReglaManchester().evaluar(VITALES_NORMALES_MANCHESTER, varios).criterios == ("Peso de los síntomas 4.5 ≥ 4",)
+    assert ReglaManchester().evaluar(VITALES_NORMALES_MANCHESTER, varios).criterios == ("Peso de los síntomas 4,5 ≥ 4",)
 
 
 @pytest.mark.parametrize("peso, vitales, esperado", [
     (0, {"fc": 131}, Clasificacion(1, ("FC 131 lpm > 130 lpm",))),
     (9, {}, Clasificacion(1, ("Peso de los síntomas 9 ≥ 9",))),
     (6, {}, Clasificacion(2, ("Peso de los síntomas 6 ≥ 6",))),
-    (0, {"temp": 39.5}, Clasificacion(3, ("Temperatura 39.5 °C ≥ 39.5 °C",))),
-    (3, {"temp": 40.1}, Clasificacion(3, ("Peso de los síntomas 3 ≥ 3", "Temperatura 40.1 °C ≥ 39.5 °C"))),
+    (0, {"temp": 39.5}, Clasificacion(3, ("Temperatura 39,5 °C ≥ 39,5 °C",))),
+    (3, {"temp": 40.1}, Clasificacion(3, ("Peso de los síntomas 3 ≥ 3", "Temperatura 40,1 °C ≥ 39,5 °C"))),
     (1, {}, Clasificacion(4, ("Peso de los síntomas 1 ≥ 1",))),
     (0, {"fc": 130, "temp": 39.4}, Clasificacion(5, (SIN_CRITERIOS,))),
 ])
@@ -121,12 +121,13 @@ def test_minsa_explica_su_nivel(peso, vitales, esperado):
 ])
 def test_condicion_compara_y_arma_el_texto(simbolo, valor, cumple):
     umbral = {"<": 90, ">": 180, "≥": 7}[simbolo]
-    assert condicion("X", valor, simbolo, umbral, " u") == (cumple, f"X {valor:g} u {simbolo} {umbral} u")
+    decimal = f"{valor:g}".replace(".", ",")  # 6.9 → «6,9»: coma decimal
+    assert condicion("X", valor, simbolo, umbral, " u") == (cumple, f"X {decimal} u {simbolo} {umbral} u")
 
 
 def test_condicion_muestra_un_decimal_sin_ceros_de_sobra():
     assert condicion("Peso", Decimal("5.00"), "≥", 4) == (True, "Peso 5 ≥ 4")
-    assert condicion("Temp", Decimal("39.50"), "≥", 39.5, " °C") == (True, "Temp 39.5 °C ≥ 39.5 °C")
+    assert condicion("Temp", Decimal("39.50"), "≥", 39.5, " °C") == (True, "Temp 39,5 °C ≥ 39,5 °C")
 
 
 def test_condicion_rechaza_un_simbolo_desconocido():

@@ -17,7 +17,7 @@ from datetime import date, timedelta
 import customtkinter as ctk
 
 from views import formato, tema
-from views.componentes.campos import campo_en_rejilla, leer_campo
+from views.componentes.campos import campo_en_rejilla, leer_campo, leer_todos
 from views.componentes.foco import marcar_error
 from views.componentes.selector import Selector
 
@@ -89,14 +89,19 @@ class CamposPeriodo(ctk.CTkFrame):
         self._rechazado = None
 
     def leer(self) -> tuple[date, date]:
-        """Las dos fechas escritas. Una que no se puede leer queda marcada y su ValueError sigue a quien llamó."""
+        """
+        Las dos fechas escritas. Las que no se pueden leer quedan marcadas (las dos, si fallan las dos) y el ValueError
+        de la primera sigue a quien llamó.
+        """
         try:
-            desde = leer_campo(self.desde, lambda texto: formato.leer_fecha(texto, "La fecha inicial"))
-            hasta = leer_campo(self.hasta, lambda texto: formato.leer_fecha(texto, "La fecha final"))
+            fechas = leer_todos({
+                "desde": lambda: leer_campo(self.desde, lambda texto: formato.leer_fecha(texto, "La fecha inicial")),
+                "hasta": lambda: leer_campo(self.hasta, lambda texto: formato.leer_fecha(texto, "La fecha final")),
+            })
         except ValueError:
             self._rechazado = self._escrito()
             raise
-        return desde, hasta
+        return fechas["desde"], fechas["hasta"]
 
     def rechazar(self):
         """El controlador rechazó el período (p. ej. la inicial después de la final): no se sabe cuál, se marcan ambas."""

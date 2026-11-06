@@ -19,10 +19,13 @@ def _validar_id(valor, nombre: str):
     return valor
 
 
-def _validar_texto(valor, nombre: str) -> str:
-    """Texto obligatorio: no vacío ni compuesto solo de espacios. Se guarda sin espacios en los extremos."""
+def _validar_texto(valor, mensaje: str) -> str:
+    """
+    Texto obligatorio: no vacío ni compuesto solo de espacios. Se guarda sin espacios en los extremos. Si falta, el
+    ValueError lleva `mensaje`, escrito para el usuario («Los nombres son obligatorios.»).
+    """
     if not isinstance(valor, str) or not valor.strip():
-        raise ValueError(f"{nombre} es obligatorio.")
+        raise ValueError(mensaje)
     return valor.strip()
 
 
@@ -58,8 +61,8 @@ class Persona(ABC):
         if documento is None and not self._ADMITE_SIN_DOCUMENTO:
             raise ValueError("El documento es obligatorio.")
         self._documento = None if documento is None else _validar_documento(documento)
-        self._nombres = _validar_texto(nombres, "nombres")
-        self._apellidos = _validar_texto(apellidos, "apellidos")
+        self._nombres = _validar_texto(nombres, "Los nombres son obligatorios.")
+        self._apellidos = _validar_texto(apellidos, "Los apellidos son obligatorios.")
         self._fecha_nac = _validar_fecha_nac(fecha_nac)
 
     @property
@@ -107,7 +110,8 @@ class Paciente(Persona):
         # id_seguro es la FK a la tabla seguro; nombre_seguro es opcional y solo sirve
         # para mostrarlo (el DAO lo obtiene con un JOIN).
         self._id_seguro = self._validar_seguro(id_seguro)
-        self._nombre_seguro = None if nombre_seguro is None else _validar_texto(nombre_seguro, "nombre_seguro")
+        self._nombre_seguro = None if nombre_seguro is None else _validar_texto(
+            nombre_seguro, "El nombre del seguro es obligatorio.")
         self._episodios = []
         # Espejo de paciente.estado_registro en la BD (RN-11: no se elimina
         # físicamente, solo se anula lógicamente conservando el registro).
@@ -169,8 +173,8 @@ class Paciente(Persona):
             raise ReglaNegocioError("El paciente está anulado (p. ej. ya se fusionó con otro registro).")
         # Se valida todo antes de modificar: si un dato es inválido, el paciente queda como estaba.
         documento = _validar_documento(documento)
-        nombres = _validar_texto(nombres, "nombres")
-        apellidos = _validar_texto(apellidos, "apellidos")
+        nombres = _validar_texto(nombres, "Los nombres son obligatorios.")
+        apellidos = _validar_texto(apellidos, "Los apellidos son obligatorios.")
         fecha_nac = _validar_fecha_nac(fecha_nac)
         self._documento, self._nombres, self._apellidos, self._fecha_nac = documento, nombres, apellidos, fecha_nac
 
@@ -208,8 +212,8 @@ class Paciente(Persona):
             raise ReglaNegocioError("El paciente está dado de baja: reactívelo antes de editar sus datos.")
         # Se valida todo antes de modificar: si un dato es inválido, el paciente queda como estaba.
         nuevos = {
-            "nombres": _validar_texto(nombres, "nombres"),
-            "apellidos": _validar_texto(apellidos, "apellidos"),
+            "nombres": _validar_texto(nombres, "Los nombres son obligatorios."),
+            "apellidos": _validar_texto(apellidos, "Los apellidos son obligatorios."),
             "fecha_nac": _validar_fecha_nac(fecha_nac),
             "sexo": self._validar_sexo(sexo),
             "id_seguro": self._validar_seguro(id_seguro),
@@ -259,8 +263,9 @@ class Empleado(Persona):
                  cargo : str, colegiatura: str | None = None, activo: bool = True):
         super().__init__(documento, nombres, apellidos, fecha_nac)
         self._id_empleado = _validar_id(id_empleado, "id_empleado")
-        self._cargo = _validar_texto(cargo, "cargo")
-        self._colegiatura = None if colegiatura is None else _validar_texto(colegiatura, "colegiatura")
+        self._cargo = _validar_texto(cargo, "El cargo es obligatorio.")
+        self._colegiatura = None if colegiatura is None else _validar_texto(colegiatura,
+                                                                            "La colegiatura es obligatoria.")
         # Espejo de empleado.estado_registro en la BD (RN-11: baja lógica).
         self._activo = _validar_activo(activo)
 
@@ -294,7 +299,7 @@ class Enfermero(Empleado):
                  cargo : str, colegiatura : str | None, area : str, activo: bool = True):
         super().__init__(id_empleado, documento, nombres, apellidos, fecha_nac, cargo, colegiatura, activo)
         # Nombre del área asignada (tabla area, mediante empleado.id_area).
-        self._area = _validar_texto(area, "area")
+        self._area = _validar_texto(area, "El área es obligatoria.")
 
     @property
     def area(self): return self._area
@@ -310,7 +315,7 @@ class Medico(Empleado):
     def __init__(self, id_empleado: int | None, documento: DocumentoIdentidad, nombres: str, apellidos: str, fecha_nac: date,
                  cargo: str, colegiatura: str | None, especialidad: str, activo: bool = True):
         super().__init__(id_empleado, documento, nombres, apellidos, fecha_nac, cargo, colegiatura, activo)
-        self._especialidad = _validar_texto(especialidad, "especialidad")
+        self._especialidad = _validar_texto(especialidad, "La especialidad es obligatoria.")
 
     @property
     def especialidad(self): return self._especialidad

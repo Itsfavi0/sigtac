@@ -121,7 +121,7 @@ class CamaDAO(BaseDAO):
                 logger.warning("Cambio de estado rechazado: la cama ya no está en %s (id_cama=%s).",
                                estado_anterior.value, id_cama)
                 raise CamaNoDisponibleError(
-                    f"La cama {cama.codigo} ya no está en estado {estado_anterior.value}: otro usuario la cambió."
+                    f"La cama {cama.codigo} ya no está en estado «{estado_anterior.texto}»: otro usuario la cambió."
                 )
             CamaDAO._insertar(
                 """

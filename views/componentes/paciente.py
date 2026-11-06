@@ -5,7 +5,8 @@ pacientes los muestran igual.
 import customtkinter as ctk
 
 from views import formato, tema
-from views.componentes.campos import campo_en_rejilla, leer_campo, leer_opcion, limpiar_al_corregir, lista_en_rejilla
+from views.componentes.campos import (campo_en_rejilla, leer_campo, leer_opcion, leer_todos, limpiar_al_corregir,
+                                      lista_en_rejilla)
 from views.componentes.documento import ETIQUETAS
 from views.componentes.foco import marcar_error
 
@@ -59,17 +60,19 @@ class CamposPaciente(ctk.CTkFrame):
     def valores(self) -> dict:
         """
         Los datos listos para el controlador: nombres, apellidos, fecha_nac (date) y, si los tiene, sexo ('M'/'F') e
-        id_seguro. Un dato que no se puede leer marca su campo y lanza ValueError con lo que hay que corregir.
+        id_seguro. Cada dato que no se puede leer marca su campo (todos a la vez), y el ValueError dice lo que hay que
+        corregir en el primero.
         """
-        datos = {
-            "nombres": self.nombres.get(),
-            "apellidos": self.apellidos.get(),
-            "fecha_nac": leer_campo(self.fecha_nac, lambda texto: formato.leer_fecha(texto, "La fecha de nacimiento")),
+        lecturas = {
+            "nombres": self.nombres.get,
+            "apellidos": self.apellidos.get,
+            "fecha_nac": lambda: leer_campo(self.fecha_nac,
+                                            lambda texto: formato.leer_fecha(texto, "La fecha de nacimiento")),
         }
         if self.con_sexo_y_seguro:
-            datos["sexo"] = leer_opcion(self.sexo, SEXOS, "Elija el sexo del paciente.")
-            datos["id_seguro"] = leer_opcion(self.seguro, self._seguros, "Elija el seguro del paciente.")
-        return datos
+            lecturas["sexo"] = lambda: leer_opcion(self.sexo, SEXOS, "Elija el sexo del paciente.")
+            lecturas["id_seguro"] = lambda: leer_opcion(self.seguro, self._seguros, "Elija el seguro del paciente.")
+        return leer_todos(lecturas)
 
     def limpiar(self):
         for campo in self.entradas:

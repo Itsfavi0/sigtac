@@ -41,9 +41,9 @@ def vacios():
 
 @pytest.mark.parametrize("minutos, texto", [
     (None, "Sin datos"),
-    (0, "0.0 min"),
-    (8.4, "8.4 min"),
-    (59.9, "59.9 min"),        # límite: todavía en minutos
+    (0, "0,0 min"),
+    (8.4, "8,4 min"),
+    (59.9, "59,9 min"),        # límite: todavía en minutos
     (60, "1 h 00 min"),        # límite: desde una hora se muestran horas
     (125.4, "2 h 05 min"),
     (312.6, "5 h 13 min"),     # los minutos se redondean
@@ -53,8 +53,8 @@ def test_formatear_minutos(minutos, texto):
     assert formatear_minutos(minutos) == texto
 
 
-@pytest.mark.parametrize("porcentaje, texto", [(None, "Sin datos"), (0.0, "0.0 %"), (37.5, "37.5 %"),
-                                               (100.0, "100.0 %")])
+@pytest.mark.parametrize("porcentaje, texto", [(None, "Sin datos"), (0.0, "0,0 %"), (37.5, "37,5 %"),
+                                               (100.0, "100,0 %")])
 def test_formatear_porcentaje(porcentaje, texto):
     assert formatear_porcentaje(porcentaje) == texto
 
@@ -74,9 +74,9 @@ def test_filas_de_indicadores():
         ("   Nivel 3 (Amarillo)", "14"),
         ("   Nivel 4 (Verde)", "9"),
         ("   Nivel 5 (Azul)", "3"),
-        ("Triajes reclasificados", "12.1 %"),
-        ("Espera promedio hasta el triaje", "8.4 min"),
-        ("Espera promedio hasta la cama", "47.0 min"),
+        ("Triajes reclasificados", "12,1 %"),
+        ("Espera promedio hasta el triaje", "8,4 min"),
+        ("Espera promedio hasta la cama", "47,0 min"),
         ("Estancia promedio", "5 h 13 min"),
     ]
 
@@ -98,7 +98,7 @@ def test_periodo_sin_actividad_muestra_sin_datos():
 def test_filas_de_camas_en_el_orden_del_enum_con_total_y_ocupacion():
     assert filas_camas(estado()) == [
         ("Disponible", "4"), ("Reservada", "1"), ("Ocupada", "2"), ("En limpieza", "1"),
-        ("Fuera de servicio", "2"), ("Total de camas", "10"), ("Ocupación", "37.5 %"),
+        ("Fuera de servicio", "2"), ("Total de camas", "10"), ("Ocupación", "37,5 %"),
     ]
 
 
@@ -128,7 +128,7 @@ def test_construye_un_pdf_con_los_valores(sin_compresion):
     pdf = construir_reporte(indicadores(), estado(), GENERADO_EN, "Luis Ramos (JEFE DE GUARDIA)")
     assert pdf.startswith(b"%PDF-")
     for texto in (b"01/10/2026 al 31/10/2026", b"26/10/2026 14:30", b"Luis Ramos", b"JEFE DE GUARDIA",
-                  b"Ingresos a emergencia", b"5 h 13 min", b"37.5 %", b"Triajes por nivel"):
+                  b"Ingresos a emergencia", b"5 h 13 min", b"37,5 %", b"Triajes por nivel"):
         assert texto in pdf, texto
 
 

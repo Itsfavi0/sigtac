@@ -103,8 +103,14 @@ def test_signos_vitales_a_diccionario():
 
 @pytest.mark.parametrize("sis, dia", [(80, 80), (70, 90)])
 def test_presion_sistolica_debe_superar_la_diastolica(sis, dia):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="sistólica debe ser mayor que la diastólica"):
         SignosVitales(sis, dia, 75, 16, 36.8, 98, id_si=1)
+    with pytest.raises(ValueError):
+        SignosVitales.validar_presion(sis, dia)  # la misma regla, sin crear el objeto (la usa la pantalla)
+
+
+def test_validar_presion_acepta_la_sistolica_apenas_mayor():
+    SignosVitales.validar_presion(81, 80)  # límite: no lanza
 
 
 @pytest.mark.parametrize("sato2", [-1, 101])
@@ -184,6 +190,13 @@ def test_no_se_puede_asignar_cama_dos_veces():
     ep.asignar_cama()
     with pytest.raises(ReglaNegocioError):
         ep.asignar_cama()
+
+
+def test_el_error_de_estado_lo_nombra_como_lo_lee_el_usuario():
+    # El mensaje llega a la pantalla: «En espera de cama», no el valor de la BD («EN ESPERA DE CAMA»)
+    with pytest.raises(ReglaNegocioError) as error:
+        episodio_con_triaje().dar_alta()
+    assert str(error.value) == "No se puede dar de alta un episodio en estado «En espera de cama»."
 
 
 @pytest.mark.parametrize("preparar", [lambda ep: None, lambda ep: ep.agregar_triaje(nuevo_triaje())])

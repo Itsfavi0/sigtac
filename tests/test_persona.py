@@ -164,8 +164,19 @@ def test_id_paciente_invalido_se_rechaza(id_paciente):
         nuevo_paciente(id_paciente=id_paciente)
 
 
+@pytest.mark.parametrize("cambio, mensaje", [
+    (dict(nombres="  "), "Los nombres son obligatorios."),
+    (dict(apellidos=""), "Los apellidos son obligatorios."),
+])
+def test_nombres_y_apellidos_vacios_dicen_el_campo_en_castellano(cambio, mensaje):
+    # El mensaje llega a la pantalla: no el nombre interno del campo («nombres es obligatorio.»)
+    with pytest.raises(ValueError) as error:
+        nuevo_paciente(**cambio)
+    assert str(error.value) == mensaje
+
+
 def test_nombre_seguro_vacio_se_rechaza():
-    with pytest.raises(ValueError, match="nombre_seguro"):
+    with pytest.raises(ValueError, match="nombre del seguro"):
         nuevo_paciente(nombre_seguro="  ")
 
 
@@ -450,7 +461,7 @@ def test_enfermero_tiene_area():
 
 @pytest.mark.parametrize("area", ["", "   ", None])
 def test_area_de_enfermero_obligatoria(area):
-    with pytest.raises(ValueError, match="area"):
+    with pytest.raises(ValueError, match="área"):
         nuevo_enfermero(area=area)
 
 

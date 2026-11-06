@@ -10,7 +10,7 @@ from prototipo.demo import AdminDemo, PacientesDemo, TriajeDemo
 from views import admin_view
 from views.admin_view import (AVISO_BUSCAR, CLAVES_DISTINTAS, ELIJA_CUENTA, FALTA_ROL, LIMITE_BITACORA, NO_ENCONTRADO,
                               CUENTA_PROPIA, TEXTO_ELEGIR_EMPLEADO, AdminView, estado_cuenta, nombres_de_cuentas,
-                              texto_detalles, texto_tabla)
+                              NOMBRES_TABLA, texto_detalles, texto_tabla)
 from views.componentes.campos import mover_opcion
 from views.componentes.tabla import SIN_LECTURA
 
@@ -76,8 +76,18 @@ def test_estado_de_la_cuenta(activo, bloqueada, texto):
     assert estado_cuenta(MagicMock(activo=activo, bloqueada=bloqueada)) == texto
 
 
+def test_toda_tabla_auditable_tiene_un_nombre_legible():
+    # Las que no están en NOMBRES_TABLA se leen bien con solo cambiar «_» por un espacio (sin tildes que falten)
+    from dao.auditoria_dao import AuditoriaDAO
+    assert set(NOMBRES_TABLA) <= AuditoriaDAO.TABLAS_AUDITABLES
+    sin_nombre = AuditoriaDAO.TABLAS_AUDITABLES - set(NOMBRES_TABLA)
+    assert sin_nombre == {"rol", "cargo", "seguro", "empleado", "usuario", "paciente", "cama", "signos_vitales",
+                          "triaje"}
+
+
 def test_textos_de_la_bitacora():
-    assert texto_tabla("episodio_emergencia") == "Episodio emergencia"
+    assert texto_tabla("episodio_emergencia") == "Episodio de emergencia"
+    assert texto_tabla("sintoma") == "Síntoma" and texto_tabla("signos_vitales") == "Signos vitales"
     assert texto_detalles({"rol_anterior": "Médico", "activo": False, "campos": ["nombres", "sexo"]}) == (
         "rol anterior: Médico · activo: no · campos: nombres, sexo")
     assert texto_detalles(None) == "" and texto_detalles({}) == ""
@@ -451,7 +461,7 @@ def test_dar_de_baja_y_reactivar(crear):
     vista.cambiar_paciente()
     assert vista._datos_paciente.cget("text") == "DNI 41234567 · Dado de baja"
     assert vista._boton_paciente.cget("text") == "Reactivar"
-    assert vista.dialogos["info"] == ["Carmen Rojas Llanos quedó dado de baja. Se puede reactivar desde aquí."]
+    assert vista.dialogos["info"] == ["Se dio de baja a Carmen Rojas Llanos. Se puede reactivar desde aquí."]
     vista.cambiar_paciente()
     assert vista._datos_paciente.cget("text") == "DNI 41234567 · Activo"
     vista.ver_bitacora()

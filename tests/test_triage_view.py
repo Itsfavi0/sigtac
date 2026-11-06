@@ -11,11 +11,11 @@ from models.excepciones import PersistenciaError, ReglaNegocioError
 from models.triaje import EpisodioEmergencia, SignosVitales, Triaje
 from prototipo.demo import CamasDemo, PacientesDemo, TriajeDemo
 from views import tema, triage_view
-from views.componentes.campos import sin_error
+from views.componentes.campos import LADO_CASILLA, SEPARACION_CASILLA, sin_error
 from views.componentes.nivel import texto_nivel
 from models.excepciones import ConexionBDError
 from views.triage_view import (AVISO_BUSCAR, NADIE_ESPERA_TRIAJE, NO_REGISTRADO, SIGNOS, SIN_SUGERENCIA,
-                               TEXTO_SIN_SIGNOS, TriageView, rango_admitido, texto_faltan)
+                               TEXTO_CORREGIR_SIGNOS, TEXTO_SIN_SIGNOS, TriageView, rango_admitido, texto_faltan)
 
 AHORA = datetime(2026, 10, 30, 10, 0)
 NORMALES = {"pa_sis": "120", "pa_dia": "80", "fc": "80", "fr": "16", "temp": "36,8", "sato2": "98"}
@@ -124,6 +124,14 @@ def test_con_los_6_signos_aparece_la_sugerencia_con_sus_criterios(crear):
     assert boton(vista) == ("Confirmar nivel 1", "normal")
 
 
+def test_los_sintomas_se_parten_al_ancho_de_su_columna(crear):
+    vista = crear()
+    vista._ajustar_sintomas(600)  # lo que hace <Configure> con el ancho de la lista
+    columna = 300 - round(tema.ESPACIO * tema.escala(vista))
+    cuadro = vista._casillas[5]._apply_widget_scaling(LADO_CASILLA + SEPARACION_CASILLA)
+    assert {int(caja._text_label.cget("wraplength")) for caja in vista._casillas.values()} == {columna - cuadro}
+
+
 def test_los_sintomas_marcados_cambian_la_sugerencia(crear):
     vista = crear()
     escribir_signos(vista)
@@ -169,8 +177,30 @@ def test_un_signo_invalido_se_marca_y_se_explica_junto_a_los_campos(crear, clave
 @pytest.mark.parametrize("valor", ["20", "300"])
 def test_los_limites_del_rango_se_aceptan(crear, valor):
     vista = crear()
-    escribir_signos(vista, pa_sis=valor)
+    escribir_signos(vista, pa_sis=valor, pa_dia="10")  # la diastólica, menor: 20 es un límite solo de la sistólica
     assert vista.leer_signos()["pa_sis"] == int(valor)
+
+
+def test_un_signo_invalido_pide_corregir_no_completar(crear):
+    vista = crear()
+    escribir_signos(vista, fc="9x")
+    assert boton(vista) == (TEXTO_CORREGIR_SIGNOS, "disabled")
+    escribir_signos(vista, fc="")  # vacío: falta, no está mal
+    assert boton(vista) == (TEXTO_SIN_SIGNOS, "disabled")
+
+
+@pytest.mark.parametrize("sistolica, diastolica", [("80", "80"), ("70", "90")])  # límite: iguales
+def test_la_diastolica_no_menor_que_la_sistolica_marca_las_dos(crear, sistolica, diastolica):
+    vista = crear()
+    escribir_signos(vista, pa_sis=sistolica, pa_dia=diastolica)
+    assert vista._campos_signos["pa_sis"]._sigtac_error and vista._campos_signos["pa_dia"]._sigtac_error
+    assert not vista._campos_signos["fc"]._sigtac_error
+    assert vista._aviso_signos.cget("text") == "La PA sistólica debe ser mayor que la diastólica."
+    assert boton(vista) == (TEXTO_CORREGIR_SIGNOS, "disabled") and vista._sugerencia is None
+    vista.triaje.sugerir.assert_not_called()
+    escribir_signos(vista, pa_sis="120", pa_dia="80")
+    assert not vista._campos_signos["pa_sis"]._sigtac_error and not vista._campos_signos["pa_dia"]._sigtac_error
+    assert boton(vista)[1] == "normal"
 
 
 def test_al_corregir_el_signo_se_quita_el_error(crear):
@@ -652,6 +682,17 @@ def test_los_datos_que_faltan_se_avisan_y_marcan_su_campo_antes_de_escribir(crea
     assert vista.leer_signos() is not None  # el formulario conserva lo escrito
 
 
+def test_sin_identificar_y_sin_datos_marca_todos_los_que_faltan(crear):
+    vista = crear()
+    vista._identidad.elegir("nn")
+    escribir(vista._motivo, "Hallada inconsciente")
+    escribir_signos(vista)
+    vista.confirmar()
+    assert [str(e) for e in vista.dialogos["error"]] == ["Elija el sexo del paciente."]  # el primero
+    assert vista._sexo_nn._sigtac_error and vista._edad_nn._sigtac_error and vista._seguro_nn._sigtac_error
+    vista.pacientes.registrar_no_identificado.assert_not_called()
+
+
 def test_confirmar_desde_la_cola_usa_el_episodio_elegido(crear):
     vista = crear()
     vista._modo.elegir("cola")
@@ -821,10 +862,16 @@ def test_cambiar_entre_nuevo_y_cola_reacomoda_el_formulario(crear, monkeypatch):
 def test_sin_barra_el_formulario_y_el_panel_se_separan_como_dos_tarjetas(crear):
     from views import tema
     vista = crear()
+
+    def margen(px):
+        # CustomTkinter multiplica el margen por el zoom de Windows (12 → 15 al 125 %); Tk lo da como tupla o texto
+        real = vista._formulario._apply_widget_scaling(px)
+        return (0, real), f"0 {real}"
+
     vista._separar_panel(False)
-    assert vista._formulario.grid_info()["padx"] in ((0, tema.ESPACIO_MEDIO), "0 12")
+    assert vista._formulario.grid_info()["padx"] in margen(tema.ESPACIO_MEDIO)
     vista._separar_panel(True)  # la barra queda entre los dos, con ESPACIO_MINIMO a cada lado
-    assert vista._formulario.grid_info()["padx"] in ((0, tema.ESPACIO_MINIMO), "0 4")
+    assert vista._formulario.grid_info()["padx"] in margen(tema.ESPACIO_MINIMO)
 
 
 def test_si_la_bd_falla_al_abrir_la_cola_el_contador_no_dice_cero(crear):

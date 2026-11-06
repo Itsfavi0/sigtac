@@ -32,13 +32,15 @@ class Cama(ABC):
     def reservar(self):
         """RN-05: Solo se puede reservar si está disponible."""
         if self._estado != Cama.ESTADO_DISPONIBLE:
-            raise CamaEstadoInvalidoError(f"No se puede reservar la cama {self.codigo} desde el estado {self._estado}")
+            raise CamaEstadoInvalidoError(
+                f"No se puede reservar la cama {self.codigo} desde el estado «{self._estado.texto}».")
         self._estado = Cama.ESTADO_RESERVADA
 
     def ocupar(self):
         """El paciente llegó físicamente a la cama."""
         if self._estado not in (self.ESTADO_DISPONIBLE, self.ESTADO_RESERVADA):
-            raise CamaEstadoInvalidoError(f"No se puede ocupar la cama {self._codigo} desde el estado {self._estado}.")
+            raise CamaEstadoInvalidoError(
+                f"No se puede ocupar la cama {self._codigo} desde el estado «{self._estado.texto}».")
         self._estado = self.ESTADO_OCUPADA
 
     def cancelar_reserva(self):

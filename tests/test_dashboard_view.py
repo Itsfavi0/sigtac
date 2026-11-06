@@ -51,8 +51,16 @@ def test_indicadores_del_jefe_de_guardia(crear):
     assert vista.avisos == [True]
 
 
+def test_sin_camas_asignadas_hoy_la_asignacion_no_tiene_valor(raiz_tk, sesion_de):
+    reportes = MagicMock(wraps=ReportesDemo())
+    reportes.indicadores.return_value = MagicMock(espera_cama_min=None)
+    vista = DashboardView(raiz_tk, CamasDemo(lambda: AHORA), sesion_de(Rol.JEFE_GUARDIA), reportes,
+                          TriajeDemo(lambda: AHORA), reloj=lambda: AHORA)
+    assert (vista.kpis[3].valor, vista.kpis[3].nota) == ("—", "sin datos de hoy")
+
+
 @pytest.mark.parametrize("rol, titulo, valor", [
-    (Rol.ADMINISTRADOR, "Espera de cama", "8 min"),
+    (Rol.ADMINISTRADOR, "Asignación de cama", "8 min"),
     (Rol.ENFERMERO, "Esperan triaje", "2"),
     (Rol.LIMPIEZA, "Fuera de servicio", "2"),
 ])

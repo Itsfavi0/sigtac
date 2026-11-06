@@ -11,6 +11,7 @@ from views.componentes.foco import marcar_error, marcar_foco, marcar_foco_contro
 
 LADO_CASILLA = 20  # el cuadro de una casilla: más chico que un campo, alineado con la letra de 13 px
 RADIO_CASILLA = 4  # proporcional a su lado, como RADIO_CONTROL lo es a un campo de 36
+SEPARACION_CASILLA = 6  # entre el cuadro y el texto: el que deja CTkCheckBox
 
 
 def etiqueta_campo(padre, texto: str) -> ctk.CTkLabel:
@@ -131,6 +132,23 @@ def leer_opcion(lista: ctk.CTkComboBox, valores: dict, mensaje: str):
     return valores[lista.get()]
 
 
+def leer_todos(lecturas: dict[str, Callable[[], object]]) -> dict:
+    """
+    Hace todas las lecturas (`leer_campo`, `leer_opcion`...) aunque falle alguna: así quedan marcados a la vez todos
+    los campos con error, no solo el primero. Devuelve clave → valor; si alguna falló, lanza el ValueError de la
+    primera, en el orden de `lecturas` (el del formulario).
+    """
+    valores, primer_error = {}, None
+    for clave, leer in lecturas.items():
+        try:
+            valores[clave] = leer()
+        except ValueError as error:
+            primer_error = primer_error or error
+    if primer_error is not None:
+        raise primer_error
+    return valores
+
+
 def limpiar_al_corregir(*campos):
     """
     Un campo marcado con error pierde el borde rojo en cuanto se corrige: al escribir en él o al elegir otra opción.
@@ -160,3 +178,13 @@ def casilla(padre, texto: str, comando: Callable[[], None] | None = None) -> ctk
         border_width=1, border_color=tema.COLOR_BORDE_CAMPO, fg_color=tema.COLOR_PRIMARIO,
         hover_color=tema.COLOR_PRIMARIO_HOVER, checkmark_color=tema.COLOR_TEXTO_SOBRE_PRIMARIO)
     return marcar_foco_control(caja, caja.toggle, color_foco=tema.COLOR_TEXTO)
+
+
+def ajustar_casilla(caja: ctk.CTkCheckBox, ancho: int):
+    """
+    Parte el texto de la casilla en líneas para que la casilla entera no pase de `ancho` (en px de la pantalla, como
+    los da un evento <Configure>): un texto largo no se corta. CTkCheckBox no lo hace solo; su texto es un
+    tkinter.Label, que mide en px de la pantalla.
+    """
+    cuadro = caja._apply_widget_scaling(LADO_CASILLA + SEPARACION_CASILLA)
+    caja._text_label.configure(wraplength=max(1, ancho - cuadro))

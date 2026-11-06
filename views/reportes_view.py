@@ -109,7 +109,7 @@ class ReportesView(ctk.CTkFrame):
                  ("Estancia", "clock"))
         self.kpis = []
         for i, (titulo, icono) in enumerate(datos):
-            # El marcador azul, como «Espera de cama» en el tablero: el mismo dato, el mismo marcador e ícono
+            # El marcador azul, como «Asignación de cama» en el tablero: el mismo dato, el mismo marcador e ícono
             tarjeta = TarjetaKPI(fila, titulo, tema.COLOR_PRIMARIO_GRAFICO, icono)
             tarjeta.grid(row=0, column=i, sticky="ew", padx=(0 if i == 0 else tema.ESPACIO_MEDIO, 0))
             fila.grid_columnconfigure(i, weight=1, uniform="kpi")

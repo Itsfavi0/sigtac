@@ -25,6 +25,7 @@ from models.estados import EstadoCama, EstadoEpisodio
 from models.excepciones import ReporteError
 from models.triaje import COLOR_POR_NIVEL, EpisodioEmergencia
 from utils.colores import NIVEL
+from utils.numeros import texto_decimal
 
 if TYPE_CHECKING:
     # Solo para las anotaciones: reporte_controller importa este módulo, y una importación real sería circular.
@@ -50,17 +51,18 @@ _NOTAS = (
 # ---- Formato de los valores
 
 def formatear_minutos(minutos: float | None) -> str:
-    """45.5 → '45.5 min'; 125 → '2 h 05 min'; None → 'Sin datos'."""
+    """45.5 → '45,5 min'; 125 → '2 h 05 min'; None → 'Sin datos'."""
     if minutos is None:
         return SIN_DATOS
     if minutos < 60:
-        return f"{minutos:.1f} min"
+        return f"{texto_decimal(minutos, 1)} min"
     horas, resto = divmod(round(minutos), 60)
     return f"{horas} h {resto:02d} min"
 
 
 def formatear_porcentaje(porcentaje: float | None, si_no_hay: str = SIN_DATOS) -> str:
-    return si_no_hay if porcentaje is None else f"{porcentaje:.1f} %"
+    """37.5 → '37,5 %'; None → `si_no_hay`."""
+    return si_no_hay if porcentaje is None else f"{texto_decimal(porcentaje, 1)} %"
 
 
 def _formatear_fecha(dia) -> str:
@@ -203,7 +205,7 @@ def construir_reporte(indicadores: "IndicadoresPeriodo", estado: "EstadoGuardia"
 def validar_ruta_pdf(ruta: str | Path) -> Path:
     """Comprueba que la ruta termine en .pdf (sin tocar el disco). Lanza ValueError si no."""
     if not isinstance(ruta, (str, Path)) or not str(ruta).strip():
-        raise ValueError("Indica dónde guardar el reporte.")
+        raise ValueError("Indique dónde guardar el reporte.")
     ruta = Path(ruta)
     if ruta.suffix.lower() != ".pdf":
         raise ValueError("El reporte debe guardarse con la extensión .pdf.")
@@ -225,7 +227,7 @@ def guardar_reporte(ruta: str | Path, indicadores: "IndicadoresPeriodo", estado:
         ruta.write_bytes(contenido)
     except OSError as error:
         logger.warning("No se pudo guardar el reporte PDF: %s", error.strerror)
-        raise ReporteError("No se pudo guardar el reporte. Comprueba que la carpeta exista y que el "
+        raise ReporteError("No se pudo guardar el reporte. Compruebe que la carpeta exista y que el "
                            "archivo no esté abierto en otro programa.") from error
     logger.info("Reporte PDF guardado (período %s a %s).", indicadores.desde, indicadores.hasta)
     return ruta

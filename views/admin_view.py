@@ -74,9 +74,18 @@ def nombres_de_cuentas(cuentas) -> dict[int, str]:
             else f"{c.nombre_completo} (cuenta {c.id_usuario})" for c in cuentas}
 
 
+# Las tablas cuyo nombre no se lee bien con solo cambiar «_» por un espacio (tildes y «de»)
+NOMBRES_TABLA = {"area": "Área", "asignacion_cama": "Asignación de cama",
+                 "episodio_emergencia": "Episodio de emergencia", "estado_cama": "Estado de cama",
+                 "estado_episodio": "Estado de episodio",
+                 "historial_estado_cama": "Historial de estados de cama", "nivel_triaje": "Nivel de triaje",
+                 "sintoma": "Síntoma", "solicitud_limpieza": "Solicitud de limpieza", "tipo_cama": "Tipo de cama",
+                 "tipo_documento": "Tipo de documento", "triaje_sintoma": "Síntomas del triaje"}
+
+
 def texto_tabla(tabla: str) -> str:
-    """«episodio_emergencia» → «Episodio emergencia»."""
-    return tabla.replace("_", " ").capitalize()
+    """«episodio_emergencia» → «Episodio de emergencia»; «signos_vitales» → «Signos vitales»."""
+    return NOMBRES_TABLA.get(tabla, tabla.replace("_", " ").capitalize())
 
 
 def texto_detalles(detalles: dict | None) -> str:
@@ -563,14 +572,15 @@ class AdminView(ctk.CTkFrame):
         paciente = self._paciente
         if paciente is None:
             return
+        # Sin «dado de baja» ni «reactivado» junto al nombre: no se sabe si es él o ella
         nombre = f"{paciente.nombres} {paciente.apellidos}"
         try:
             if paciente.activo:
                 self._pacientes.dar_de_baja(paciente.id_paciente)
-                mensaje = f"{nombre} quedó dado de baja. Se puede reactivar desde aquí."
+                mensaje = f"Se dio de baja a {nombre}. Se puede reactivar desde aquí."
             else:
                 self._pacientes.reactivar(paciente.id_paciente)
-                mensaje = f"{nombre} fue reactivado."
+                mensaje = f"Se reactivó a {nombre}."
         except (SigtacError, ValueError) as error:
             mostrar_error(self, error)  # p. ej. tiene un episodio abierto
             self._releer_paciente()     # otra PC pudo cambiarlo

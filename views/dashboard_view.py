@@ -20,6 +20,7 @@ from views.componentes import InsigniaNivel, MatrizCamas, Tarjeta, TarjetaKPI, m
 logger = logging.getLogger(__name__)
 
 NADIE_ESPERA = "Nadie espera cama."
+TITULO_ASIGNACION_CAMA = "Asignación de cama"
 
 
 class DashboardView(ctk.CTkFrame):
@@ -94,10 +95,12 @@ class DashboardView(ctk.CTkFrame):
     def _cuarto_indicador_titulo(self):
         """
         El cuarto indicador depende del rol: la espera promedio pide REPORTES; si no, lo que el rol sí ve. Devuelve el
-        título, el color y el ícono.
+        título, el color y el ícono. «Asignación de cama», no «Espera de cama»: es el promedio de quienes ya
+        recibieron cama hoy, no la espera de quien sigue en la cola (que puede llevar horas, y se ve abajo). La nota
+        queda corta: con «2 h 05 min» no cabe más que «hoy».
         """
         if self._reportes is not None and self._sesion.puede(Permiso.REPORTES):
-            return "Espera de cama", tema.COLOR_PRIMARIO_GRAFICO, "hourglass"
+            return TITULO_ASIGNACION_CAMA, tema.COLOR_PRIMARIO_GRAFICO, "hourglass"
         if self._triaje is not None and self._sesion.puede(Permiso.TRIAJE):
             return "Esperan triaje", tema.COLOR_PRIMARIO_GRAFICO, "heartbeat"
         return "Fuera de servicio", tema.COLOR_ESTADO_CAMA[EstadoCama.FUERA_SERVICIO], "bed-off"

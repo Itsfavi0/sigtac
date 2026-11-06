@@ -63,8 +63,7 @@ class SignosVitales:
             minimo, maximo = self.RANGOS[nombre]
             if not (minimo <= valor <= maximo):
                 raise ValueError(f"{nombre} fuera del rango admitido ({minimo}-{maximo}): {valor}")
-        if pa_sis <= pa_dia:
-            raise ValueError("La presión sistólica debe ser mayor a la diastólica.")
+        self.validar_presion(pa_sis, pa_dia)
 
         self._id_si = id_si
         self._pa_sis = pa_sis
@@ -73,6 +72,15 @@ class SignosVitales:
         self._fr = fr
         self._temp = temp
         self._sato2 = sato2
+
+    @staticmethod
+    def validar_presion(pa_sis, pa_dia):
+        """
+        La única regla que compara dos signos: la sistólica debe ser mayor que la diastólica. La usa el constructor,
+        y también la pantalla para marcar los dos campos de la presión (sin repetir la regla).
+        """
+        if pa_sis <= pa_dia:
+            raise ValueError("La PA sistólica debe ser mayor que la diastólica.")
 
     @property
     def id_si(self): return self._id_si
@@ -246,7 +254,7 @@ class EpisodioEmergencia:
 
     def _exigir_abierto(self, accion: str):
         if self.cerrado:
-            motivo = "anulado" if not self._activo else f"en estado {self._estado}"
+            motivo = "anulado" if not self._activo else f"en estado «{self._estado.texto}»"
             raise ReglaNegocioError(f"No se puede {accion} en un episodio {motivo}.")
 
     def agregar_triaje(self, triaje: Triaje):
@@ -279,7 +287,7 @@ class EpisodioEmergencia:
     def asignar_cama(self):
         """RN-01: solo un episodio en espera de cama y con un triaje activo puede recibir cama."""
         if self._estado != self.ESTADO_EN_ESPERA:
-            raise ReglaNegocioError(f"No se puede asignar cama a un episodio en estado {self._estado}.")
+            raise ReglaNegocioError(f"No se puede asignar cama a un episodio en estado «{self._estado.texto}».")
         if self.obtener_triaje_actual() is None:
             raise ReglaNegocioError("No se puede asignar cama sin un triaje activo (RN-01).")
         self._estado = self.ESTADO_EN_ATENCION
@@ -290,13 +298,14 @@ class EpisodioEmergencia:
         el episodio vuelve a esperar cama. La cama la libera Cama.cancelar_reserva().
         """
         if self._estado != self.ESTADO_EN_ATENCION:
-            raise ReglaNegocioError(f"No se puede cancelar la asignación de un episodio en estado {self._estado}.")
+            raise ReglaNegocioError(
+                f"No se puede cancelar la asignación de un episodio en estado «{self._estado.texto}».")
         self._estado = self.ESTADO_EN_ESPERA
 
     def dar_alta(self):
         """Solo se da de alta a un paciente que está siendo atendido en una cama."""
         if self._estado != self.ESTADO_EN_ATENCION:
-            raise ReglaNegocioError(f"No se puede dar de alta un episodio en estado {self._estado}.")
+            raise ReglaNegocioError(f"No se puede dar de alta un episodio en estado «{self._estado.texto}».")
         self._cerrar(self.ESTADO_ALTA)
 
     def referir(self):
@@ -307,7 +316,8 @@ class EpisodioEmergencia:
         """
         self._exigir_abierto("referir al paciente")
         if self._estado not in (self.ESTADO_EN_ESPERA, self.ESTADO_EN_ATENCION):
-            raise ReglaNegocioError(f"No se puede referir un episodio en estado {self._estado}: falta el triaje.")
+            raise ReglaNegocioError(
+                f"No se puede referir un episodio en estado «{self._estado.texto}»: falta el triaje.")
         self._cerrar(self.ESTADO_REFERIDO)
 
     def registrar_fuga(self):

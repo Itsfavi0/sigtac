@@ -484,6 +484,16 @@ def test_lista_deshabilitada_no_cambia(raiz_tk):
 
 # ---- casilla
 
+def test_ajustar_casilla_parte_el_texto_sin_contar_el_cuadro(raiz_tk):
+    from views.componentes.campos import LADO_CASILLA, SEPARACION_CASILLA, ajustar_casilla
+    caja = casilla(raiz_tk, "Alteración de la Conciencia (Glasgow < 8)")
+    ajustar_casilla(caja, 200)
+    cuadro = caja._apply_widget_scaling(LADO_CASILLA + SEPARACION_CASILLA)
+    assert int(caja._text_label.cget("wraplength")) == 200 - cuadro
+    ajustar_casilla(caja, 10)  # más angosta que el cuadro: no un ancho negativo (Tk lo leería como «sin límite»)
+    assert int(caja._text_label.cget("wraplength")) == 1
+
+
 def test_casilla_se_marca_con_el_teclado_y_avisa(raiz_tk):
     from views.componentes.foco import activar
     cambios = []
@@ -624,6 +634,34 @@ def test_campos_paciente_marcan_el_campo_que_no_se_puede_leer(raiz_tk, preparar,
     assert not getattr(campos, campo)._sigtac_error and campos.fecha_nac.get() == ""
 
 
+def test_campos_paciente_vacios_marcan_todos_a_la_vez(raiz_tk):
+    # No solo el primero: así se ve de una vez todo lo que falta. El mensaje es el del primero (la fecha)
+    campos = CamposPaciente(raiz_tk)
+    campos.cargar_seguros(SEGUROS)
+    with pytest.raises(ValueError, match="La fecha de nacimiento debe tener la forma"):
+        campos.valores()
+    assert campos.fecha_nac._sigtac_error and campos.sexo._sigtac_error and campos.seguro._sigtac_error
+
+
+def test_leer_todos_hace_todas_las_lecturas_y_lanza_el_primer_error(raiz_tk):
+    from views.componentes.campos import leer_todos
+    hechas = []
+
+    def lectura(clave, error=None):
+        def leer():
+            hechas.append(clave)
+            if error:
+                raise ValueError(error)
+            return clave.upper()
+        return leer
+
+    assert leer_todos({"a": lectura("a"), "b": lectura("b")}) == {"a": "A", "b": "B"}
+    hechas.clear()
+    with pytest.raises(ValueError, match="^falta b$"):
+        leer_todos({"a": lectura("a"), "b": lectura("b", "falta b"), "c": lectura("c", "falta c")})
+    assert hechas == ["a", "b", "c"]  # la tercera se leyó (y marcó) aunque la segunda falló
+
+
 def test_campos_paciente_sin_sexo_ni_seguro_al_identificar(raiz_tk):
     from datetime import date
     campos = CamposPaciente(raiz_tk, con_sexo_y_seguro=False)
@@ -761,6 +799,15 @@ def test_una_fecha_mal_escrita_queda_marcada_hasta_que_cambia(raiz_tk):
     assert periodo.hasta._sigtac_error
     escribir_fecha(periodo, periodo.hasta, "28/02/2026")
     assert not periodo.hasta._sigtac_error
+
+
+def test_dos_fechas_mal_escritas_quedan_marcadas_las_dos(raiz_tk):
+    periodo, _ = crear_periodo(raiz_tk)
+    escribir_fecha(periodo, periodo.desde, "1/10")
+    escribir_fecha(periodo, periodo.hasta, "31/02/2026")
+    with pytest.raises(ValueError, match="La fecha inicial"):
+        periodo.leer()
+    assert periodo.desde._sigtac_error and periodo.hasta._sigtac_error
 
 
 def test_rechazar_marca_las_dos_y_al_corregir_se_van(raiz_tk):

@@ -17,13 +17,14 @@ import customtkinter as ctk
 from models.estados import EstadoEpisodio
 from models.excepciones import SigtacError
 from models.triaje import SignosVitales, Triaje
+from utils.numeros import texto_decimal
 from views import formato, tema
 from views.componentes import (BotonPrimario, BotonSecundario, CamposDocumento, CamposPaciente, FichaPaciente,
                                Desplazable, InsigniaNivel, Selector, TablaDatos, Tarjeta, campo_texto, casilla,
                                etiqueta_campo, lista_opciones, marcar_error, marcar_foco, mostrar_error, mostrar_info,
                                texto_nivel)
-from views.componentes.campos import (campo_en_rejilla, leer_campo, leer_opcion, limpiar_al_corregir, lista_en_rejilla,
-                                      sin_error)
+from views.componentes.campos import (ajustar_casilla, campo_en_rejilla, leer_campo, leer_opcion, leer_todos,
+                                      limpiar_al_corregir, lista_en_rejilla, sin_error)
 from views.componentes.paciente import SEXOS
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ AVISO_BUSCAR = "Busque el documento. Si el paciente no está registrado, aquí m
 NO_REGISTRADO = "No hay un paciente con ese documento: complete sus datos para registrarlo."
 TEXTO_CONFIRMAR = "Confirmar nivel"
 TEXTO_SIN_SIGNOS = "Complete los signos vitales"   # el botón deshabilitado dice por qué no responde
+TEXTO_CORREGIR_SIGNOS = "Corrija los signos vitales"  # hay uno escrito que no se puede usar (el aviso dice cuál)
 TEXTO_RECLASIFICAR = "Reclasificar"
 TEXTO_CANCELAR_RECLASIFICACION = "Cancelar reclasificación"
 AGREGA_AL_EPISODIO = "El triaje se agrega a este episodio; no se abre otro."
@@ -58,9 +60,9 @@ TRAS_TRIAJE = {
 
 
 def rango_admitido(clave: str) -> str:
-    """«20–300»: el rango que el modelo admite para ese signo (SignosVitales.RANGOS)."""
+    """«20–300»: el rango que el modelo admite para ese signo (SignosVitales.RANGOS), con coma decimal."""
     minimo, maximo = SignosVitales.RANGOS[clave]
-    return f"{minimo:g}–{maximo:g}"
+    return f"{texto_decimal(minimo)}–{texto_decimal(maximo)}"
 
 
 def texto_faltan(faltan: int) -> str:
@@ -108,6 +110,7 @@ class TriageView(ctk.CTkFrame):
         self._fila_cola = None     # el episodio elegido en la cola: al elegir otro, los datos clínicos se borran
         self._seguros = {}         # nombre del seguro → id_seguro
         self._casillas = {}        # id_sintoma → casilla
+        self._signos_con_error = False  # algún signo escrito no se puede usar: el botón pide corregir, no completar
         self._tarea = None
 
         self.grid_columnconfigure(0, weight=1)
@@ -357,10 +360,20 @@ class TriageView(ctk.CTkFrame):
                 continue
             marcar_error(campo, False)
             signos[clave] = valor
+        if "pa_sis" in signos and "pa_dia" in signos:
+            try:
+                SignosVitales.validar_presion(signos["pa_sis"], signos["pa_dia"])
+            except ValueError as error:
+                # La regla compara dos campos: se marcan los dos, porque el error puede estar en cualquiera
+                for clave in ("pa_sis", "pa_dia"):
+                    marcar_error(self._campos_signos[clave])
+                    del signos[clave]
+                problema = problema or str(error)
         self._avisar_signos(problema)
         return signos if len(signos) == len(SIGNOS) else None
 
     def _avisar_signos(self, problema: str | None):
+        self._signos_con_error = problema is not None
         self._aviso_signos.configure(text=problema or "")
         if problema:
             self._aviso_signos.grid()
@@ -373,6 +386,7 @@ class TriageView(ctk.CTkFrame):
         tarjeta = self._seccion("3. Síntomas", "Marque los que presenta")
         self._lista_sintomas = self._cuerpo(tarjeta)
         self._lista_sintomas.grid_columnconfigure((0, 1), weight=1, uniform="sintomas")
+        self._lista_sintomas.bind("<Configure>", lambda evento: self._ajustar_sintomas(evento.width), add="+")
 
     def _mostrar_sintomas(self, sintomas):
         for i, sintoma in enumerate(sintomas):
@@ -382,6 +396,15 @@ class TriageView(ctk.CTkFrame):
         if not sintomas:
             ctk.CTkLabel(self._lista_sintomas, text="No hay síntomas en el catálogo.", font=tema.fuente("normal"),
                          text_color=tema.COLOR_TEXTO_SECUNDARIO).grid(row=0, column=0, sticky="w")
+
+    def _ajustar_sintomas(self, ancho: int):
+        """
+        Un síntoma que no cabe en su columna se parte en dos líneas (a 1093 de ancho, «Alteración de la Conciencia
+        (Glasgow < 8)» se cortaba). `ancho` es el de la lista, en px de la pantalla; entre columnas queda ESPACIO.
+        """
+        columna = ancho // 2 - round(tema.ESPACIO * tema.escala(self))
+        for caja in self._casillas.values():
+            ajustar_casilla(caja, columna)
 
     def sintomas_elegidos(self) -> list[int]:
         return [id_sintoma for id_sintoma, caja in self._casillas.items() if caja.get()]
@@ -539,14 +562,16 @@ class TriageView(ctk.CTkFrame):
     def _actualizar_acciones(self):
         """
         El botón principal dice qué va a registrar («Confirmar nivel 2»). Deshabilitado dice por qué: faltan los
-        signos, o faltan caracteres de la justificación (RN-10). Así no parece activo sin responder.
+        signos, hay uno que corregir, o faltan caracteres de la justificación (RN-10). Así no parece activo sin
+        responder.
         """
         hay_sugerencia = self._sugerencia is not None
         self._boton_reclasificar.configure(
             text=TEXTO_CANCELAR_RECLASIFICACION if self._reclasificando else TEXTO_RECLASIFICAR,
             state="normal" if hay_sugerencia else "disabled")
         if not hay_sugerencia:
-            self._boton_confirmar.configure(text=TEXTO_SIN_SIGNOS, state="disabled")
+            texto = TEXTO_CORREGIR_SIGNOS if self._signos_con_error else TEXTO_SIN_SIGNOS
+            self._boton_confirmar.configure(text=texto, state="disabled")
             return
         nivel = self.nivel_final() or self._sugerencia.nivel
         faltan = Triaje.MIN_JUSTIFICACION - len(self._texto_justificacion())
@@ -599,10 +624,12 @@ class TriageView(ctk.CTkFrame):
         if self._paciente is not None:
             return self._paciente
         if self._identidad.valor == "nn":
-            sexo = leer_opcion(self._sexo_nn, SEXOS, "Elija el sexo del paciente.")
-            edad = leer_campo(self._edad_nn, lambda texto: formato.leer_numero(texto, "La edad aparente"))
-            seguro = leer_opcion(self._seguro_nn, self._seguros, "Elija el seguro del paciente.")
-            self._paciente = self._pacientes.registrar_no_identificado(sexo, edad, seguro)
+            datos = leer_todos({  # marca a la vez todo lo que falta, no solo lo primero
+                "sexo": lambda: leer_opcion(self._sexo_nn, SEXOS, "Elija el sexo del paciente."),
+                "edad": lambda: leer_campo(self._edad_nn, lambda texto: formato.leer_numero(texto, "La edad aparente")),
+                "seguro": lambda: leer_opcion(self._seguro_nn, self._seguros, "Elija el seguro del paciente."),
+            })
+            self._paciente = self._pacientes.registrar_no_identificado(datos["sexo"], datos["edad"], datos["seguro"])
             return self._paciente
         tipo, numero = self._documento.valores()
         if self._buscado != (tipo, numero.strip()):
