@@ -134,3 +134,11 @@ def test_programa_la_siguiente_actualizacion_y_la_cancela_al_cerrar(crear):
     assert vista._tarea is not None
     vista.destroy()
     assert vista._tarea is None
+
+
+def test_oculto_no_se_actualiza_y_al_volver_lee_y_retoma(crear):
+    vista = crear()
+    vista.al_ocultar()
+    assert vista._tarea is None  # no consulta ni cambia el encabezado de otra pantalla
+    vista.al_mostrar()
+    assert vista._tarea is not None and vista.avisos[-1] is True

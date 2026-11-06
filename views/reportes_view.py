@@ -184,6 +184,10 @@ class ReportesView(ctk.CTkFrame):
 
     # ---- Datos
 
+    def al_mostrar(self):
+        """Al volver a Reportes: relee el período escrito y «Ahora en la guardia», sin diálogo si falla."""
+        self._consultar(avisar_error=False)
+
     def _consultar(self, avisar_error: bool) -> tuple[date, date] | None:
         """
         Lee el período, consulta y muestra. Devuelve el período mostrado, o None si no se pudo: una fecha mal escrita

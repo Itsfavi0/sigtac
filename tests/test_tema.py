@@ -13,7 +13,8 @@ FONDOS = {"superficie": tema.COLOR_SUPERFICIE, "fondo": tema.COLOR_FONDO, "barra
 PARES = [tema.COLOR_FONDO, tema.COLOR_BARRA, tema.COLOR_SUPERFICIE, tema.COLOR_CASILLA, tema.COLOR_ACTIVO,
          tema.COLOR_BORDE, tema.COLOR_BORDE_CAMPO, tema.COLOR_DIVISOR, *TEXTOS.values(), tema.COLOR_PRIMARIO,
          tema.COLOR_PRIMARIO_HOVER, tema.COLOR_PRIMARIO_GRAFICO, tema.COLOR_ALERTA_FONDO, tema.COLOR_SIN_DATO, *tema.COLOR_NIVEL.values(),
-         *tema.COLOR_ESTADO_CAMA.values()]
+         *tema.COLOR_ESTADO_CAMA.values(), *tema.COLOR_FONDO_ESTADO_CAMA.values(),
+         *tema.COLOR_BORDE_ESTADO_CAMA.values()]
 
 
 def test_hay_un_color_por_cada_estado_de_cama():
@@ -60,8 +61,20 @@ def test_el_borde_de_los_campos_se_ve(i, modo):
 
 @pytest.mark.parametrize("i, modo", MODOS)
 @pytest.mark.parametrize("estado", list(EstadoCama))
-def test_el_borde_de_cada_estado_de_cama_se_ve(i, modo, estado):
+def test_el_color_de_cada_estado_de_cama_se_ve(i, modo, estado):
+    # La franja sobre el tinte de su casilla, y la muestra de la leyenda sobre la tarjeta (3:1: indican el estado)
+    assert _contraste(tema.COLOR_ESTADO_CAMA[estado][i], tema.COLOR_FONDO_ESTADO_CAMA[estado][i]) >= 3
     assert _contraste(tema.COLOR_ESTADO_CAMA[estado][i], tema.COLOR_CASILLA[i]) >= 3
+
+
+@pytest.mark.parametrize("i, modo", MODOS)
+@pytest.mark.parametrize("estado", list(EstadoCama))
+def test_el_texto_de_una_casilla_de_cama_se_lee_sobre_su_tinte(i, modo, estado):
+    assert _contraste(tema.COLOR_TEXTO[i], tema.COLOR_FONDO_ESTADO_CAMA[estado][i]) >= 4.5
+
+
+def test_hay_tinte_y_borde_para_cada_estado_de_cama():
+    assert set(tema.COLOR_FONDO_ESTADO_CAMA) == set(tema.COLOR_BORDE_ESTADO_CAMA) == set(EstadoCama)
 
 
 @pytest.mark.parametrize("i, modo", MODOS)
@@ -105,7 +118,7 @@ def test_color_no_valido(fondo):
         color_texto_sobre(fondo)
 
 
-@pytest.mark.parametrize("modo, esperado", [("light", "#F5F5F7"), ("dark", "#242424")])
+@pytest.mark.parametrize("modo, esperado", [("light", "#ECEFF3"), ("dark", "#242424")])
 def test_color_actual_segun_el_modo(monkeypatch, modo, esperado):
     monkeypatch.setattr(ctk, "get_appearance_mode", lambda: modo.capitalize())
     assert tema.color_actual(tema.COLOR_FONDO) == esperado

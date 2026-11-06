@@ -680,6 +680,10 @@ class TriageView(ctk.CTkFrame):
 
     # ---- Datos
 
+    def al_mostrar(self):
+        """Al volver a Triaje: la cola puede haber cambiado. Lo escrito en el formulario se conserva."""
+        self._recargar_cola()
+
     def _cargar_datos(self):
         """Seguros, síntomas y la cola, al abrir. Si la BD falla, un solo aviso; el formulario queda usable."""
         try:

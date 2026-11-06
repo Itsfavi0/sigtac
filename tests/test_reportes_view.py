@@ -6,7 +6,7 @@ import pytest
 
 from controllers.reporte_controller import EstadoGuardia, IndicadoresPeriodo
 from models.estados import EstadoCama, EstadoEpisodio
-from models.excepciones import ConexionBDError, ReporteError
+from models.excepciones import ConexionBDError, PersistenciaError, ReporteError
 from prototipo.demo import ReportesDemo
 from views import reportes_view, tema
 from views.reportes_view import SIN_LECTURA, ReportesView, nombre_archivo
@@ -303,3 +303,13 @@ def test_si_la_bd_falla_al_exportar_el_encabezado_lo_dice(crear, guardar_como, t
     vista.reportes.exportar_pdf.side_effect = ConexionBDError("No hay conexión con la base de datos.")
     vista.exportar()
     assert vista.avisos[-1] is False and len(vista.dialogos["error"]) == 1
+
+
+def test_al_volver_relee_sin_dialogo(crear):
+    vista = crear()
+    leidas = vista.reportes.estado_actual.call_count
+    vista.al_mostrar()
+    assert vista.reportes.estado_actual.call_count == leidas + 1 and vista.avisos[-1] is True
+    vista.reportes.estado_actual.side_effect = PersistenciaError("Sin conexión.")
+    vista.al_mostrar()
+    assert vista.dialogos["error"] == [] and vista.avisos[-1] is False

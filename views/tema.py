@@ -13,6 +13,7 @@ from pathlib import Path
 
 import customtkinter as ctk
 
+from models.estados import EstadoCama
 from utils.colores import ESTADO_CAMA, NIVEL
 
 logger = logging.getLogger(__name__)
@@ -54,33 +55,51 @@ LADO_ICONO_KPI = 16         # el ícono dentro del marcador de un indicador
 LADO_MARCADOR_KPI = 22      # el marcador: el ícono con aire y su borde de 1 px
 
 # ---- Colores: (claro, oscuro)
+# El claro es un gris azulado suave, sin blanco puro ni negro puro: bajo luz fluorescente, el contraste máximo
+# cansa la vista. Los textos siguen sobre 4,5:1 (tests/test_tema.py). El oscuro es el gris neutro del Figma.
 
-COLOR_FONDO = ("#F5F5F7", "#242424")
-COLOR_BARRA = ("#FFFFFF", "#202020")
-COLOR_SUPERFICIE = ("#FFFFFF", "#2B2B2B")      # tarjetas, paneles, tablas
-COLOR_CASILLA = ("#FFFFFF", "#292929")         # fondo de una casilla de cama
-COLOR_ACTIVO = ("#F0F0F2", "#2F2F2F")          # ítem activo, hover, píldoras
-COLOR_BORDE = ("#D9D9DE", "#444444")           # tarjetas y paneles
-COLOR_BORDE_CAMPO = ("#8E8E93", "#757575")     # campos y botones secundarios (3:1 como mínimo)
-COLOR_DIVISOR = ("#E6E6EA", "#383838")         # líneas que separan zonas
-COLOR_TEXTO = ("#1D1D1F", "#EEEEEE")
-COLOR_ETIQUETA = ("#4A4A50", "#A5A5A5")        # etiquetas de campo y títulos de KPI
-COLOR_TEXTO_SECUNDARIO = ("#5F6368", "#A3A3A3")
-COLOR_PLACEHOLDER = ("#6B6B70", "#959595")
-COLOR_PRIMARIO = ("#0A6CDE", "#0A6CDE")        # solo la acción principal y el ítem activo
-COLOR_PRIMARIO_HOVER = ("#0A5CC0", "#0B5FC2")
+COLOR_FONDO = ("#ECEFF3", "#242424")
+COLOR_BARRA = ("#F6F8FA", "#202020")
+COLOR_SUPERFICIE = ("#FAFBFC", "#2B2B2B")      # tarjetas, paneles, tablas
+COLOR_CASILLA = ("#FAFBFC", "#292929")         # fondo de una casilla de cama
+COLOR_ACTIVO = ("#E2E7EE", "#2F2F2F")          # ítem activo, hover, píldoras
+COLOR_BORDE = ("#D3D9E1", "#444444")           # tarjetas y paneles
+COLOR_BORDE_CAMPO = ("#858C97", "#757575")     # campos y botones secundarios (3:1 como mínimo)
+COLOR_DIVISOR = ("#E1E6EC", "#383838")         # líneas que separan zonas
+COLOR_TEXTO = ("#252A31", "#EEEEEE")
+COLOR_ETIQUETA = ("#48515E", "#A5A5A5")        # etiquetas de campo y títulos de KPI
+COLOR_TEXTO_SECUNDARIO = ("#57606D", "#A3A3A3")
+COLOR_PLACEHOLDER = ("#626974", "#959595")
+COLOR_PRIMARIO = ("#2563B8", "#0A6CDE")        # solo la acción principal y el ítem activo
+COLOR_PRIMARIO_HOVER = ("#1E559E", "#0B5FC2")
 # El azul de un ícono, un marcador o el borde de foco (menú activo, indicadores, campos y botones): el primario,
 # aclarado en oscuro para llegar a 3:1 sobre las superficies y el ítem activo. Lo que lleva texto blanco encima
 # (botones, fila elegida) sigue con COLOR_PRIMARIO: ese texto necesita el tono oscuro.
-COLOR_PRIMARIO_GRAFICO = ("#0A6CDE", "#3D8BF2")
+COLOR_PRIMARIO_GRAFICO = ("#2563B8", "#3D8BF2")
 COLOR_TEXTO_SOBRE_PRIMARIO = ("#FFFFFF", "#FFFFFF")
 COLOR_ERROR = ("#C5221F", "#FF6B61")
 COLOR_EXITO = ("#137333", "#34C759")           # «Actualizado», conexión correcta
 COLOR_ALERTA_FONDO = ("#FDECEA", "#302525")    # bloque de una prioridad 1
-COLOR_SIN_DATO = ("#E6E6EA", "#3A3A3A")        # etiqueta de nivel cuando aún no hay triaje
+COLOR_SIN_DATO = ("#E1E6EC", "#3A3A3A")        # etiqueta de nivel cuando aún no hay triaje
 
 COLOR_NIVEL = NIVEL                # nivel de triaje → relleno de su etiqueta
-COLOR_ESTADO_CAMA = ESTADO_CAMA    # EstadoCama → borde de la casilla
+COLOR_ESTADO_CAMA = ESTADO_CAMA    # EstadoCama → franja de la casilla, leyenda e indicadores
+# La casilla de una cama se tiñe con el color de su estado: el 10 % (16 % en oscuro) sobre COLOR_CASILLA, y su borde,
+# el 45 % (50 %). Así el mapa se lee de un vistazo; lo que indica el estado es la franja y el texto
+COLOR_FONDO_ESTADO_CAMA = {
+    EstadoCama.DISPONIBLE: ("#E4F0E9", "#2B4231"),
+    EstadoCama.RESERVADA: ("#EDEAF8", "#41394B"),
+    EstadoCama.OCUPADA: ("#F7E7E6", "#4B2D2C"),
+    EstadoCama.EN_LIMPIEZA: ("#F3ECE3", "#4B4524"),
+    EstadoCama.FUERA_SERVICIO: ("#EDEFF0", "#39393A"),
+}
+COLOR_BORDE_ESTADO_CAMA = {
+    EstadoCama.DISPONIBLE: ("#97CAA7", "#2E7841"),
+    EstadoCama.RESERVADA: ("#C1AEEB", "#745A94"),
+    EstadoCama.OCUPADA: ("#EBA09B", "#943732"),
+    EstadoCama.EN_LIMPIEZA: ("#DABA8B", "#94801A"),
+    EstadoCama.FUERA_SERVICIO: ("#C0C3C7", "#5C5C5E"),
+}
 
 TEXTO_CLARO = "#FFFFFF"
 TEXTO_OSCURO = "#1D1D1F"

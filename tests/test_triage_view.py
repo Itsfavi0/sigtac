@@ -879,3 +879,12 @@ def test_si_la_bd_falla_al_abrir_la_cola_el_contador_no_dice_cero(crear):
     triaje.cola_de_triaje.side_effect = PersistenciaError("No se pudo leer la cola.")
     vista = crear(triaje=triaje)
     assert vista._modo.texto("cola") == "En cola"
+
+
+def test_al_volver_relee_la_cola_y_conserva_lo_medido(crear):
+    vista = crear()
+    escribir_signos(vista)
+    leidas = vista.triaje.cola_de_triaje.call_count
+    vista.al_mostrar()
+    assert vista.triaje.cola_de_triaje.call_count == leidas + 1
+    assert vista.leer_signos() is not None  # lo medido sigue ahí

@@ -55,7 +55,7 @@ def main():
     ventana.geometry(f"{opciones.tamano}+0+0")
     ventana.minsize(*tema.TAMANO_MINIMO)
     principal = AppPrincipal(ventana, AuthController(), sesion_demo(Rol(opciones.rol)), al_cerrar=ventana.destroy,
-                             pantallas=PANTALLAS_DEMO)
+                             pantallas=PANTALLAS_DEMO, precargar=not opciones.captura)
     principal.pack(fill="both", expand=True)
     if opciones.pantalla:
         principal.mostrar(opciones.pantalla)

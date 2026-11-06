@@ -484,3 +484,12 @@ def test_si_la_bd_falla_al_abrir_el_contador_no_dice_cero(crear):
     pacientes.listar_no_identificados.side_effect = PersistenciaError("No se pudo leer la lista.")
     vista = crear(pacientes=pacientes)
     assert vista._modo.texto("nn") == "Sin identificar"
+
+
+def test_al_volver_relee_los_nn_y_conserva_lo_escrito(crear):
+    vista = crear()
+    vista._documento.campo_numero.insert(0, "4812")
+    leidas = vista.pacientes.listar_no_identificados.call_count
+    vista.al_mostrar()
+    assert vista.pacientes.listar_no_identificados.call_count == leidas + 1
+    assert vista._documento.campo_numero.get() == "4812"

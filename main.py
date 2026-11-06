@@ -33,7 +33,7 @@ class Aplicacion:
         self._cambiar(LoginView(self._ventana, self._auth, al_iniciar=self.mostrar_principal))
 
     def mostrar_principal(self, sesion: Sesion):
-        self._cambiar(AppPrincipal(self._ventana, self._auth, sesion, al_cerrar=self.mostrar_login))
+        self._cambiar(AppPrincipal(self._ventana, self._auth, sesion, al_cerrar=self.mostrar_login, precargar=True))
 
     def salir(self):
         """Al cerrar la ventana también se cierra la sesión."""

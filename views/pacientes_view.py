@@ -330,6 +330,10 @@ class PacientesView(ctk.CTkFrame):
 
     # ---- Datos
 
+    def al_mostrar(self):
+        """Al volver a Pacientes: la lista de NN puede haber cambiado. Lo buscado o escrito se conserva."""
+        self._recargar_nn()
+
     def _cargar_datos(self):
         """Los seguros y la lista de NN, al abrir. Si la BD falla, un solo aviso; la búsqueda sigue disponible."""
         try:

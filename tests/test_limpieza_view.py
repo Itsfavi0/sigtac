@@ -94,3 +94,10 @@ def test_una_cama_dada_de_alta_aparece_por_limpiar(raiz_tk, crear):  # RN-07: el
     demo.dar_alta(ocupada.episodio.id_episodio)
     vista = crear(camas=MagicMock(wraps=demo))
     assert filas(vista._tabla)[-1][0] == ocupada.cama.codigo
+
+
+def test_al_volver_relee_las_camas_por_limpiar(crear):
+    vista = crear()
+    leidas = vista.camas.solicitudes_limpieza.call_count
+    vista.al_mostrar()
+    assert vista.camas.solicitudes_limpieza.call_count == leidas + 1 and vista.dialogos["error"] == []

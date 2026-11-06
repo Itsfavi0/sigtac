@@ -77,6 +77,25 @@ def test_recargar_reemplaza_las_camas(raiz_tk):
     assert matriz.cantidad_camas == 1 and len(matriz._grupos) == 1 and matriz._lineas == []
 
 
+def test_las_mismas_camas_se_repintan_sin_rehacer_las_casillas(raiz_tk):
+    # Lo normal al releer el tablero: las camas son las mismas y solo cambia su estado
+    matriz = MatrizCamas(raiz_tk)
+    matriz.cargar([CamaUCI(1, "UCI-01", "UCI", D), CamaUCI(2, "UCI-02", "UCI", O)])
+    casillas = list(matriz._grupos[0][2])
+    matriz.cargar([CamaUCI(1, "UCI-01", "UCI", O), CamaUCI(2, "UCI-02", "UCI", O)])
+    assert matriz._grupos[0][2] == casillas  # las mismas casillas
+    assert [c.cama.estado for c in casillas] == [O, O]
+    assert matriz._grupos[0][3].cget("text") == "0 de 2 libres"
+
+
+def test_otras_camas_rehacen_el_mapa(raiz_tk):
+    matriz = MatrizCamas(raiz_tk)
+    matriz.cargar([CamaUCI(1, "UCI-01", "UCI", D)])
+    antes = matriz._grupos[0][2][0]
+    matriz.cargar([CamaUCI(1, "UCI-01", "UCI", D), CamaUCI(3, "UCI-03", "UCI", D)])  # una cama nueva
+    assert not antes.winfo_exists() and matriz.cantidad_camas == 2
+
+
 def test_con_alto_suficiente_no_hay_barra(raiz_tk):
     matriz = MatrizCamas(raiz_tk)
     matriz.cargar(camas_demo())

@@ -71,6 +71,10 @@ class LimpiezaView(ctk.CTkFrame):
 
     # ---- Datos
 
+    def al_mostrar(self):
+        """Al volver a Limpieza: otra PC pudo dar de alta o confirmar camas."""
+        self._recargar()
+
     def _cargar_datos(self):
         """Al abrir. Si la BD falla, un solo aviso y la lista vacía."""
         try:

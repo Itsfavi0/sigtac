@@ -132,12 +132,24 @@ def test_tarjeta_kpi(raiz_tk):
 
 
 @pytest.mark.parametrize("estado", list(EstadoCama))
-def test_tarjeta_cama_con_el_borde_de_su_estado(raiz_tk, estado):
+def test_tarjeta_cama_con_los_colores_de_su_estado(raiz_tk, estado):
     cama = CamaObservacion(7, "OBS-07", "Observación", estado)
     tarjeta = TarjetaCama(raiz_tk, cama)
-    assert tuple(tarjeta.cget("border_color")) == tema.COLOR_ESTADO_CAMA[estado]
+    assert tuple(tarjeta.cget("fg_color")) == tema.COLOR_FONDO_ESTADO_CAMA[estado]
+    assert tuple(tarjeta.cget("border_color")) == tema.COLOR_BORDE_ESTADO_CAMA[estado]
+    assert tuple(tarjeta._franja.cget("fg_color")) == tema.COLOR_ESTADO_CAMA[estado]
     assert textos(tarjeta) == ["OBS-07", TarjetaCama.texto_estado(estado)]  # el estado va escrito
     assert tarjeta.cama is cama
+
+
+def test_tarjeta_cama_se_vuelve_a_pintar_sin_rehacerse(raiz_tk):
+    tarjeta = TarjetaCama(raiz_tk, CamaObservacion(7, "OBS-07", "Obs", EstadoCama.DISPONIBLE))
+    hijos = tarjeta.winfo_children()
+    otra = CamaObservacion(7, "OBS-07", "Obs", EstadoCama.FUERA_SERVICIO)
+    tarjeta.mostrar(otra)
+    assert tarjeta.winfo_children() == hijos and tarjeta.cama is otra
+    assert tuple(tarjeta.cget("fg_color")) == tema.COLOR_FONDO_ESTADO_CAMA[EstadoCama.FUERA_SERVICIO]
+    assert textos(tarjeta) == ["OBS-07", "F. de servicio"] and tarjeta._codigo.cget("font").cget("overstrike")
 
 
 def test_texto_del_estado_en_la_casilla():

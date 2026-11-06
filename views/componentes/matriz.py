@@ -53,7 +53,7 @@ class MatrizCamas(ctk.CTkFrame):
         self._ventana = self._lienzo.create_window(0, 0, window=self._interior, anchor="nw")
         self._vacio = ctk.CTkLabel(self._interior, text=SIN_CAMAS, font=tema.fuente("normal"),
                                    text_color=tema.COLOR_TEXTO_SECUNDARIO)
-        self._grupos = []    # (marco del grupo, grilla, casillas)
+        self._grupos = []    # (marco del grupo, grilla, casillas, «x de n libres»)
         self._lineas = []
         self._clave = None
         self.filas, self.columnas, self.desplazable = 0, [], False
@@ -65,17 +65,28 @@ class MatrizCamas(ctk.CTkFrame):
     # ---- datos
 
     def cargar(self, camas: Iterable[Cama]):
-        """Reemplaza las camas del mapa, agrupadas por tipo en el orden de ORDEN_TIPOS."""
-        for marco, _, _ in self._grupos:
+        """
+        Muestra las camas, agrupadas por tipo en el orden de ORDEN_TIPOS. Si son las mismas que ya mostraba (lo normal
+        al releer el tablero: solo cambian de estado), repinta las casillas que ya tiene en vez de rehacerlas, que
+        con 36 camas tarda medio segundo.
+        """
+        camas = list(camas)
+        por_tipo = [(tipo, [c for c in camas if type(c) is tipo]) for tipo in ORDEN_TIPOS]
+        por_tipo = [(tipo, del_tipo) for tipo, del_tipo in por_tipo if del_tipo]
+        mostradas = [[casilla.cama.id_cama for casilla in casillas] for _, _, casillas, _ in self._grupos]
+        if self._grupos and mostradas == [[c.id_cama for c in del_tipo] for _, del_tipo in por_tipo]:
+            for (_, del_tipo), (_, _, casillas, libres) in zip(por_tipo, self._grupos):
+                for casilla, cama in zip(casillas, del_tipo):
+                    casilla.mostrar(cama)
+                libres.configure(text=self._texto_libres(del_tipo))
+            return
+        for marco, _, _, _ in self._grupos:
             marco.destroy()
         for linea in self._lineas:
             linea.destroy()
         self._grupos, self._lineas, self._clave = [], [], None
-        camas = list(camas)
-        for tipo in ORDEN_TIPOS:
-            del_tipo = [c for c in camas if type(c) is tipo]
-            if del_tipo:
-                self._grupos.append(self._crear_grupo(tipo.NOMBRE_CORTO, del_tipo))
+        for tipo, del_tipo in por_tipo:
+            self._grupos.append(self._crear_grupo(tipo.NOMBRE_CORTO, del_tipo))
         self._lineas = [ctk.CTkFrame(self._interior, width=1, fg_color=tema.COLOR_DIVISOR, corner_radius=0)
                         for _ in self._grupos[1:]]
         if self._grupos:
@@ -86,7 +97,7 @@ class MatrizCamas(ctk.CTkFrame):
 
     @property
     def cantidad_camas(self) -> int:
-        return sum(len(casillas) for _, _, casillas in self._grupos)
+        return sum(len(casillas) for _, _, casillas, _ in self._grupos)
 
     def _crear_grupo(self, nombre: str, camas: list[Cama]):
         marco = ctk.CTkFrame(self._interior, fg_color="transparent")
@@ -94,13 +105,18 @@ class MatrizCamas(ctk.CTkFrame):
         titulo.pack(fill="x", padx=self.MARGEN, pady=(self.MARGEN - 2, tema.ESPACIO_MINIMO))
         ctk.CTkLabel(titulo, text=nombre, font=tema.fuente("fuerte"), text_color=tema.COLOR_TEXTO,
                      height=17).pack(anchor="w")
-        libres = sum(c.estado == EstadoCama.DISPONIBLE for c in camas)
-        ctk.CTkLabel(titulo, text=f"{libres} de {len(camas)} libres", font=tema.fuente("pequena"),
-                     text_color=tema.COLOR_TEXTO_SECUNDARIO, height=15).pack(anchor="w")
+        libres = ctk.CTkLabel(titulo, text=self._texto_libres(camas), font=tema.fuente("pequena"),
+                              text_color=tema.COLOR_TEXTO_SECUNDARIO, height=15)
+        libres.pack(anchor="w")
         grilla = ctk.CTkFrame(marco, fg_color="transparent")
         grilla.pack(fill="x", padx=(self.MARGEN, self.MARGEN - self.SEPARACION))
         casillas = [TarjetaCama(grilla, cama) for cama in camas]
-        return marco, grilla, casillas
+        return marco, grilla, casillas, libres
+
+    @staticmethod
+    def _texto_libres(camas: list[Cama]) -> str:
+        libres = sum(c.estado == EstadoCama.DISPONIBLE for c in camas)
+        return f"{libres} de {len(camas)} libres"
 
     # ---- disposición
 
@@ -114,7 +130,7 @@ class MatrizCamas(ctk.CTkFrame):
             self._lienzo.itemconfigure(self._ventana, width=max(ancho_real, 1))
             return
         ancho = ancho_real / escala
-        cantidades = [len(casillas) for _, _, casillas in self._grupos]
+        cantidades = [len(casillas) for _, _, casillas, _ in self._grupos]
         filas, columnas = distribuir(cantidades, ancho - len(cantidades) * 2 * self.MARGEN,
                                      self.ANCHO_MINIMO, self.SEPARACION)
         clave = (round(ancho), round(alto_real / escala), tuple(columnas))
@@ -128,7 +144,7 @@ class MatrizCamas(ctk.CTkFrame):
         sobra = max(0.0, ancho - sum(base))
         anchos = [b + sobra * k / sum(columnas) for b, k in zip(base, columnas)]
         x = 0.0
-        for i, ((marco, grilla, casillas), w, k) in enumerate(zip(self._grupos, anchos, columnas)):
+        for i, ((marco, grilla, casillas, _), w, k) in enumerate(zip(self._grupos, anchos, columnas)):
             if i:
                 self._lineas[i - 1].place(relx=x / ancho, y=0, relheight=1)
             marco.place(relx=x / ancho, y=0, relwidth=w / ancho, relheight=1)

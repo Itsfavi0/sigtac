@@ -385,3 +385,13 @@ def test_cambiar_de_opcion_vuelve_a_leer_las_camas(crear):
     lecturas = vista.camas.mapa_camas.call_count
     vista._modo.elegir("mantenimiento")
     assert vista.camas.mapa_camas.call_count == lecturas + 1
+
+
+def test_al_volver_relee_sin_dialogo_aunque_falle(crear):
+    vista = crear()
+    leidas = vista.camas.cola_de_espera.call_count
+    vista.al_mostrar()
+    assert vista.camas.cola_de_espera.call_count == leidas + 1
+    vista.camas.cola_de_espera.side_effect = PersistenciaError("Sin conexión.")
+    vista.al_mostrar()
+    assert vista.dialogos["error"] == []

@@ -17,11 +17,12 @@ NIVEL = {
     5: ("#1967D2", "#0A84FF"),
 }
 
-# Borde de cada estado de cama en la matriz (el estado también va escrito en la casilla: nunca solo color)
+# Color de cada estado de cama: la franja de su casilla en la matriz, la leyenda y los indicadores (el estado también
+# va escrito en la casilla: nunca solo color)
 ESTADO_CAMA = {
     EstadoCama.DISPONIBLE: ("#1E8E3E", "#34C759"),
     EstadoCama.RESERVADA: ("#7B4FD6", "#BF8CFF"),
     EstadoCama.OCUPADA: ("#D93025", "#FF453A"),
     EstadoCama.EN_LIMPIEZA: ("#B26A00", "#FFD60A"),
-    EstadoCama.FUERA_SERVICIO: ("#8E8E93", "#8E8E93"),
+    EstadoCama.FUERA_SERVICIO: ("#7A7F87", "#8E8E93"),
 }

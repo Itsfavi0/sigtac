@@ -340,6 +340,10 @@ class GestionCamasView(ctk.CTkFrame):
 
     # ---- Datos
 
+    def al_mostrar(self):
+        """Al volver a Gestión de camas: relee las listas, sin diálogo, y conserva lo elegido si sigue."""
+        self._recargar(conservar=True)
+
     def _operar(self, operacion, exito):
         """
         Una operación del controlador. Si falla (p. ej. otra PC cambió la cama), se avisa y se recarga conservando la

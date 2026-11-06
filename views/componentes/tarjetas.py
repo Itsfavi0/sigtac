@@ -103,22 +103,43 @@ class TarjetaKPI(ctk.CTkFrame):
 
 class TarjetaCama(ctk.CTkFrame):
     """
-    Una casilla del mapa: el código y el estado escritos, con el borde del color del estado (como en el Figma).
-    Una cama fuera de servicio lleva el código tachado. El ancho lo decide la matriz que la contiene.
+    Una casilla del mapa: el código y el estado escritos, sobre un fondo teñido del color del estado y con una franja
+    de ese color a la izquierda, para leer el mapa de un vistazo. Una cama fuera de servicio lleva el código tachado.
+    El ancho lo decide la matriz que la contiene.
     """
 
     ALTO = 40
+    ANCHO_FRANJA = 4
+    X_FRANJA = 3   # dentro del borde, con 2 px de aire
+    TEXTO_X = tema.ESPACIO + 5  # después de la franja, con el mismo aire que antes tenía el texto junto al borde
 
     def __init__(self, padre, cama: Cama):
-        super().__init__(padre, height=self.ALTO, corner_radius=tema.RADIO_CONTROL, fg_color=tema.COLOR_CASILLA,
-                         border_width=1, border_color=tema.COLOR_ESTADO_CAMA[cama.estado])
+        super().__init__(padre, height=self.ALTO, corner_radius=tema.RADIO_CONTROL, border_width=tema.GROSOR_BORDE)
         self.pack_propagate(False)
-        self._cama = cama
+        self._cama = None
+        self._franja = ctk.CTkFrame(self, width=self.ANCHO_FRANJA, corner_radius=self.ANCHO_FRANJA // 2)
+        self._franja.place(x=self.X_FRANJA, rely=0.15, relheight=0.7)
+        self._codigo = ctk.CTkLabel(self, text="", font=tema.fuente("codigo"), text_color=tema.COLOR_TEXTO, height=16)
+        self._codigo.pack(anchor="w", padx=self.TEXTO_X, pady=(3, 0))
+        self._estado = ctk.CTkLabel(self, text="", font=tema.fuente("pequena"), text_color=tema.COLOR_TEXTO,
+                                    height=15)
+        self._estado.pack(anchor="w", padx=self.TEXTO_X)
+        self.mostrar(cama)
+
+    def mostrar(self, cama: Cama):
+        """
+        Pinta la cama (otra, o la misma con otro estado) sin rehacer la casilla: el tablero se relee cada 30 s y así no
+        reconstruye las casillas cada vez. Si la cama sigue igual, no repinta nada (cada repintado redibuja la casilla).
+        """
+        anterior, self._cama = self._cama, cama
+        if anterior is not None and (anterior.codigo, anterior.estado) == (cama.codigo, cama.estado):
+            return
+        self.configure(fg_color=tema.COLOR_FONDO_ESTADO_CAMA[cama.estado],
+                       border_color=tema.COLOR_BORDE_ESTADO_CAMA[cama.estado])
+        self._franja.configure(fg_color=tema.COLOR_ESTADO_CAMA[cama.estado])
         fuera = cama.estado == EstadoCama.FUERA_SERVICIO
-        ctk.CTkLabel(self, text=cama.codigo, font=tema.fuente("codigo", tachada=fuera), text_color=tema.COLOR_TEXTO,
-                     height=16).pack(anchor="w", padx=tema.ESPACIO + 1, pady=(3, 0))
-        ctk.CTkLabel(self, text=self.texto_estado(cama.estado), font=tema.fuente("pequena"),
-                     text_color=tema.COLOR_TEXTO_SECUNDARIO, height=15).pack(anchor="w", padx=tema.ESPACIO + 1)
+        self._codigo.configure(text=cama.codigo, font=tema.fuente("codigo", tachada=fuera))
+        self._estado.configure(text=self.texto_estado(cama.estado))
 
     @staticmethod
     def texto_estado(estado: EstadoCama) -> str:

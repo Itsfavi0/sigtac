@@ -83,7 +83,8 @@ class DashboardView(ctk.CTkFrame):
             for estado in EstadoCama:
                 ctk.CTkFrame(caja, width=tema.MUESTRA_LEYENDA[0], height=tema.MUESTRA_LEYENDA[1],
                              corner_radius=tema.RADIO_MUESTRA,
-                             fg_color="transparent", border_width=1, border_color=tema.COLOR_ESTADO_CAMA[estado]).pack(
+                             fg_color=tema.COLOR_FONDO_ESTADO_CAMA[estado], border_width=1,
+                             border_color=tema.COLOR_ESTADO_CAMA[estado]).pack(
                     side="left", padx=(tema.ESPACIO_MEDIO, tema.ESPACIO_MINIMO))
                 ctk.CTkLabel(caja, text=formato.texto_estado_cama(estado), font=tema.fuente("pequena"),
                              text_color=tema.COLOR_TEXTO_SECUNDARIO).pack(side="left")
@@ -207,6 +208,16 @@ class DashboardView(ctk.CTkFrame):
             self._mostrar_cola()
 
     # ---- ciclo de actualización
+
+    def al_mostrar(self):
+        """Al volver al tablero (la ventana principal lo conserva): lee ya y retoma la actualización cada 30 s."""
+        self.refrescar()
+
+    def al_ocultar(self):
+        """Oculto no se actualiza: no consulta la BD ni cambia el encabezado de la pantalla visible."""
+        if self._tarea is not None:
+            self.after_cancel(self._tarea)
+            self._tarea = None
 
     def _avisar(self, correcto: bool):
         if self._al_actualizar is not None:

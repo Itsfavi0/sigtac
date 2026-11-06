@@ -602,6 +602,10 @@ class AdminView(ctk.CTkFrame):
 
     # ---- Datos
 
+    def al_mostrar(self):
+        """Al volver a Administración: relee cuentas y empleados, sin diálogo, y conserva lo elegido si sigue."""
+        self._recargar(conservar=True)
+
     def _operar(self, operacion, exito: str):
         """
         Una operación sobre la cuenta elegida. Si falla (p. ej. es la propia cuenta), se avisa y se recarga conservando

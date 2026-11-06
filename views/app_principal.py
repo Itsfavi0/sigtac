@@ -6,6 +6,12 @@ encabezado del módulo (título, qué muestra, hora de actualización, fecha y r
 Cada pantalla se registra en PANTALLAS con una función crear(padre, sesion, principal) que devuelve su marco. Todos
 los módulos tienen la suya (hay una prueba que lo exige); un módulo sin pantalla, como en las pruebas que pasan
 `pantallas`, muestra un aviso.
+
+Una pantalla se construye una sola vez por sesión: al cambiar de módulo se oculta, y al volver se muestra como quedó
+(un triaje a medio escribir sigue ahí). Construir una tarda de 0,3 a 0,8 s; mostrarla ya construida, casi nada. Con
+`precargar`, las del menú se construyen ocultas después de abrir la primera, una por vez. Una pantalla puede tener
+`al_mostrar()` (al volver a ella: relee sus datos sin diálogo) y `al_ocultar()` (p. ej. detener una actualización
+automática).
 """
 import tkinter as tk
 from collections.abc import Callable
@@ -133,9 +139,11 @@ class AppPrincipal(ctk.CTkFrame):
     """
 
     MS_RELOJ = 1000
+    MS_ANTES_DE_PRECARGAR = 500  # que la primera pantalla termine de dibujarse antes de construir las otras
+    MS_ENTRE_PRECARGAS = 50      # entre una pantalla y la siguiente: deja pasar los clics del usuario
 
     def __init__(self, padre, auth: AuthController, sesion: Sesion, al_cerrar,
-                 pantallas: dict[str, Callable] | None = None):
+                 pantallas: dict[str, Callable] | None = None, precargar: bool = False):
         super().__init__(padre, fg_color=tema.COLOR_FONDO, corner_radius=0)
         self._auth = auth
         self._sesion = sesion
@@ -146,7 +154,11 @@ class AppPrincipal(ctk.CTkFrame):
         self._divisores = []
         self._actual = None
         self._pantalla = None
+        self._guardadas = {}       # clave → pantalla ya construida: volver a ella no la reconstruye
+        self._precargando = False  # se construye una pantalla oculta: su aviso de actualización no va al encabezado
+        self._sin_conexion = False  # la última lectura falló: no se precarga (cada pantalla abriría un diálogo)
         self._tarea_reloj = None
+        self._tarea_precarga = None
 
         self.grid_columnconfigure(2, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -161,6 +173,8 @@ class AppPrincipal(ctk.CTkFrame):
         self._actualizar_reloj()
         if self._modulos:
             self.mostrar(self._modulos[0].clave)
+            if precargar:
+                self._tarea_precarga = self.after(self.MS_ANTES_DE_PRECARGAR, self._precargar)
         else:
             self._mostrar_aviso(TEXTO_SIN_MODULOS)
 
@@ -279,7 +293,13 @@ class AppPrincipal(ctk.CTkFrame):
         self._actualizado.configure(text=f"{PUNTO} {SIN_CONEXION}", text_color=tema.COLOR_ERROR)
 
     def informar_actualizacion(self, correcta: bool, momento: datetime):
-        """El aviso que reciben las pantallas que se actualizan solas (al_actualizar del tablero)."""
+        """
+        El aviso que reciben las pantallas que se actualizan solas (al_actualizar del tablero y de reportes). El de
+        una pantalla que se precarga no se muestra: el encabezado es de la pantalla visible.
+        """
+        self._sin_conexion = not correcta
+        if self._precargando:
+            return
         if correcta:
             self.marcar_actualizado(momento)
         else:
@@ -308,8 +328,43 @@ class AppPrincipal(ctk.CTkFrame):
         crear = self._pantallas.get(clave)
         if crear is None:
             self._mostrar_aviso(TEXTO_PENDIENTE)
-        else:
-            self._colocar(crear(self._contenido, self._sesion, self))
+            return
+        guardada = self._guardadas.get(clave)
+        if guardada is None:
+            self._colocar(self._guardar(clave, crear))
+            return
+        self._colocar(guardada)
+        al_mostrar = getattr(guardada, "al_mostrar", None)
+        if al_mostrar is not None:
+            al_mostrar()  # se construyó antes: sus datos pueden haber cambiado
+
+    def _guardar(self, clave: str, crear: Callable):
+        pantalla = self._guardadas[clave] = crear(self._contenido, self._sesion, self)
+        return pantalla
+
+    def _precargar(self):
+        """
+        Construye, oculta, la siguiente pantalla del menú que aún no existe, y programa la que sigue. Una por vez:
+        entre una y otra pasan los clics del usuario. Se detiene si la base de datos no respondió.
+        """
+        if self._tarea_precarga is not None:
+            self.after_cancel(self._tarea_precarga)  # llamado antes de su hora: que no corra dos veces
+            self._tarea_precarga = None
+        pendiente = next((m.clave for m in self._modulos
+                          if m.clave not in self._guardadas and m.clave in self._pantallas), None)
+        if pendiente is None or self._sin_conexion:
+            return
+        foco = self.focus_get()
+        self._precargando = True
+        try:
+            self._guardar(pendiente, self._pantallas[pendiente])
+        finally:
+            self._precargando = False
+        if foco is not None:
+            # Una pantalla pone el foco en su primer campo al construirse (after_idle); oculta, no debe quitárselo a
+            # la visible. Este after_idle corre después del suyo
+            self.after_idle(lambda: foco.winfo_exists() and foco.focus_set())
+        self._tarea_precarga = self.after(self.MS_ENTRE_PRECARGAS, self._precargar)
 
     def _marcar_item(self, clave: str, activo: bool):
         boton, indicador = self._items[clave]
@@ -324,8 +379,16 @@ class AppPrincipal(ctk.CTkFrame):
                                    text_color=tema.COLOR_TEXTO_SECUNDARIO))
 
     def _colocar(self, pantalla):
-        if self._pantalla is not None:
-            self._pantalla.destroy()
+        """Muestra `pantalla`. La anterior se oculta si es de un módulo (se reutiliza) o se destruye si es un aviso."""
+        anterior = self._pantalla
+        if anterior is not None and anterior is not pantalla:
+            if any(anterior is guardada for guardada in self._guardadas.values()):
+                anterior.pack_forget()
+                al_ocultar = getattr(anterior, "al_ocultar", None)
+                if al_ocultar is not None:
+                    al_ocultar()
+            else:
+                anterior.destroy()
         self._pantalla = pantalla
         pantalla.pack(fill="both", expand=True)
 
@@ -371,7 +434,8 @@ class AppPrincipal(ctk.CTkFrame):
         self._al_cerrar()
 
     def destroy(self):
-        if self._tarea_reloj is not None:
-            self.after_cancel(self._tarea_reloj)
-            self._tarea_reloj = None
+        for tarea in (self._tarea_reloj, self._tarea_precarga):
+            if tarea is not None:
+                self.after_cancel(tarea)
+        self._tarea_reloj = self._tarea_precarga = None
         super().destroy()

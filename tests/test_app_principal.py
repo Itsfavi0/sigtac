@@ -112,8 +112,89 @@ def test_la_pantalla_registrada_se_crea_con_la_sesion_y_reemplaza_a_la_anterior(
     primera = vista._pantalla
     vista.mostrar("triaje")
     assert [(s, p) for _, s, p in creadas] == [(sesion, vista), (sesion, vista)]
-    assert not primera.winfo_exists()  # la pantalla anterior se destruye
+    assert primera.winfo_exists() and not primera.winfo_manager()  # la anterior se oculta, no se destruye
     assert vista._pantalla is creadas[1][0]
+
+
+class PantallaQueAnota(ctk.CTkFrame):
+    """Una pantalla con los avisos opcionales al mostrarse y al ocultarse."""
+
+    def __init__(self, padre, anotados, clave):
+        super().__init__(padre)
+        self.anotados, self.clave = anotados, clave
+        anotados.append(("creada", clave))
+
+    def al_mostrar(self):
+        self.anotados.append(("mostrada", self.clave))
+
+    def al_ocultar(self):
+        self.anotados.append(("oculta", self.clave))
+
+
+def _pantallas_que_anotan(anotados, claves=("tablero", "triaje", "pacientes")):
+    return {clave: (lambda padre, sesion, principal, clave=clave: PantallaQueAnota(padre, anotados, clave))
+            for clave in claves}
+
+
+def test_volver_a_un_modulo_no_reconstruye_su_pantalla_y_le_avisa(raiz_tk, sesion_de):
+    anotados = []
+    vista, _, _ = crear(raiz_tk, sesion_de(Rol.ENFERMERO), pantallas=_pantallas_que_anotan(anotados))
+    tablero = vista._pantalla
+    vista.mostrar("triaje")
+    vista.mostrar("tablero")
+    assert vista._pantalla is tablero and tablero.winfo_manager() == "pack"
+    # La nueva se construye antes de ocultar la anterior (mientras tanto se ve la anterior, no un hueco). Recién
+    # creada no se avisa (acaba de leer sus datos); al volver, sí
+    assert anotados == [("creada", "tablero"), ("creada", "triaje"), ("oculta", "tablero"), ("oculta", "triaje"),
+                        ("mostrada", "tablero")]
+
+
+def test_el_aviso_de_un_modulo_sin_pantalla_se_destruye_al_salir(raiz_tk, sesion_de):
+    anotados = []
+    vista, _, _ = crear(raiz_tk, sesion_de(Rol.ENFERMERO), pantallas=_pantallas_que_anotan(anotados, ("triaje",)))
+    aviso = vista._pantalla  # el tablero no tiene pantalla en este registro
+    vista.mostrar("triaje")
+    assert not aviso.winfo_exists()
+
+
+def test_precargar_construye_las_demas_ocultas_y_sin_tocar_el_encabezado(raiz_tk, sesion_de):
+    anotados = []
+    vista = AppPrincipal(raiz_tk, MagicMock(spec=AuthController), sesion_de(Rol.ENFERMERO), MagicMock(),
+                         pantallas=_pantallas_que_anotan(anotados), precargar=True)
+    vista.marcar_actualizado(datetime(2026, 10, 27, 10, 42))
+    vista._precargando = True  # lo que pasa mientras se construye una oculta que avisa (p. ej. reportes)
+    vista.informar_actualizacion(False, datetime(2026, 10, 27, 10, 43))
+    assert vista._actualizado.cget("text") == "● Actualizado 10:42"
+    vista._precargando = False
+    vista._sin_conexion = False
+    vista._precargar()
+    vista._precargar()
+    assert anotados == [("creada", "tablero"), ("creada", "triaje"), ("creada", "pacientes")]
+    assert all(not vista._guardadas[c].winfo_manager() for c in ("triaje", "pacientes"))
+    assert vista._pantalla is vista._guardadas["tablero"]
+    vista._precargar()  # ya no queda ninguna: no programa otra
+    assert vista._tarea_precarga is None
+    vista.mostrar("triaje")  # ya construida: solo se muestra
+    assert anotados[-2:] == [("oculta", "tablero"), ("mostrada", "triaje")]
+    vista.destroy()
+
+
+def test_sin_conexion_no_se_precarga(raiz_tk, sesion_de):
+    # Cada pantalla abriría su propio diálogo de error
+    anotados = []
+    vista, _, _ = crear(raiz_tk, sesion_de(Rol.ENFERMERO), pantallas=_pantallas_que_anotan(anotados))
+    vista.informar_actualizacion(False, datetime(2026, 10, 27, 10, 42))
+    vista._precargar()
+    assert anotados == [("creada", "tablero")]
+
+
+def test_cerrar_la_ventana_cancela_la_precarga(raiz_tk, sesion_de):
+    vista = AppPrincipal(raiz_tk, MagicMock(spec=AuthController), sesion_de(Rol.ENFERMERO), MagicMock(),
+                         pantallas={}, precargar=True)
+    tarea = vista._tarea_precarga
+    assert tarea is not None
+    vista.destroy()
+    assert tarea not in vista.tk.call("after", "info")
 
 
 def test_no_se_puede_abrir_un_modulo_que_el_rol_no_tiene(raiz_tk, sesion_de):

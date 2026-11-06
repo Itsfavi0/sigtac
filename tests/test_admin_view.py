@@ -549,3 +549,10 @@ def test_la_propia_cuenta_no_ofrece_desactivar_ni_cambiar_el_rol(raiz_tk, dialog
     vista._tabla_cuentas.seleccionar(2)
     raiz_tk.update()
     assert vista._boton_acceso.cget("state") == "normal"
+
+
+def test_al_volver_relee_las_cuentas(crear):
+    vista = crear()
+    leidas = vista.admin.listar_cuentas.call_count
+    vista.al_mostrar()
+    assert vista.admin.listar_cuentas.call_count == leidas + 1 and vista.dialogos["error"] == []
