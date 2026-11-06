@@ -47,8 +47,9 @@
 
 ### Tarea actual
 
-Fase 7 en curso: revisión de tester hecha, y corregidos sus 3 problemas y sus detalles menores. Hechos además la paleta más suave, las casillas de cama con tinte y el cambio de pantalla rápido. Gestión de camas, rediseñada. Siguen: decidir en equipo el aspecto del botón deshabilitado y preparar la sustentación. Cada pantalla nueva se registra en `views/app_principal.py` (`PANTALLAS`) y en `prototipo/ver.py` (`PANTALLAS_DEMO`).
-`scripts/verificar_controladores.py` contra MySQL (2026-11-06, ejecutado por el usuario): **97 de 97 comprobaciones correctas**, con el PDF, los criterios y `pacientes_con_cama`.
+Fase 7 en curso. Hecho: la revisión de tester (y sus correcciones), la paleta más suave, las casillas de cama con tinte, el cambio de pantalla rápido y Gestión de camas rediseñada. `scripts/verificar_controladores.py` contra MySQL (2026-11-06, ejecutado por el usuario): **97 de 97 comprobaciones correctas**. Todo está en `main` y subido a GitHub.
+
+**Lo que sigue está en «Para retomar»**, más abajo.
 
 ---
 
@@ -173,11 +174,29 @@ Ninguno bloqueante. Las decisiones menores están en "Pendientes conocidos".
 
 ---
 
-## Próximo trabajo previsto
+## Para retomar (próximo trabajo previsto)
 
-1. Validar con el equipo la matriz de permisos (`models/permisos.py`; ver CHANGELOG del 2026-10-21 y 2026-10-26).
-2. Fase 7: preparar la sustentación (demo del flujo completo y matriz de pruebas). La integración desde las vistas ya se recorrió en la revisión de tester.
-3. Decidir en equipo si el botón principal deshabilitado debe verse distinto (hoy se ve igual; su texto dice qué falta).
+Al empezar una sesión: leer `CLAUDE.md`, esta sección y las dos o tres primeras entradas de `docs/CHANGELOG.md`
+(las más recientes, con sus «Pendientes»). Comprobar con `python -m pytest` que todo pasa antes de cambiar nada.
+
+1. **Preparar la sustentación** (entrega: 19/12/2026):
+   - **Guion de la demo:**
+     - el flujo de `PRODUCT.md` («Operating Context»): login → registrar paciente → triaje → cola → asignar cama → alta → limpieza → indicadores y PDF;
+     - con qué rol se hace cada paso (las cuentas de prueba están en `db_scripts/seed.sql`);
+     - mostrar también el rechazo de una regla (RN-10 sin justificación, o una cama tomada por otra PC).
+   - **Tabla de pruebas:** los 13 casos de la Fase 7 en `DEVELOPMENT_PLAN.md` (todos pasaron en la revisión de tester del 2026-11-05; el detalle está en el CHANGELOG de ese día). Sumar el número de pruebas automáticas y el 97 de 97 de `verificar_controladores.py`.
+   - **Antes de la demo,** volver a cargar `db_scripts/seed.sql` en `sigtac_db`. Quedaron datos de la revisión («Prueba QA Tester Sigtac», un NN fusionado, un episodio abierto de Rosa Mendoza y una cuenta para el empleado 55555555). Lo ejecuta el usuario con su cuenta de administrador.
+2. **Decidir en equipo el botón principal deshabilitado:**
+   - hoy se ve igual que el habilitado; es una decisión del 2026-10-30: su texto dice qué falta, p. ej. «Complete los signos vitales»;
+   - si se cambia, el lugar es `BotonPrimario` (`views/componentes/botones.py`, `text_color_disabled`) y una prueba de `tests/test_triage_view.py` (`test_al_abrir_no_hay_sugerencia_y_el_boton_dice_por_que`);
+   - afecta a todas las pantallas.
+3. **Validar con el equipo la matriz de permisos** (`models/permisos.py`; ver CHANGELOG del 2026-10-21 y 2026-10-26): si el enfermero puede registrar una fuga, y que la baja de pacientes sea solo del administrador.
+4. **Opcional, si hay tiempo:**
+   - dar a Limpieza el estilo de Gestión de camas: casillas elegibles con `ListaSeleccion`, en `views/componentes/seleccion.py`;
+   - actualizar `db_scripts/diagrama.png` (ver «Pendientes conocidos»).
+
+Para revisar cómo se ve una pantalla sin MySQL: `python -m prototipo.ver --pantalla camas --tamano 1093x614 --captura salida.png`
+(también `--modo oscuro` y `--rol "Enfermero de Triaje"`). El tamaño mínimo que debe soportar es 1093×540.
 
 Respecto al plan original, `auditoria_dao.py` se hizo antes que `triaje_dao.py` y `asignacion_dao.py` porque es de una sola tabla y no depende de transacciones (ver `CHANGELOG.md` del 2026-10-12).
 

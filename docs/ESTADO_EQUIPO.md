@@ -90,5 +90,10 @@ Si alguien usa la base de la PC donde se hicieron las pruebas, conviene volver a
 
 ## Próximos pasos
 
-1. Decidir el aspecto del botón deshabilitado.
-2. Preparar la sustentación: la demo del flujo completo y la tabla de pruebas.
+1. Preparar la sustentación (entrega: 19/12): el guion de la demo del flujo completo y la tabla de pruebas.
+2. Antes de la demo, volver a cargar `seed.sql` en la base, para borrar los datos que dejó la revisión.
+3. Decidir en equipo:
+   - el aspecto del botón deshabilitado (hoy se ve igual que el habilitado; su texto dice qué falta);
+   - los permisos: ¿el enfermero puede registrar una fuga?
+
+El detalle de cada paso, para quien siga trabajando, está en `docs/PROJECT_STATUS.md` («Para retomar»).
