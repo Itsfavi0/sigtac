@@ -176,6 +176,14 @@ RN-10: reclasificar exige justificación escrita (≥ 10 caracteres) · RN-11: b
   una sola ventana Tk por sesión, porque crear una por prueba falla de forma intermitente.
   `tests/test_capas.py` impide que `views/` o `main.py` importen `dao` o `mysql`.
 
+## Agentes
+
+- Se pueden usar sin preguntar en dos casos:
+  - para revisar de forma independiente un cambio de interfaz o de varias capas antes de darlo por terminado;
+  - para búsquedas amplias en el repositorio.
+- Para lo demás se trabaja directo: un agente empieza sin el contexto de la conversación y cuesta más.
+- Al terminar se informa qué agentes se usaron y qué encontraron.
+
 ## Git
 
 - Commits al estilo `tipo(ámbito): mensaje` en español (`feat`, `fix`, `docs`, `test`, `refactor`), uno por cambio lógico.
