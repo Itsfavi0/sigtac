@@ -5,6 +5,55 @@
 
 ---
 
+## [2026-11-06] — Fase 7: detalles menores de la revisión de tester
+
+### Cambio
+- **Mensajes sin nombres técnicos:**
+  - los errores de estado dicen «en estado «En atención (con cama)»», no «EN ATENCIÓN (CON CAMA)» (`EpisodioEmergencia`, `Cama`, y los de concurrencia de `CamaDAO` y `EpisodioDAO`, con `EstadoX.texto`);
+  - un texto obligatorio vacío dice «Los nombres son obligatorios.», no «nombres es obligatorio.». `_validar_texto` (`models/persona.py`) recibe el mensaje completo;
+  - el filtro y la columna «Tabla» de la bitácora dicen «Síntoma», «Área», «Episodio de emergencia»… (`NOMBRES_TABLA` en `admin_view.py`).
+- **Trato de usted en el PDF:** «Compruebe que la carpeta exista…» e «Indique dónde guardar el reporte.».
+- **Sin género supuesto:** «Se dio de baja a Carmen Rojas Llanos.» y «Se reactivó a…» (antes «quedó dado de baja» y «fue reactivado»).
+- **Coma decimal** en todo lo que lee el usuario: el PDF («45,5 min», «37,5 %»), los criterios del triaje («Temperatura 39,5 °C ≥ 39,5 °C») y los rangos de los signos («25–45»). Un solo dueño: `utils/numeros.py` (`texto_decimal`), que usan el modelo, la vista y el PDF.
+- **Síntomas largos:** «Alteración de la Conciencia (Glasgow < 8)» y «Dificultad Respiratoria Severa (Disnea)» se parten en dos líneas en lugar de cortarse a 1093 de ancho (`ajustar_casilla` en `campos.py`; Triaje la aplica al cambiar el ancho de la lista).
+- **Todos los errores a la vez:** al confirmar sin datos se marcan todos los campos que no se pueden leer, no solo el primero; el mensaje sigue siendo el del primero. `leer_todos` (`campos.py`) lo usan `CamposPaciente` (Triaje y Pacientes), el paciente sin identificar del Triaje y `CamposPeriodo` (Reportes y Bitácora).
+- **PA diastólica ≥ sistólica:** se marcan los dos campos de la presión y se explica bajo los signos («La PA sistólica debe ser mayor que la diastólica.»). La regla sigue siendo del modelo: `SignosVitales.validar_presion`, que también usa el constructor.
+- **El botón de Triaje distingue faltar de estar mal:** «Corrija los signos vitales» si hay uno inválido, «Complete los signos vitales» si falta alguno.
+- **Tablero:** el cuarto indicador del jefe de guardia se llama «Asignación de cama» (antes «Espera de cama»), con la nota «hoy».
+- **Ventana principal:** el aviso de un módulo sin pantalla dice «Esta pantalla no está disponible.» (decía «se agrega en el siguiente paso de la Fase 6»), y su docstring y comentario ya no hablan de pantallas pendientes.
+- **Una prueba dependía del zoom de Windows:** `test_sin_barra_el_formulario...` (Triaje) comparaba el margen sin escala y fallaba al 125 %, también con el código anterior. Ahora lo compara con la escala real.
+
+### Archivos afectados
+- `utils/numeros.py` (nuevo), `utils/pdf_generator.py`
+- `models/persona.py`, `models/triaje.py`, `models/cama.py`, `models/estrategias.py`
+- `dao/cama_dao.py`, `dao/episodio_dao.py` (solo el texto del error)
+- `views/triage_view.py`, `views/dashboard_view.py`, `views/admin_view.py`, `views/app_principal.py`, `views/reportes_view.py` (un comentario)
+- `views/componentes/campos.py`, `views/componentes/paciente.py`, `views/componentes/periodo.py`
+- Pruebas: `test_numeros.py` (nueva), `test_estrategias.py`, `test_pdf_generator.py`, `test_persona.py`, `test_triaje.py`, `test_cama.py`, `test_triaje_controller.py`, `test_admin_view.py`, `test_componentes.py`, `test_triage_view.py`, `test_dashboard_view.py`
+- `docs/`
+
+### Motivo
+Cerrar los detalles menores que dejó la revisión de tester del 2026-11-05: mensajes que el usuario lee con nombres internos o con otro trato, números en otro formato que el resto de la app y formularios que no muestran de una vez todo lo que hay que corregir.
+
+### Impacto
+- Pruebas: **2161 pasan** (antes 2136).
+- Sin cambios de esquema ni de controladores. Un método nuevo del modelo (`SignosVitales.validar_presion`), con la misma regla de antes.
+- **Cambios visibles:** los textos de arriba, la coma decimal, los síntomas en dos líneas, todos los campos con error marcados a la vez y el título del indicador del tablero.
+
+### Decisiones
+- **Coma decimal en todo, no solo en el PDF:** el tester lo vio en el PDF, pero la pantalla también mostraba punto («Temperatura 39.5 °C»). Un mismo dato se lee igual en los dos. Los campos siguen aceptando coma y punto (`formato.leer_numero`). La función vive en `utils/` porque la usan `models/`, `views/` y el PDF, como `utils/colores.py`.
+- **Los nombres vacíos no se marcan en la pantalla:** `CamposPaciente` solo lee lo escrito; que sean obligatorios lo decide el modelo, que ahora lo dice en castellano. Marcarlos en la vista repetiría esa regla.
+- **La PA se valida en la vista llamando al modelo** (`validar_presion`), no copiando la comparación: así la vista sabe qué dos campos marcar y la regla tiene un solo dueño.
+- **«Asignación de cama» y la nota «hoy»:** el valor es el promedio de quienes ya recibieron cama hoy, no la espera de quien sigue en la cola. Se probaron «Espera promedio de cama», «Demora en asignar cama» y la nota «asignadas hoy»: a 1093×614 se cortaban (medido con capturas, también con «2 h 05 min», el valor más ancho). Reportes conserva «Espera de cama»: allí la línea de arriba ya dice que son promedios del período y no hay una cola al lado.
+- **El aviso de un módulo sin pantalla se conserva:** las pruebas de la ventana principal pasan `pantallas={}` para no construir pantallas reales.
+
+### Pendientes
+- **El botón principal deshabilitado se ve igual que el habilitado:** sigue como se decidió el 2026-10-30 (su texto dice qué falta). Cambiarlo afecta a todas las pantallas; queda para que lo decida el equipo.
+- **Del segundo triaje:** el aviso final usa el estado leído al buscar (ver la entrada del 2026-11-05).
+- **Pendiente del usuario:** `scripts/verificar_controladores.py` contra MySQL.
+
+---
+
 ## [2026-11-05] — Fase 7: revisión de tester y tres correcciones de Triaje y la ventana
 
 ### Cambio

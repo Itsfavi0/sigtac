@@ -1,10 +1,10 @@
-# SIGTAC — Estado del proyecto (5 de noviembre de 2026)
+# SIGTAC — Estado del proyecto (6 de noviembre de 2026)
 
 ## En resumen
 
 - **La aplicación está completa**: las 8 pantallas funcionan con la base de datos real.
-- **Hicimos una revisión de tester**: los 13 casos de prueba del plan pasan. Aparecieron 3 problemas para corregir y algunos detalles menores.
-- **Siguiente paso**: corregir esos problemas y preparar la sustentación (Fase 7).
+- **Hicimos una revisión de tester**: los 13 casos de prueba del plan pasan. Los 3 problemas y los detalles menores que aparecieron **ya están corregidos**.
+- **Siguiente paso**: la verificación final contra MySQL y preparar la sustentación (Fase 7).
 
 ## Avance por fases
 
@@ -17,9 +17,9 @@
 | 4. Controladores (casos de uso y permisos) | ✅ Completada |
 | 5. Utilidades (contraseñas, registro de eventos, PDF) | ✅ Completada |
 | 6. Pantallas | ✅ Completada el 04/11 |
-| 7. Integración y pruebas | 🔄 En curso: pruebas hechas, faltan las correcciones |
+| 7. Integración y pruebas | 🔄 En curso: pruebas y correcciones hechas; falta la sustentación |
 
-**2115 pruebas automáticas** pasan (`python -m pytest`). No necesitan MySQL.
+**2161 pruebas automáticas** pasan (`python -m pytest`). No necesitan MySQL.
 
 ## Qué hay en la aplicación
 
@@ -53,18 +53,23 @@ Probamos la aplicación real contra MySQL, manejando la ventana como un usuario 
 
 También funcionan el ciclo completo de la cama (reservada → ocupada → limpieza → disponible) y los permisos de cada rol.
 
-## Qué falta corregir
+## Qué se corrigió después de la revisión
 
-**Importantes**
-1. **Volver a triar a un paciente que ya espera cama.** Si empeora, hoy no se puede registrar un nuevo triaje desde la pantalla. La regla existe en el sistema, pero la pantalla no la ofrece.
-2. **Ventana muy pequeña.** Por debajo de ~1093×614 se cortan textos. En Triaje desaparece la pestaña «En cola».
-3. **Cambio de paciente en Triaje.** Si se empieza a registrar a uno y se cambia a «Sin identificar», los signos vitales escritos se quedan.
+**Importantes** (5/11)
+1. **Volver a triar a un paciente que ya espera cama.** Ahora Triaje lo reconoce al buscarlo y agrega el nuevo triaje a su mismo episodio.
+2. **Ventana muy pequeña.** La ventana ya no se achica por debajo de 1093×540.
+3. **Cambio de paciente en Triaje.** Al cambiar de paciente se borran los signos, los síntomas y el motivo escritos.
 
-**Menores** (redacción y aspecto)
-- Algunos mensajes muestran nombres técnicos, como «EN ATENCIÓN (CON CAMA)».
-- Un botón deshabilitado se ve igual que uno habilitado.
-- El PDF usa punto decimal y uno de sus mensajes trata de «tú»; el resto de la app trata de usted.
-- Dos síntomas largos no caben en su casilla en pantallas pequeñas.
+**Menores** (6/11)
+- Los mensajes ya no muestran nombres técnicos: dicen «En atención (con cama)», «Los nombres son obligatorios.» y «Síntoma» (con tilde) en la bitácora.
+- Toda la app usa coma decimal (también el PDF), y el PDF trata de usted.
+- «Se dio de baja a…» en lugar de «quedó dado de baja», que suponía el género.
+- Los síntomas largos se parten en dos líneas.
+- Al confirmar con datos que faltan, se marcan todos los campos con error a la vez.
+- Si la PA diastólica no es menor que la sistólica, se marcan los dos campos y el botón dice «Corrija los signos vitales».
+- En el tablero, el indicador del tiempo hasta la cama se llama «Asignación de cama», para no confundirlo con la espera de quien sigue en la cola.
+
+**Para decidir en equipo:** el botón principal deshabilitado se ve igual que el habilitado. Es una decisión de diseño de octubre: su texto dice qué falta («Complete los signos vitales»). Cambiarlo afecta a todas las pantallas.
 
 ## Para probarla
 
@@ -78,7 +83,6 @@ Si alguien usa la base de la PC donde se hicieron las pruebas, conviene volver a
 
 ## Próximos pasos
 
-1. Corregir los 3 problemas importantes.
-2. Corregir los detalles menores.
-3. Ejecutar `scripts/verificar_controladores.py` contra MySQL (confirmación final con datos reales).
-4. Preparar la sustentación: la demo del flujo completo y la tabla de pruebas.
+1. Ejecutar `scripts/verificar_controladores.py` contra MySQL (confirmación final con datos reales).
+2. Decidir el aspecto del botón deshabilitado.
+3. Preparar la sustentación: la demo del flujo completo y la tabla de pruebas.

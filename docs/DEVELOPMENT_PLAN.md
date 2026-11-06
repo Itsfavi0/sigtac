@@ -378,7 +378,7 @@ Debe permitir:
 
 ### Integración
 
-En los controladores (sin interfaz), verificado en MySQL con `scripts/verificar_controladores.py` (2026-10-22); falta repetirlo desde las vistas:
+En los controladores (sin interfaz), verificado en MySQL con `scripts/verificar_controladores.py` (2026-10-22), y repetido desde las vistas en la revisión de tester (2026-11-05):
 
 - [x] Login → sesión → permisos (`verificar_controladores.py` inicia sesión con una cuenta creada por el administrador).
 - [x] Paciente → episodio.

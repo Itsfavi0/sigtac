@@ -2,7 +2,7 @@
 
 > Estado de trabajo actual del proyecto.
 > Este archivo debe mantenerse pequeño y actualizado después de cada sesión importante.
-> Última actualización: 2026-11-04.
+> Última actualización: 2026-11-06.
 
 ---
 
@@ -40,11 +40,12 @@
 - **Administración (2026-11-04):** `views/admin_view.py` (cuentas, nueva cuenta, bitácora y baja o reactivación de pacientes). Con ella **la Fase 6 tiene todas sus pantallas**. Piezas nuevas: `CamposPeriodo` (compartida con Reportes) y `CamposDocumento.al_cambiar_tipo`. Lógica nueva: `controllers/periodo.py` (`rango_de_dias`, la validación del período de indicadores y bitácora), `PacienteController.buscar_para_administrar` y `AdminController.listar_tablas_auditables`.
 - **Etapa 1, detalles visuales e íconos (2026-11-04):** `Desplazable` (barras solo cuando hacen falta), `TablaDatos` (borde en oscuro, `sin_lectura`, `al_activar`), el texto de los estados en `models/estados.py`, medidas en `tema.py`, arreglos en Pacientes, Triaje y Administración, e íconos de Tabler (MIT) en el menú, el logo y los indicadores. **La Fase 6 queda cerrada.**
 - **Fase 7, revisión de tester (2026-11-05):** pasan las 13 pruebas del plan (app real contra MySQL y recorrido de la demo). Corregido: segundo triaje desde Triaje (RN-09, `PacienteController.episodio_abierto`), los datos clínicos se borran al cambiar de paciente y el tamaño mínimo pasa a 1093×540. Resumen para el equipo en `docs/ESTADO_EQUIPO.md`.
-- Pruebas: **2136 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`. Las de las vistas usan una ventana Tk oculta.
+- **Fase 7, detalles menores (2026-11-06):** mensajes sin nombres técnicos ni «tú», coma decimal en toda la app y el PDF (`utils/numeros.py`), síntomas largos en dos líneas, todos los campos con error marcados a la vez (`leer_todos`), la PA marcada en sus dos campos (`SignosVitales.validar_presion`) y el indicador «Asignación de cama» en el tablero.
+- Pruebas: **2161 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`. Las de las vistas usan una ventana Tk oculta.
 
 ### Tarea actual
 
-Fase 7 en curso: revisión de tester hecha y sus 3 problemas corregidos. Quedan los detalles menores (CHANGELOG del 2026-11-05, «Pendientes») y preparar la sustentación. Cada pantalla nueva se registra en `views/app_principal.py` (`PANTALLAS`) y en `prototipo/ver.py` (`PANTALLAS_DEMO`).
+Fase 7 en curso: revisión de tester hecha, y corregidos sus 3 problemas y sus detalles menores. Queda decidir en equipo el aspecto del botón deshabilitado y preparar la sustentación. Cada pantalla nueva se registra en `views/app_principal.py` (`PANTALLAS`) y en `prototipo/ver.py` (`PANTALLAS_DEMO`).
 Falta que el usuario ejecute `scripts/verificar_controladores.py` para confirmar el PDF, los criterios y `pacientes_con_cama` con datos reales.
 
 ---
@@ -60,7 +61,7 @@ Falta que el usuario ejecute `scripts/verificar_controladores.py` para confirmar
 | Fase 4 — Controllers | Completada (2026-10-22). Verificada en MySQL 8.0.46 |
 | Fase 5 — Utils | Completada (2026-10-26): `security.py`, `logging_config.py` y `pdf_generator.py` |
 | Fase 6 — Views | Pantallas hechas: login, ventana principal, tablero, triaje y pacientes (2026-10-30); gestión de camas y limpieza (2026-10-31); reportes, administración, detalles visuales e íconos (2026-11-04). **Completada** |
-| Fase 7 — Integración y pruebas | En curso: revisión de tester (2026-11-05), 13/13 pruebas del plan; corregidos sus 3 problemas |
+| Fase 7 — Integración y pruebas | En curso: revisión de tester (2026-11-05), 13/13 pruebas del plan; corregidos sus 3 problemas y sus detalles menores (2026-11-06) |
 
 ---
 
@@ -174,7 +175,8 @@ Ninguno bloqueante. Las decisiones menores están en "Pendientes conocidos".
 
 1. Validar con el equipo la matriz de permisos (`models/permisos.py`; ver CHANGELOG del 2026-10-21 y 2026-10-26).
 2. Ejecutar `scripts/verificar_controladores.py` para confirmar la exportación a PDF y `pacientes_con_cama` con datos reales.
-3. Fase 7: repetir desde las vistas la integración ya verificada en los controladores, y las pruebas de `DEVELOPMENT_PLAN.md` (Fase 7), con una matriz de pruebas para la sustentación.
+3. Fase 7: preparar la sustentación (demo del flujo completo y matriz de pruebas). La integración desde las vistas ya se recorrió en la revisión de tester.
+4. Decidir en equipo si el botón principal deshabilitado debe verse distinto (hoy se ve igual; su texto dice qué falta).
 
 Respecto al plan original, `auditoria_dao.py` se hizo antes que `triaje_dao.py` y `asignacion_dao.py` porque es de una sola tabla y no depende de transacciones (ver `CHANGELOG.md` del 2026-10-12).
 

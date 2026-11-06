@@ -51,8 +51,9 @@ dao/          Acceso a datos: db_connection.py (Singleton ConexionBD), base_dao.
               reporte_dao.py y un *_dao.py por entidad
 models/       Dominio: persona, documento, cama, triaje, asignacion, usuario (CuentaUsuario, política de claves),
               estrategias, permisos, estados y auditoria (Enum), excepciones
-utils/        security.py (bcrypt), logging_config.py, pdf_generator.py (reporte PDF con ReportLab) y colores.py
-              (colores de niveles de triaje y estados de cama, compartidos por las vistas y el PDF)
+utils/        security.py (bcrypt), logging_config.py, pdf_generator.py (reporte PDF con ReportLab), colores.py
+              (colores de niveles de triaje y estados de cama, compartidos por las vistas y el PDF) y numeros.py
+              (coma decimal: criterios del triaje, vistas y PDF)
 views/        CustomTkinter: tema.py (único lugar de colores —pares claro/oscuro—, fuentes y espacios); componentes/ (Tarjeta, campos y listas, Selector, tabla...);
               assets/fonts (Inter, OFL); formato.py (textos de nombres, documentos, horas y plazos) y las pantallas
               (Fase 6). Diseño aprobado en docs/diseno/ y PRODUCT.md
