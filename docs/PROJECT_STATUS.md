@@ -46,7 +46,7 @@
 ### Tarea actual
 
 Fase 7 en curso: revisión de tester hecha, y corregidos sus 3 problemas y sus detalles menores. Queda decidir en equipo el aspecto del botón deshabilitado y preparar la sustentación. Cada pantalla nueva se registra en `views/app_principal.py` (`PANTALLAS`) y en `prototipo/ver.py` (`PANTALLAS_DEMO`).
-Falta que el usuario ejecute `scripts/verificar_controladores.py` para confirmar el PDF, los criterios y `pacientes_con_cama` con datos reales.
+`scripts/verificar_controladores.py` contra MySQL (2026-11-06, ejecutado por el usuario): **97 de 97 comprobaciones correctas**, con el PDF, los criterios y `pacientes_con_cama`.
 
 ---
 
@@ -113,7 +113,7 @@ Falta que el usuario ejecute `scripts/verificar_controladores.py` para confirmar
 
 `cama_controller.py` también refiere, registra fugas y saca o devuelve camas al servicio (92 pruebas). `paciente_controller.py` también edita, da de baja y reactiva pacientes (78 pruebas).
 
-Todo el flujo, incluidas dos pruebas de concurrencia entre PCs, verificado en MySQL 8.0.46 con `scripts/verificar_controladores.py` (56 comprobaciones).
+Todo el flujo, incluidas dos pruebas de concurrencia entre PCs, verificado en MySQL 8.0.46 con `scripts/verificar_controladores.py` (56 comprobaciones el 2026-10-22; 97 de 97 el 2026-11-06).
 
 ### Fase 5 — Utils
 
@@ -174,9 +174,8 @@ Ninguno bloqueante. Las decisiones menores están en "Pendientes conocidos".
 ## Próximo trabajo previsto
 
 1. Validar con el equipo la matriz de permisos (`models/permisos.py`; ver CHANGELOG del 2026-10-21 y 2026-10-26).
-2. Ejecutar `scripts/verificar_controladores.py` para confirmar la exportación a PDF y `pacientes_con_cama` con datos reales.
-3. Fase 7: preparar la sustentación (demo del flujo completo y matriz de pruebas). La integración desde las vistas ya se recorrió en la revisión de tester.
-4. Decidir en equipo si el botón principal deshabilitado debe verse distinto (hoy se ve igual; su texto dice qué falta).
+2. Fase 7: preparar la sustentación (demo del flujo completo y matriz de pruebas). La integración desde las vistas ya se recorrió en la revisión de tester.
+3. Decidir en equipo si el botón principal deshabilitado debe verse distinto (hoy se ve igual; su texto dice qué falta).
 
 Respecto al plan original, `auditoria_dao.py` se hizo antes que `triaje_dao.py` y `asignacion_dao.py` porque es de una sola tabla y no depende de transacciones (ver `CHANGELOG.md` del 2026-10-12).
 

@@ -4,7 +4,7 @@
 
 - **La aplicación está completa**: las 8 pantallas funcionan con la base de datos real.
 - **Hicimos una revisión de tester**: los 13 casos de prueba del plan pasan. Los 3 problemas y los detalles menores que aparecieron **ya están corregidos**.
-- **Siguiente paso**: la verificación final contra MySQL y preparar la sustentación (Fase 7).
+- **Siguiente paso**: preparar la sustentación (Fase 7). La verificación contra MySQL ya pasó: 97 de 97.
 
 ## Avance por fases
 
@@ -20,6 +20,7 @@
 | 7. Integración y pruebas | 🔄 En curso: pruebas y correcciones hechas; falta la sustentación |
 
 **2161 pruebas automáticas** pasan (`python -m pytest`). No necesitan MySQL.
+Además, la verificación contra MySQL real (`scripts/verificar_controladores.py`) dio **97 de 97 comprobaciones correctas** (06/11).
 
 ## Qué hay en la aplicación
 
@@ -83,6 +84,5 @@ Si alguien usa la base de la PC donde se hicieron las pruebas, conviene volver a
 
 ## Próximos pasos
 
-1. Ejecutar `scripts/verificar_controladores.py` contra MySQL (confirmación final con datos reales).
-2. Decidir el aspecto del botón deshabilitado.
-3. Preparar la sustentación: la demo del flujo completo y la tabla de pruebas.
+1. Decidir el aspecto del botón deshabilitado.
+2. Preparar la sustentación: la demo del flujo completo y la tabla de pruebas.

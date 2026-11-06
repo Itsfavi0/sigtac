@@ -50,7 +50,7 @@ Cerrar los detalles menores que dejó la revisión de tester del 2026-11-05: men
 ### Pendientes
 - **El botón principal deshabilitado se ve igual que el habilitado:** sigue como se decidió el 2026-10-30 (su texto dice qué falta). Cambiarlo afecta a todas las pantallas; queda para que lo decida el equipo.
 - **Del segundo triaje:** el aviso final usa el estado leído al buscar (ver la entrada del 2026-11-05).
-- **Pendiente del usuario:** `scripts/verificar_controladores.py` contra MySQL.
+- **Verificación contra MySQL:** el usuario ejecutó `scripts/verificar_controladores.py` con este código: **97 de 97 comprobaciones correctas**. Ya no queda pendiente.
 
 ---
 
