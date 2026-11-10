@@ -222,3 +222,31 @@ def test_columnas_o_filas_invalidas(raiz_tk):
         ListaSeleccion(raiz_tk, Elemento, "", alto_elemento=20, columnas=0)
     with pytest.raises(ValueError):
         ListaSeleccion(raiz_tk, Elemento, "", alto_elemento=20, filas=0)
+
+
+@pytest.mark.parametrize("columnas", [1, 2, 3, 4])
+def test_en_varias_columnas_todos_los_elementos_miden_lo_mismo(crear, columnas):
+    # Entre dos vecinos queda la separación; en los bordes, nada. Antes la separación iba entera a la derecha de cada
+    # elemento menos el último, y el último quedaba esa separación más ancho
+    lista = crear(columnas=columnas, separacion=8)
+    margenes = [lista._margenes_columna(c) for c in range(columnas)]
+    assert margenes[0][0] == 0 and margenes[-1][1] == 0
+    assert all(margenes[c][1] + margenes[c + 1][0] == 8 for c in range(columnas - 1))
+    totales = [izquierdo + derecho for izquierdo, derecho in margenes]
+    assert max(totales) - min(totales) <= 1  # iguales, salvo el redondeo de 8/3
+
+
+def margen(valor) -> tuple[int, int]:
+    """Tk devuelve un margen como entero (igual a ambos lados) o como tupla, ya multiplicado por la escala."""
+    texto = str(valor).replace("(", " ").replace(")", " ").replace(",", " ")
+    numeros = tuple(int(float(n)) for n in texto.split())
+    return numeros if len(numeros) == 2 else numeros * 2
+
+
+def test_el_elemento_colocado_lleva_los_margenes_de_su_columna(crear, raiz_tk):
+    lista = crear(columnas=3, separacion=8)
+    lista.cargar(datos(1, 2, 3))
+    escala = tema.escala(raiz_tk)  # CustomTkinter multiplica los márgenes por el zoom de la pantalla
+    esperados = [tuple(int(m * escala) for m in lista._margenes_columna(c)) for c in range(3)]
+    assert esperados[0][0] == 0 and esperados[2][1] == 0
+    assert [margen(lista.elemento(i).grid_info()["padx"]) for i in (1, 2, 3)] == esperados

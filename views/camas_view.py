@@ -26,8 +26,9 @@ from models.excepciones import SigtacError
 from models.triaje import excede_plazo
 from views import formato, tema
 from views.componentes import (BotonPrimario, BotonSecundario, Desplazable, InsigniaNivel, ListaSeleccion, Selector,
-                               Tarjeta, TarjetaCama, campo_texto, confirmar, etiqueta_campo, marcar_error,
-                               mostrar_error, mostrar_info, texto_nivel)
+                               Tarjeta, TarjetaCama, aviso_columna, campo_texto, confirmar, dos_columnas,
+                               etiqueta_campo, etiqueta_resumen, fila_acciones, marcar_error, mostrar_error,
+                               mostrar_info, texto_nivel)
 from views.componentes.campos import sin_error
 
 logger = logging.getLogger(__name__)
@@ -212,9 +213,6 @@ class GestionCamasView(ctk.CTkFrame):
     FILAS_CAMAS = 2
     FILAS_MANTENIMIENTO = 4  # filas de casillas visibles en Mantenimiento
     COLUMNAS_CAMAS = 3       # casillas por fila: caben en una columna de la tarjeta a 1093×614
-    ALTO_ETIQUETA = 28       # las etiquetas del resumen
-    LADO_PUNTO = 8           # el punto de color de una etiqueta del resumen
-    ANCHO_AVISO = 360        # lo que dice la columna derecha sin nada elegido, partido para no pasar de ella
     ANCHO_CASILLA = 128      # la casilla de la cama del paciente, junto a su acción principal
 
     def __init__(self, padre, camas, reloj=datetime.now):
@@ -240,9 +238,9 @@ class GestionCamasView(ctk.CTkFrame):
         cuerpo.pack(fill="both", expand=True, padx=tema.ESPACIO_2, pady=(0, tema.ESPACIO_2))
 
         self._resumen = ctk.CTkFrame(cuerpo, fg_color="transparent")
-        self._etiquetas_resumen = (self._etiqueta(self._resumen),
-                                   self._etiqueta(self._resumen, tema.COLOR_NIVEL[1]),
-                                   self._etiqueta(self._resumen, tema.COLOR_ESTADO_CAMA[EstadoCama.DISPONIBLE]))
+        self._etiquetas_resumen = (etiqueta_resumen(self._resumen),
+                                   etiqueta_resumen(self._resumen, tema.COLOR_NIVEL[1]),
+                                   etiqueta_resumen(self._resumen, tema.COLOR_ESTADO_CAMA[EstadoCama.DISPONIBLE]))
         self._paneles = {"espera": self._crear_espera(cuerpo), "con_cama": self._crear_con_cama(cuerpo),
                          "mantenimiento": self._crear_mantenimiento(cuerpo)}
         self._paneles["espera"].pack(fill="x")
@@ -251,7 +249,7 @@ class GestionCamasView(ctk.CTkFrame):
     # ---- Esperan cama
 
     def _crear_espera(self, padre) -> ctk.CTkFrame:
-        marco, izquierda, derecha = self._dos_columnas(padre)
+        marco, izquierda, derecha = dos_columnas(padre)
         etiqueta_campo(izquierda, "Cola por prioridad").pack(anchor="w", pady=(0, tema.ESPACIO))
         self._lista_cola = self._lista_pacientes(
             izquierda, lambda padre_, entrada: FilaCola(padre_, entrada, self._ahora), NADIE_ESPERA,
@@ -267,7 +265,7 @@ class GestionCamasView(ctk.CTkFrame):
             al_seleccionar=lambda _id: self._actualizar_asignar(), al_activar=lambda _id: self.asignar(),
             actualizar=TarjetaCama.mostrar)
         self._lista_compatibles.pack(fill="x")
-        fila = self._fila_acciones(derecha)
+        fila = fila_acciones(derecha)
         self._boton_asignar = BotonPrimario(fila, TEXTO_ELEGIR_PACIENTE, self.asignar, state="disabled")
         self._boton_asignar.pack(side="left")
         return marco
@@ -331,24 +329,24 @@ class GestionCamasView(ctk.CTkFrame):
     # ---- Con cama
 
     def _crear_con_cama(self, padre) -> ctk.CTkFrame:
-        marco, izquierda, derecha = self._dos_columnas(padre)
+        marco, izquierda, derecha = dos_columnas(padre)
         etiqueta_campo(izquierda, "Reservadas u ocupadas").pack(anchor="w", pady=(0, tema.ESPACIO))
         self._lista_con_cama = self._lista_pacientes(izquierda, FilaConCama, NADIE_CON_CAMA, self._con_cama_elegido)
 
-        self._sin_con_cama = self._aviso(derecha, ELIJA_CON_CAMA)
+        self._sin_con_cama = aviso_columna(derecha, ELIJA_CON_CAMA)
         self._detalle_con_cama = ctk.CTkFrame(derecha, fg_color="transparent")
         self._ficha_con_cama = FichaElegido(self._detalle_con_cama)
         self._ficha_con_cama.pack(fill="x")
 
         # La casilla de su cama, al lado de la acción principal: la columna no debe quedar más alta que la lista (si
         # la tarjeta crece al elegir, aparece la barra de la pantalla y todo se vuelve a acomodar)
-        fila = self._fila_acciones(derecha)
+        fila = fila_acciones(derecha)
         self._casilla_con_cama = None
         self._fila_cama = fila
         # El principal cambia con el estado de la cama: «Llegó a la cama» (reservada) o «Dar de alta» (ocupada)
         self._boton_cama = BotonPrimario(fila, TEXTO_ELEGIR_CON_CAMA, self._accion_principal, state="disabled")
         self._boton_cama.pack(side="left")
-        otras = self._fila_acciones(derecha, arriba=tema.ESPACIO)
+        otras = fila_acciones(derecha, arriba=tema.ESPACIO)
         self._boton_cancelar = BotonSecundario(otras, "Cancelar reserva", self.cancelar_reserva, state="disabled")
         self._boton_referir = BotonSecundario(otras, "Referir", self.referir, state="disabled")
         self._boton_fuga = BotonSecundario(otras, "Registrar fuga", self.registrar_fuga, state="disabled")
@@ -448,7 +446,7 @@ class GestionCamasView(ctk.CTkFrame):
     # ---- Mantenimiento
 
     def _crear_mantenimiento(self, padre) -> ctk.CTkFrame:
-        marco, izquierda, derecha = self._dos_columnas(padre)
+        marco, izquierda, derecha = dos_columnas(padre)
         etiqueta_campo(izquierda, "Por tipo de cama").pack(anchor="w", pady=(0, tema.ESPACIO))
         self._lista_mantenimiento = ListaSeleccion(
             izquierda, TarjetaCama, SIN_CAMAS_MANTENIMIENTO, alto_elemento=TarjetaCama.ALTO,
@@ -457,7 +455,7 @@ class GestionCamasView(ctk.CTkFrame):
             al_activar=lambda _id: self._activar_mantenimiento(), actualizar=TarjetaCama.mostrar)
         self._lista_mantenimiento.pack(fill="x")
 
-        self._sin_mantenimiento = self._aviso(derecha, ELIJA_MANTENIMIENTO)
+        self._sin_mantenimiento = aviso_columna(derecha, ELIJA_MANTENIMIENTO)
         self._detalle_mantenimiento = ctk.CTkFrame(derecha, fg_color="transparent")
         self._codigo_mantenimiento = ctk.CTkLabel(self._detalle_mantenimiento, text="", font=tema.fuente("subtitulo"),
                                                   text_color=tema.COLOR_TEXTO, anchor="w")
@@ -476,7 +474,7 @@ class GestionCamasView(ctk.CTkFrame):
         self._motivo.bind("<Return>", lambda _e: self.mantenimiento(), add="+")
         self._motivo.bind("<KeyRelease>", lambda _e: self._motivo_editado(), add="+")
 
-        self._fila_mantenimiento = fila = self._fila_acciones(derecha)
+        self._fila_mantenimiento = fila = fila_acciones(derecha)
         self._boton_mantenimiento = BotonPrimario(fila, TEXTO_ELEGIR_MANTENIMIENTO, self.mantenimiento,
                                                   state="disabled")
         self._boton_mantenimiento.pack(side="left")
@@ -664,19 +662,6 @@ class GestionCamasView(ctk.CTkFrame):
 
     # ---- Piezas de la pantalla
 
-    def _dos_columnas(self, padre) -> tuple[ctk.CTkFrame, ctk.CTkFrame, ctk.CTkFrame]:
-        """Lo que se elige a la izquierda; lo elegido y sus acciones a la derecha, separados por una línea."""
-        marco = ctk.CTkFrame(padre, fg_color="transparent")
-        marco.grid_columnconfigure(0, weight=5, uniform="columnas")
-        marco.grid_columnconfigure(2, weight=6, uniform="columnas")
-        izquierda = ctk.CTkFrame(marco, fg_color="transparent")
-        izquierda.grid(row=0, column=0, sticky="nsew")
-        ctk.CTkFrame(marco, width=1, fg_color=tema.COLOR_DIVISOR, corner_radius=0).grid(
-            row=0, column=1, sticky="ns", padx=tema.ESPACIO_2)
-        derecha = ctk.CTkFrame(marco, fg_color="transparent")
-        derecha.grid(row=0, column=2, sticky="nsew")
-        return marco, izquierda, derecha
-
     def _lista_pacientes(self, padre, crear, texto_vacio: str, al_seleccionar, al_activar=None) -> ListaSeleccion:
         lista = ListaSeleccion(padre, crear, texto_vacio, alto_elemento=FilaPaciente.ALTO, filas=self.FILAS_LISTA,
                                separacion=tema.ESPACIO_MINIMO, al_seleccionar=al_seleccionar, al_activar=al_activar,
@@ -690,26 +675,3 @@ class GestionCamasView(ctk.CTkFrame):
             fila.mostrar(dato, self._ahora)
         else:
             fila.mostrar(dato)
-
-    def _etiqueta(self, padre, color=None) -> ctk.CTkLabel:
-        """Una etiqueta del resumen, gris como las del tablero («Plazo 10 min»); con `color`, un punto delante."""
-        marco = ctk.CTkFrame(padre, fg_color=tema.COLOR_ACTIVO, corner_radius=tema.RADIO_CONTROL)
-        marco.pack(side="left", padx=(0, tema.ESPACIO))
-        if color is not None:
-            ctk.CTkFrame(marco, width=self.LADO_PUNTO, height=self.LADO_PUNTO, corner_radius=self.LADO_PUNTO // 2,
-                         fg_color=color).pack(side="left", padx=(tema.ESPACIO_MEDIO, 0))
-        texto = ctk.CTkLabel(marco, text="", font=tema.fuente("etiqueta"), text_color=tema.COLOR_ETIQUETA,
-                             height=self.ALTO_ETIQUETA)
-        texto.pack(side="left", padx=(tema.ESPACIO if color is not None else tema.ESPACIO_MEDIO, tema.ESPACIO_MEDIO))
-        return texto
-
-    def _aviso(self, padre, texto: str) -> ctk.CTkLabel:
-        """Lo que dice la columna derecha mientras no hay nada elegido."""
-        return ctk.CTkLabel(padre, text=texto, font=tema.fuente("normal"), text_color=tema.COLOR_TEXTO_SECUNDARIO,
-                            anchor="w", justify="left", wraplength=self.ANCHO_AVISO)
-
-    @staticmethod
-    def _fila_acciones(padre, arriba: int = tema.ESPACIO_2) -> ctk.CTkFrame:
-        fila = ctk.CTkFrame(padre, fg_color="transparent")
-        fila.pack(fill="x", pady=(arriba, 0))
-        return fila

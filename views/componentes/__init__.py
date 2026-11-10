@@ -1,6 +1,7 @@
 """Piezas de interfaz compartidas por las pantallas: una sola forma de hacer cada cosa."""
 from views.componentes.botones import BotonPrimario, BotonSecundario
 from views.componentes.campos import campo_texto, casilla, etiqueta_campo, lista_opciones
+from views.componentes.columnas import aviso_columna, dos_columnas, etiqueta_resumen, fila_acciones
 from views.componentes.cubierta import Cubierta
 from views.componentes.desplazable import Desplazable
 from views.componentes.documento import CamposDocumento
@@ -19,6 +20,6 @@ from views.componentes.tarjetas import Tarjeta, TarjetaCama, TarjetaKPI
 __all__ = ["BotonPrimario", "BotonSecundario", "CamposDocumento", "CamposPaciente", "CamposPeriodo", "Cubierta",
            "Desplazable",
            "FichaPaciente", "InsigniaNivel", "ListaSeleccion", "Marca", "MatrizCamas", "Selector", "TablaDatos",
-           "Tarjeta", "TarjetaCama", "TarjetaKPI", "campo_texto", "casilla", "confirmar", "etiqueta_campo",
-           "lista_opciones", "marcar_error", "marcar_foco", "mostrar_error", "mostrar_info", "pedir_ruta_pdf",
-           "texto_nivel"]
+           "Tarjeta", "TarjetaCama", "TarjetaKPI", "aviso_columna", "campo_texto", "casilla", "confirmar",
+           "dos_columnas", "etiqueta_campo", "etiqueta_resumen", "fila_acciones", "lista_opciones", "marcar_error",
+           "marcar_foco", "mostrar_error", "mostrar_info", "pedir_ruta_pdf", "texto_nivel"]

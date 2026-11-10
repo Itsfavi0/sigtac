@@ -5,6 +5,57 @@
 
 ---
 
+## [2026-11-10] — Limpieza con el estilo de Gestión de camas; el tablero se acomoda una sola vez
+
+### Cambio
+- **Limpieza** (`views/limpieza_view.py`), con la forma de la pestaña Mantenimiento de Gestión de camas (vista previa aprobada por el usuario):
+  - **resumen** arriba: «4 camas por limpiar» (con el punto del color de «En limpieza») y «La más antigua: 1 h 00 min». Sin camas, solo «0 camas por limpiar»;
+  - a la izquierda, **las camas como casillas** (código y tipo), de la más antigua a la más reciente, que se eligen con clic o teclado; Enter confirma;
+  - a la derecha, **la cama elegida**: código, tipo · área y «En limpieza desde las 09:00 (1 h 00 min)», y el botón «Confirmar limpieza de HOS-06». Sin elegir, dice qué hacer;
+  - al volver a la pantalla o si otra PC ya la confirmó, la cama elegida sigue elegida si sigue en la lista.
+- **`views/componentes/columnas.py`** (nuevo; extracción aprobada por el usuario): `dos_columnas`, `etiqueta_resumen`, `aviso_columna` y `fila_acciones`, que eran métodos privados de Gestión de camas. Gestión de camas las usa sin cambiar cómo se ve.
+- **Tablero tras el login:** la matriz de camas, cuando va a necesitar su barra, se reparte ya para el ancho que le deja. Antes se acomodaba dos veces y la segunda redibujaba las 34 casillas (de 1,75 s a 1,44 s en la demo). Con la cubierta del login, el tablero aparece completo de una vez; lo único que cambia después es el reloj.
+- **`ListaSeleccion`:** todas las casillas de una fila miden lo mismo; antes la última era 8 px más ancha y en Limpieza se cortaba «Hospitalización».
+- **`Desplazable`:** no decide la barra mientras la pantalla se construye (lo visible mide 1 px). Una barra colocada y quitada en ese momento quedaba a la vista sin lugar, tapando el borde derecho de la tarjeta.
+- **Demo:** `CamasDemo.solicitudes_limpieza` ordena como el DAO (la más antigua primero); antes devolvía el orden inverso.
+
+### Archivos afectados
+- `views/limpieza_view.py`, `views/camas_view.py`
+- `views/componentes/columnas.py` (nuevo), `views/componentes/__init__.py`, `views/componentes/seleccion.py`, `views/componentes/desplazable.py`, `views/componentes/matriz.py`
+- `prototipo/demo.py`
+- Pruebas: `tests/test_limpieza_view.py`, `tests/test_columnas.py` (nuevo), `tests/test_seleccion.py`, `tests/test_matriz.py`, `tests/test_componentes.py`
+- `docs/`
+
+### Motivo
+Los dos opcionales de «Para retomar»: Limpieza era la única pantalla de trabajo con una tabla gris y un botón, y el tablero se reacomodaba unos segundos después del login.
+
+### Impacto
+- Pruebas: **2274 pasan** (antes 2251).
+- Sin cambios de controladores, modelos ni esquema: RN-07 y RN-08 siguen igual.
+- Gestión de camas se ve igual: el revisor comparó el árbol completo de widgets de sus tres pestañas antes y después de la extracción (597 líneas); solo cambiaron los márgenes de las casillas.
+
+### Decisiones
+- **La causa del tablero no era la precarga** (la hipótesis anotada antes): sin precarga se reacomodaba igual. Medido: la matriz se acomodaba para 1027 px, mostraba su barra y volvía a acomodarse para 1011 px, 0,85 s después.
+- **Limpieza sigue a Mantenimiento** y no a «Esperan cama»: se elige una cama, no un paciente. Las casillas llevan el tipo en el segundo renglón, como las camas compatibles, porque todas están «En limpieza».
+- **Una solicitud sin su cama en el mapa** (una cama dada de baja mientras esperaba limpieza: el mapa solo trae las activas) no se muestra, y el resumen cuenta solo las que se muestran.
+- **Minutos en texto corrido sin el cero** («7 min»), como en el tablero y en Reportes; «07 min» queda para las columnas alineadas.
+- **Proceso de la interfaz** (skill ui-consistency):
+  - checklist de 12 puntos desde Gestión de camas;
+  - calibración con otro agente sobre una copia con un aviso escrito a mano en lugar de `aviso_columna`, que encontró;
+  - revisión de un agente que no escribió el código. Encontró, y se corrigió:
+    - el resumen contaba también las solicitudes sin casilla («4» con 3 casillas);
+    - «07 min» en texto corrido;
+    - «Ninguna espera» sin camas, un texto que no estaba aprobado;
+    - pruebas que comparaban márgenes sin escalar (fallarían con el zoom de Windows al 125 %);
+    - una prueba de Enter que no pasaba por la lista;
+    - faltaba el caso de otra PC que ya confirmó la cama y esta sale de la lista.
+
+### Pendientes
+- `views/admin_view.py` conserva su propio `_fila_acciones`, igual a `fila_acciones`: unificarlo en otra tarea.
+- Con zoom de pantalla, el margen entre casillas de `ListaSeleccion` puede quedar 1 px menor que la separación (se redondea antes de escalar).
+
+---
+
 ## [2026-11-10] — Cambio de pantalla en un solo paso (Cubierta)
 
 ### Cambio

@@ -174,10 +174,20 @@ class ListaSeleccion(ctk.CTkFrame):
         self._vincular(elemento, id_dato)
         return elemento
 
+    def _margenes_columna(self, columna: int) -> tuple[int, int]:
+        """
+        Los márgenes (izquierdo, derecho) de un elemento de esa columna: entre dos vecinos suman la separación, en los
+        bordes no hay, y todos los elementos quedan del mismo ancho (las celdas son iguales). Si la separación quedara
+        entera a la derecha de cada uno, el último sería esa separación más ancho que los demás.
+        """
+        paso = self._separacion / self._columnas
+        izquierdo = columna * paso
+        derecho = (self._columnas - 1 - columna) * paso
+        return round(izquierdo), round(derecho)
+
     def _colocar(self, posicion: int, id_dato: Hashable, elemento: ctk.CTkFrame):
         fila, columna = divmod(posicion, self._columnas)
-        elemento.grid(row=fila, column=columna, sticky="ew",
-                      padx=(0, 0 if columna == self._columnas - 1 else self._separacion),
+        elemento.grid(row=fila, column=columna, sticky="ew", padx=self._margenes_columna(columna),
                       pady=(0 if fila == 0 else self._separacion, 0))
         self._elementos[id_dato] = elemento
         # Sus colores sin elegir, leídos después de pintarlo (una casilla cambia con el estado de su cama)

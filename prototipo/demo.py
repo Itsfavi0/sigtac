@@ -150,7 +150,8 @@ class CamasDemo:
                 if cama.estado == D and cama.es_compatible(episodio.nivel_actual)]
 
     def solicitudes_limpieza(self):
-        return list(self._limpieza)
+        """Como SolicitudLimpiezaDAO.listar_pendientes: de la más antigua a la más reciente."""
+        return sorted(self._limpieza, key=lambda s: (s.fecha_solicitud, s.id_solicitud))
 
     def esperar_cama(self, episodio: EpisodioEmergencia, paciente: Paciente):
         """Lo que hace el primer triaje: el paciente pasa a la cola de cama."""

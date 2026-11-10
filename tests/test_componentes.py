@@ -922,6 +922,26 @@ def test_desplazable_muestra_la_barra_solo_si_el_contenido_no_cabe(raiz_tk):
     contenido.destroy()
 
 
+def test_desplazable_sin_acomodar_aun_no_decide_la_barra(raiz_tk):
+    # Mientras la pantalla se construye, lo visible mide 1 px: colocar la barra y quitarla antes de que la pantalla
+    # aparezca la deja a la vista igual, sin lugar, encima de la tarjeta. Se decide con el tamaño real
+    from views.componentes import Desplazable
+    avisos = []
+    contenido = Desplazable(raiz_tk, al_cambiar_barra=avisos.append)
+    ctk.CTkFrame(contenido, height=300).pack()
+    raiz_tk.update_idletasks()
+    assert contenido._parent_canvas.winfo_height() <= 1  # la ventana de pruebas está oculta
+    antes = contenido._scrollbar.grid_info()
+    # Devuelve lo que hay (CustomTkinter coloca la barra al crearla), sin tocarla ni avisar
+    assert contenido.ajustar_barra() is contenido.muestra_barra
+    assert contenido.ajustar_barra(alto_visible=1) is contenido.muestra_barra
+    assert contenido._scrollbar.grid_info() == antes and avisos == []
+    contenido.ajustar_barra(alto_visible=100)  # ya con su tamaño: hace falta
+    assert contenido.muestra_barra and avisos == [True]
+    assert contenido.ajustar_barra(alto_visible=1) is True and avisos == [True]  # sin tamaño, no cambia de opinión
+    contenido.destroy()
+
+
 @pytest.mark.parametrize("actual, y_conservar, y_abajo, esperado", [
     (0, 100, 380, 0),      # el pie ya se ve (380 + 10 = 390 < 400): no se mueve
     (0, 100, 390, 0),      # justo en el borde (390 + 10 = 400): tampoco

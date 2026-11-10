@@ -61,6 +61,11 @@ class Desplazable(ctk.CTkScrollableFrame):
         """
         self._tarea = None
         visible = self._parent_canvas.winfo_height() if alto_visible is None else alto_visible
+        if visible <= 1:
+            # Aún sin acomodar (la pantalla se está construyendo): no se decide, lo hará el <Configure> de su tamaño
+            # real. Una barra colocada y quitada antes de que la pantalla aparezca queda a la vista igual, sin lugar
+            # (Tk la muestra al mostrar la pantalla), encima del borde de la tarjeta
+            return self.muestra_barra
         hace_falta = self.winfo_reqheight() > visible + 1
         if hace_falta:
             self._scrollbar.grid(padx=(tema.ESPACIO_MINIMO, 0))  # CTkScrollbar.grid ya lo escala con el zoom
