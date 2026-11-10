@@ -26,7 +26,8 @@ from models.excepciones import SigtacError
 from models.permisos import Rol
 from views import formato, tema
 from views.componentes import (BotonPrimario, BotonSecundario, CamposDocumento, CamposPeriodo, Desplazable, Selector,
-                               TablaDatos, Tarjeta, lista_opciones, marcar_error, mostrar_error, mostrar_info)
+                               TablaDatos, Tarjeta, fila_acciones, lista_opciones, marcar_error, mostrar_error,
+                               mostrar_info)
 from views.componentes.campos import celda, campo_texto, leer_opcion, lista_en_rejilla
 from views.componentes.documento import ETIQUETAS
 from views.componentes.periodo import texto_periodo
@@ -226,7 +227,7 @@ class AdminView(ctk.CTkFrame):
                                            text_color=tema.COLOR_TEXTO, anchor="w")
         self._cuenta_titulo.pack(anchor="w", pady=(tema.ESPACIO_2, 0))
 
-        fila = self._fila_acciones(marco)
+        fila = fila_acciones(marco)
         self._boton_acceso = BotonSecundario(fila, "Desactivar", self.cambiar_acceso, state="disabled")
         self._boton_acceso.pack(side="left")
         self._boton_desbloquear = BotonSecundario(fila, "Desbloquear", self.desbloquear, state="disabled")
@@ -349,7 +350,7 @@ class AdminView(ctk.CTkFrame):
         self._clave_nueva = CamposClave(rejilla, 0, 1, marco)
         for campo in self._clave_nueva.entradas:
             campo.bind("<Return>", self.crear_cuenta, add="+")
-        fila = self._fila_acciones(marco)
+        fila = fila_acciones(marco)
         self._clave_nueva.antes = fila  # el aviso, entre la rejilla y el botón
         self._boton_crear = BotonPrimario(fila, TEXTO_ELEGIR_EMPLEADO, self.crear_cuenta, state="disabled")
         self._boton_crear.pack(side="left")
@@ -413,7 +414,7 @@ class AdminView(ctk.CTkFrame):
         self._filtro_usuario.pack(fill="x")
         for campo in self.periodo.entradas:
             campo.bind("<Return>", self.ver_bitacora, add="+")
-        fila = self._fila_acciones(marco)
+        fila = fila_acciones(marco)
         BotonPrimario(fila, "Ver bitácora", self.ver_bitacora).pack(side="left")
         self._registros = {}  # id_bitacora → registro, para mostrar el detalle completo del elegido
         self._tabla_bitacora = TablaDatos(marco, self.COLUMNAS_BITACORA, SIN_REGISTROS, filas=self.FILAS_BITACORA,
@@ -512,7 +513,7 @@ class AdminView(ctk.CTkFrame):
         self._datos_paciente = ctk.CTkLabel(self._encontrado, text="", font=tema.fuente("pequena"),
                                             text_color=tema.COLOR_TEXTO_SECUNDARIO, anchor="w")
         self._datos_paciente.pack(anchor="w")
-        fila = self._fila_acciones(self._encontrado)
+        fila = fila_acciones(self._encontrado)
         self._boton_paciente = BotonPrimario(fila, "Dar de baja", self.cambiar_paciente)
         self._boton_paciente.pack(side="left")
         return marco
@@ -691,11 +692,3 @@ class AdminView(ctk.CTkFrame):
             self.ver_bitacora(avisar_error=False)  # lo recién hecho en las otras opciones ya aparece
         else:
             self._documento.enfocar()
-
-    # ---- Piezas de la pantalla
-
-    @staticmethod
-    def _fila_acciones(padre) -> ctk.CTkFrame:
-        fila = ctk.CTkFrame(padre, fg_color="transparent")
-        fila.pack(fill="x", pady=(tema.ESPACIO_2, 0))
-        return fila

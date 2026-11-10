@@ -5,6 +5,22 @@
 
 ---
 
+## [2026-11-10] — Administración usa la fila de acciones compartida
+
+### Cambio
+- `views/admin_view.py` usa `fila_acciones` (`views/componentes/columnas.py`) en sus 4 filas de botones (acceso y desbloqueo, crear cuenta, ver bitácora, dar de baja) y se borra su `_fila_acciones` propio, que era igual.
+
+### Archivos afectados
+- `views/admin_view.py`, `docs/`
+
+### Motivo
+El pendiente de la entrada anterior: con dos copias, cambiar la separación de los botones en `columnas.py` habría dejado a Administración distinta de Gestión de camas y Limpieza sin que nadie lo decidiera (una regla, un dueño).
+
+### Impacto
+- Sin cambio visible: la misma separación (`ESPACIO_2`). Pruebas: **2274 pasan**.
+
+---
+
 ## [2026-11-10] — Limpieza con el estilo de Gestión de camas; el tablero se acomoda una sola vez
 
 ### Cambio

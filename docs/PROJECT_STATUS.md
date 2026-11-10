@@ -194,7 +194,6 @@ Al empezar una sesión: leer `CLAUDE.md`, esta sección y las dos o tres primera
    - afecta a todas las pantallas.
 3. **Validar con el equipo la matriz de permisos** (`models/permisos.py`; ver CHANGELOG del 2026-10-21 y 2026-10-26): si el enfermero puede registrar una fuga, y que la baja de pacientes sea solo del administrador.
 4. **Opcional, si hay tiempo:**
-   - que Administración use `fila_acciones` (`views/componentes/columnas.py`) en lugar de su `_fila_acciones` propio;
    - actualizar `db_scripts/diagrama.png` (ver «Pendientes conocidos»).
 
 Para revisar cómo se ve una pantalla sin MySQL: `python -m prototipo.ver --pantalla camas --tamano 1093x614 --captura salida.png`
