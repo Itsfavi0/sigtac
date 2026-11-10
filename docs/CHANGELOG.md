@@ -5,6 +5,62 @@
 
 ---
 
+## [2026-11-10] — Correcciones de la revisión de experiencia de uso
+
+### Cambio
+Revisión hecha con el usuario siguiendo un caso de punta a punta en una guardia de noche (triaje → cama → alta → limpieza → tablero), a 1093×614, con los principios de `PRODUCT.md`. Se corrigió:
+- **Seguridad:**
+  - **Limpieza:** Enter y el doble clic en una casilla solo eligen; se confirma únicamente con el botón, que nombra la cama. Una cama confirmada por error quedaría «disponible» estando sucia.
+  - **Confirmaciones** (alta, referir, fuga, fusionar…) con «No» elegido de entrada: un Enter apurado no confirma.
+- **Teclado:** al pasar con Tab a un campo que quedó bajo el borde, la pantalla baja hasta él (`Desplazable`, con `<<TraverseIn>>`). En Triaje, SatO₂ quedaba con 14 de sus 36 px a la vista y «3. Síntomas», oculta.
+- **Tablero:** el indicador «Prioridad 1–2 sin cama» dice en rojo «N fuera de plazo» si alguno de nivel 1–2 pasó su plazo, y el pie de la cola avisa si alguno de los que no caben, de cualquier nivel, lo está. El NN que llevaba 1 h 11 min quedaba escondido en «2 pacientes más en espera».
+- **Rapidez:**
+  - **Avisos sin diálogo:** las operaciones de todos los días avisan en el encabezado («✓ Alta registrada…», en verde, unos segundos) y ya no abren un diálogo que había que cerrar (`avisar_exito`). La clave entregada en persona y el PDF guardado siguen con diálogo.
+  - **Gestión de camas:**
+    - la primera cama compatible queda elegida («Asignar OBS-01 a …» en dos clics, o Enter y Enter);
+    - «Con cama» muestra primero las reservadas;
+    - se puede buscar por nombre o código de cama (Escape borra).
+- **Claridad:**
+  - **El botón principal deshabilitado se ve gris**: en azul parecía disponible. Su texto sigue diciendo qué falta. «Reclasificar» nace deshabilitado.
+  - **Triaje, en «Nuevo»:** un botón «2 esperan triaje · Ver la cola» lleva a la cola; el selector de arriba se pasaba por alto.
+  - **Textos que no caben terminan en «…»** (`EtiquetaRecortada`): «Médico de Emerge…» en la barra lateral y los motivos largos en las listas de Gestión de camas.
+- **`ListaSeleccion`:** su barra estiraba la lista a 200 px (el alto por omisión de `CTkScrollbar`), y las camas compatibles mostraban 4 filas en lugar de 2.
+
+### Archivos afectados
+- `views/componentes/errores.py`, `botones.py`, `desplazable.py`, `seleccion.py`, `tarjetas.py`, `recorte.py` (nuevo), `__init__.py`; `views/tema.py`
+- `views/app_principal.py`, `triage_view.py`, `camas_view.py`, `limpieza_view.py`, `pacientes_view.py`, `admin_view.py`, `dashboard_view.py`
+- Pruebas: `tests/test_recorte.py` (nuevo), `test_componentes.py`, `test_app_principal.py`, `test_tema.py`, `test_seleccion.py`, `test_camas_view.py`, `test_triage_view.py`, `test_limpieza_view.py`, `test_dashboard_view.py` y los dobles de `test_admin_view.py` y `test_pacientes_view.py`
+- `docs/`
+
+### Motivo
+La revisión con el usuario: 15 puntos, ordenados por impacto en una guardia real. El usuario pidió corregirlos todos.
+
+### Impacto
+- Pruebas: **2332 pasan** (antes 2274).
+- Sin cambios de controladores, modelos ni esquema.
+- **Decisión pendiente del equipo resuelta:** el botón principal deshabilitado (pendiente desde el 2026-10-30) ahora se ve gris.
+- **Revisión independiente** (con calibración: un color escrito a mano plantado en una copia del tablero, que el revisor encontró). Encontró y se corrigió:
+  - Escape en la búsqueda dejaba el texto guía como texto escrito y el filtro dejaba de funcionar;
+  - el desplazamiento al foco usaba `<FocusIn>`, que llega también con un clic, por cada contenedor y al volver a la ventana o cerrar un diálogo, y movía la vista sin motivo. Ahora usa `<<TraverseIn>>`, que Tk genera solo al recorrer con Tab;
+  - en una recarga, la cama preelegida reemplazaba en silencio a la que el usuario había elegido y otra PC reservó: ahora se preelige solo al elegir al paciente;
+  - «2 fuera de plazo» bajo «Prioridad 1–2 sin cama» contaba también al nivel 3: ahora cuenta solo los del título;
+  - con la lectura fallida, borrar la búsqueda hacía decir «Ninguna cama tiene un paciente asignado»; y la búsqueda quedaba puesta tras una operación;
+  - el recordatorio de Triaje era una etiqueta clicable a la que no se llegaba con el teclado: ahora es un botón;
+  - en oscuro, el botón deshabilitado (#2F2F2F) no se distinguía de la tarjeta: ahora #3A3A3A (contraste 4,51:1);
+  - comentarios que contaban la historia del código (van aquí, no en el código);
+  - en la segunda pasada: borrar la búsqueda vacía tras una operación le quitaba el texto guía (ahora se borra solo si hay algo escrito), y el foco que pone el código (Triaje, al pasar al registro o a los signos) también baja la pantalla hasta el campo (`Desplazable.mostrar_foco`).
+
+### Pendientes
+- Los `BotonSecundario` deshabilitados se distinguen poco de los habilitados (solo cambia el tono del texto); junto al principal gris, parecen más disponibles que él. Se podría atenuar su borde.
+
+### Decisiones
+- **Punto 4 descartado** («textos guía poco legibles»): `COLOR_PLACEHOLDER` ya tiene ~5,5:1 de contraste (AA). Oscurecerlo lo confundiría con un valor escrito.
+- **Punto 15 queda para el equipo:** el rojo significa «Ocupada» en la matriz y «Nivel 1» en la cola. Es un cambio de la paleta aprobada.
+- **La cola del tablero no se reordena** por plazo: el orden por gravedad es clínico. El aviso va en el indicador y en el pie.
+- **El aviso de éxito va en el encabezado**, en el lugar de la descripción (dos renglones como mucho), y no en una ventana flotante: ese lugar no tapa ningún botón.
+
+---
+
 ## [2026-11-10] — Administración usa la fila de acciones compartida
 
 ### Cambio

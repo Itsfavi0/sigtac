@@ -18,7 +18,7 @@ AHORA = datetime(2026, 10, 30, 10, 0)
 def dialogos(monkeypatch):
     anotados = {"error": [], "info": []}
     monkeypatch.setattr(limpieza_view, "mostrar_error", lambda ventana, error: anotados["error"].append(error))
-    monkeypatch.setattr(limpieza_view, "mostrar_info", lambda ventana, texto: anotados["info"].append(texto))
+    monkeypatch.setattr(limpieza_view, "avisar_exito", lambda ventana, texto: anotados["info"].append(texto))
     return anotados
 
 
@@ -132,14 +132,15 @@ def test_el_detalle_dice_desde_cuando_sin_el_cero_de_las_columnas(crear):
     assert vista._desde.cget("text") == "En limpieza desde las 09:00 (1 h 00 min)"
 
 
-def test_enter_en_una_cama_confirma_su_limpieza(crear):
-    # La ventana de pruebas está oculta y Tk no le entrega teclas: se prueba lo que hace Enter en la lista (su
-    # vínculo llama a _activar, que usa la casilla elegida)
+def test_enter_o_doble_clic_en_una_cama_no_confirman_su_limpieza(crear):
+    # Confirmar la cama equivocada la mostraría disponible estando sucia: solo el botón, que la nombra, confirma.
+    # La ventana de pruebas está oculta y Tk no le entrega teclas: se prueba lo que hacen Enter y el doble clic en la
+    # lista (los dos llaman a _activar)
     vista = crear()
     elegir(vista, 1)
-    assert vista._lista._lienzo.bind("<Return>")
     vista._lista._activar()
-    vista.camas.confirmar_limpieza.assert_called_once_with(1)
+    vista.camas.confirmar_limpieza.assert_not_called()
+    assert vista._lista.seleccionado() == 1  # sigue elegida, lista para el botón
 
 
 # ---- Confirmar

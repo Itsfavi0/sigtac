@@ -11,6 +11,7 @@ from models.excepciones import PersistenciaError, ReglaNegocioError
 from models.triaje import EpisodioEmergencia, SignosVitales, Triaje
 from prototipo.demo import CamasDemo, PacientesDemo, TriajeDemo
 from views import tema, triage_view
+from views.componentes import BotonSecundario
 from views.componentes.campos import LADO_CASILLA, SEPARACION_CASILLA, sin_error
 from views.componentes.nivel import texto_nivel
 from models.excepciones import ConexionBDError
@@ -27,7 +28,7 @@ def dialogos(monkeypatch):
     """Los diálogos de la pantalla, anotados en lugar de abrirse (bloquearían la prueba)."""
     anotados = {"error": [], "info": []}
     monkeypatch.setattr(triage_view, "mostrar_error", lambda ventana, error: anotados["error"].append(error))
-    monkeypatch.setattr(triage_view, "mostrar_info", lambda ventana, texto: anotados["info"].append(texto))
+    monkeypatch.setattr(triage_view, "avisar_exito", lambda ventana, texto: anotados["info"].append(texto))
     return anotados
 
 
@@ -73,9 +74,28 @@ def boton(vista):
 def test_al_abrir_no_hay_sugerencia_y_el_boton_dice_por_que(crear):
     vista = crear()
     assert vista._vacio.cget("text") == SIN_SUGERENCIA
-    # Deshabilitado, el botón azul se ve igual: su texto dice qué falta
+    # Deshabilitado se ve gris (no parece disponible) y su texto dice qué falta
     assert boton(vista) == (TEXTO_SIN_SIGNOS, "disabled")
-    assert vista._boton_reclasificar.cget("state") == "disabled"
+    assert tuple(vista._boton_confirmar.cget("fg_color")) == tema.COLOR_FONDO_DESHABILITADO
+    assert vista._boton_reclasificar.cget("state") == "disabled"  # desde que se crea: no hay nada que reclasificar
+
+
+def test_en_nuevo_un_recordatorio_dice_cuantos_esperan_en_la_cola_y_lleva_a_ella(crear):
+    # El selector «Nuevo / En cola» se pasaba por alto: se podía registrar de nuevo a quien ya esperaba
+    vista = crear()
+    boton = vista._recordatorio_cola
+    assert isinstance(boton, BotonSecundario) and boton.winfo_manager() == "pack"  # un botón: Tab y Enter llegan
+    assert boton.cget("text") == f"{vista._tabla.cantidad} esperan triaje · Ver la cola"
+    boton.invoke()
+    assert vista._modo.valor == "cola"
+
+
+def test_sin_nadie_en_la_cola_no_hay_recordatorio(crear):
+    vista = crear()
+    vista._mostrar_cola([])
+    assert not vista._recordatorio_cola.winfo_manager()
+    vista._mostrar_recordatorio_cola(1)
+    assert vista._recordatorio_cola.cget("text") == "1 espera triaje · Ver la cola"
 
 
 def test_al_abrir_carga_seguros_sintomas_y_la_cola(crear):

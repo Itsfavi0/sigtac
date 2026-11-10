@@ -26,6 +26,7 @@ def dialogos(monkeypatch):
     anotados = {"error": [], "info": []}
     monkeypatch.setattr(admin_view, "mostrar_error", lambda ventana, error: anotados["error"].append(error))
     monkeypatch.setattr(admin_view, "mostrar_info", lambda ventana, texto: anotados["info"].append(texto))
+    monkeypatch.setattr(admin_view, "avisar_exito", lambda ventana, texto: anotados["info"].append(texto))
     return anotados
 
 

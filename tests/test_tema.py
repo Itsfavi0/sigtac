@@ -12,7 +12,8 @@ TEXTOS = {"texto": tema.COLOR_TEXTO, "etiqueta": tema.COLOR_ETIQUETA, "secundari
 FONDOS = {"superficie": tema.COLOR_SUPERFICIE, "fondo": tema.COLOR_FONDO, "barra": tema.COLOR_BARRA}
 PARES = [tema.COLOR_FONDO, tema.COLOR_BARRA, tema.COLOR_SUPERFICIE, tema.COLOR_CASILLA, tema.COLOR_ACTIVO,
          tema.COLOR_BORDE, tema.COLOR_BORDE_CAMPO, tema.COLOR_DIVISOR, *TEXTOS.values(), tema.COLOR_PRIMARIO,
-         tema.COLOR_PRIMARIO_HOVER, tema.COLOR_PRIMARIO_GRAFICO, tema.COLOR_ALERTA_FONDO, tema.COLOR_SIN_DATO, *tema.COLOR_NIVEL.values(),
+         tema.COLOR_PRIMARIO_HOVER, tema.COLOR_PRIMARIO_GRAFICO, tema.COLOR_ALERTA_FONDO, tema.COLOR_SIN_DATO,
+         tema.COLOR_FONDO_DESHABILITADO, *tema.COLOR_NIVEL.values(),
          *tema.COLOR_ESTADO_CAMA.values(), *tema.COLOR_FONDO_ESTADO_CAMA.values(),
          *tema.COLOR_BORDE_ESTADO_CAMA.values()]
 
@@ -94,6 +95,10 @@ def test_el_numero_sobre_cada_nivel_se_lee(i, modo, nivel):
 @pytest.mark.parametrize("i, modo", MODOS)
 def test_el_texto_sobre_el_primario_y_sin_dato_se_lee(i, modo):
     assert _contraste(tema.COLOR_TEXTO_SOBRE_PRIMARIO[i], tema.COLOR_PRIMARIO[i]) >= 4.5
+    # Deshabilitado, su texto dice qué falta: también se lee
+    assert _contraste(tema.COLOR_TEXTO_DESHABILITADO[i], tema.COLOR_FONDO_DESHABILITADO[i]) >= 4.5
+    # y el botón no se confunde con la tarjeta en la que está
+    assert tema.COLOR_FONDO_DESHABILITADO[i] != tema.COLOR_SUPERFICIE[i]
     assert _contraste(color_texto_sobre(tema.COLOR_SIN_DATO[i]), tema.COLOR_SIN_DATO[i]) >= 4.5
 
 

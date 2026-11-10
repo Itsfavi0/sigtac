@@ -19,7 +19,7 @@ def dialogos(monkeypatch):
     """Los diálogos de la pantalla, anotados en lugar de abrirse. `confirmar` responde lo que diga la prueba."""
     anotados = {"error": [], "info": [], "pregunta": [], "respuesta": True}
     monkeypatch.setattr(pacientes_view, "mostrar_error", lambda ventana, error: anotados["error"].append(error))
-    monkeypatch.setattr(pacientes_view, "mostrar_info", lambda ventana, texto: anotados["info"].append(texto))
+    monkeypatch.setattr(pacientes_view, "avisar_exito", lambda ventana, texto: anotados["info"].append(texto))
 
     def confirmar(ventana, pregunta):
         anotados["pregunta"].append(pregunta)

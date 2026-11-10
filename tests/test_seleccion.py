@@ -250,3 +250,14 @@ def test_el_elemento_colocado_lleva_los_margenes_de_su_columna(crear, raiz_tk):
     esperados = [tuple(int(m * escala) for m in lista._margenes_columna(c)) for c in range(3)]
     assert esperados[0][0] == 0 and esperados[2][1] == 0
     assert [margen(lista.elemento(i).grid_info()["padx"]) for i in (1, 2, 3)] == esperados
+
+
+def test_la_barra_no_estira_la_lista_mas_alla_de_sus_filas(crear, raiz_tk):
+    # CustomTkinter da a su barra 200 px de alto por omisión: al aparecer estiraba la lista aunque pidiera 2 filas
+    lista = crear(columnas=3, filas=2)
+    lista.cargar(datos(*range(30)))
+    raiz_tk.update_idletasks()
+    lista._contenido_cambiado()  # con más filas que las pedidas: aparece la barra
+    raiz_tk.update_idletasks()
+    assert lista._barra.winfo_manager() == "pack"
+    assert lista.winfo_reqheight() <= lista._lienzo.winfo_reqheight() + round(2 * lista.MARGEN * tema.escala(lista)) + 2

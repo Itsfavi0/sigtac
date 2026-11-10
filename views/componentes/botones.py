@@ -10,17 +10,33 @@ from views.componentes.foco import marcar_foco_control
 
 class BotonPrimario(ctk.CTkButton):
     """
-    La acción principal. Deshabilitado conserva el texto blanco: sobre el azul, el gris que CustomTkinter usa por
-    defecto no se lee. Quien lo deshabilita cambia el texto («Verificando…») para que se note que espera.
+    La acción principal. Deshabilitado se ve gris, con el texto secundario, para que no parezca disponible: quien lo
+    presiona sin respuesta creería que la aplicación se colgó. Su texto dice qué falta («Complete los signos
+    vitales»).
     """
 
     def __init__(self, padre, texto: str, comando, **opciones):
         super().__init__(padre, text=texto, command=comando, height=tema.ALTO_CONTROL, corner_radius=tema.RADIO_CONTROL,
                          font=tema.fuente("fuerte"), fg_color=tema.COLOR_PRIMARIO,
                          hover_color=tema.COLOR_PRIMARIO_HOVER, text_color=tema.COLOR_TEXTO_SOBRE_PRIMARIO,
-                         text_color_disabled=tema.COLOR_TEXTO_SOBRE_PRIMARIO, **opciones)
+                         text_color_disabled=tema.COLOR_TEXTO_DESHABILITADO, **opciones)
+        self._pintar_estado()
         # Un borde azul no se vería sobre el azul: el foco se marca con el color del texto
         marcar_foco_control(self, self.invoke, color_foco=tema.COLOR_TEXTO)
+
+    def configure(self, require_redraw=False, **opciones):
+        super().configure(require_redraw=require_redraw, **opciones)
+        if "state" in opciones:
+            self._pintar_estado()
+
+    def _pintar_estado(self):
+        """El relleno según el estado: azul si responde, gris si está deshabilitado."""
+        habilitado = self.cget("state") != "disabled"
+        super().configure(fg_color=tema.COLOR_PRIMARIO if habilitado else tema.COLOR_FONDO_DESHABILITADO)
+
+    @property
+    def deshabilitado(self) -> bool:
+        return self.cget("state") == "disabled"
 
 
 class BotonSecundario(ctk.CTkButton):

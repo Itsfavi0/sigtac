@@ -23,6 +23,16 @@ NADIE_ESPERA = "Nadie espera cama."
 TITULO_ASIGNACION_CAMA = "Asignación de cama"
 
 
+def fuera_de_plazo(cola, ahora: datetime) -> list:
+    """Quienes esperan cama desde hace más que el plazo de su nivel (los que no tienen triaje no tienen plazo)."""
+    return [e for e in cola
+            if e.nivel is not None and excede_plazo(e.nivel, formato.minutos_desde(e.episodio.fecha_ingreso, ahora))]
+
+
+def texto_fuera_de_plazo(cantidad: int) -> str:
+    return f"{cantidad} fuera de plazo"
+
+
 class DashboardView(ctk.CTkFrame):
     TITULO = "Tablero de camas"
     SUBTITULO = "Estado de la guardia en este momento"
@@ -148,7 +158,13 @@ class DashboardView(ctk.CTkFrame):
         disponible = formato.porcentaje(libres, len(en_servicio))
         self.kpis[0].mostrar(f"{libres} / {len(en_servicio)}", f"{disponible} disponible")
         self.kpis[1].mostrar(str(limpieza), "por confirmar")
-        self.kpis[2].mostrar(str(urgentes), "requieren cama ya" if urgentes else "ninguno")
+        # Si alguno de prioridad 1–2 pasó su plazo, la nota lo dice en rojo (cuenta solo los del título del
+        # indicador). Los de otros niveles fuera de plazo se ven en rojo en la cola, o en su pie si no caben
+        tarde = len(fuera_de_plazo([e for e in cola if e.nivel in (1, 2)], self._reloj()))
+        if tarde:
+            self.kpis[2].mostrar(str(urgentes), texto_fuera_de_plazo(tarde), alerta=True)
+        else:
+            self.kpis[2].mostrar(str(urgentes), "requieren cama ya" if urgentes else "ninguno")
         self.kpis[3].mostrar(*cuarto)
 
     def _mostrar_cola(self):
@@ -163,12 +179,19 @@ class DashboardView(ctk.CTkFrame):
         ahora = self._reloj()
         for entrada in self._cola[:self._filas_visibles]:
             self._fila(entrada, ahora)
-        restantes = len(self._cola) - self._filas_visibles
-        if restantes > 0:
+        ocultos = self._cola[self._filas_visibles:]
+        if ocultos:
             ctk.CTkFrame(self._filas, height=1, fg_color=tema.COLOR_DIVISOR, corner_radius=0).pack(fill="x")
-            texto = "1 paciente más en espera" if restantes == 1 else f"{restantes} pacientes más en espera"
-            ctk.CTkLabel(self._filas, text=texto, font=tema.fuente("pequena"), text_color=tema.COLOR_TEXTO_SECUNDARIO,
-                         height=28).pack(anchor="w")
+            pie = ctk.CTkFrame(self._filas, fg_color="transparent")
+            pie.pack(anchor="w")
+            texto = "1 paciente más en espera" if len(ocultos) == 1 else f"{len(ocultos)} pacientes más en espera"
+            ctk.CTkLabel(pie, text=texto, font=tema.fuente("pequena"), text_color=tema.COLOR_TEXTO_SECUNDARIO,
+                         height=28).pack(side="left")
+            # Si entre los que no caben alguien pasó su plazo, se dice aquí: no está entre las filas a la vista
+            tarde = len(fuera_de_plazo(ocultos, ahora))
+            if tarde:
+                ctk.CTkLabel(pie, text=f" · {texto_fuera_de_plazo(tarde)}", font=tema.fuente("fuerte"),
+                             text_color=tema.COLOR_ERROR, height=28).pack(side="left")
 
     def _fila(self, entrada, ahora):
         ctk.CTkFrame(self._filas, height=1, fg_color=tema.COLOR_DIVISOR, corner_radius=0).pack(fill="x")

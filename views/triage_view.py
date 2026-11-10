@@ -20,8 +20,8 @@ from models.triaje import SignosVitales, Triaje
 from utils.numeros import texto_decimal
 from views import formato, tema
 from views.componentes import (BotonPrimario, BotonSecundario, CamposDocumento, CamposPaciente, FichaPaciente,
-                               Desplazable, InsigniaNivel, Selector, TablaDatos, Tarjeta, campo_texto, casilla,
-                               etiqueta_campo, lista_opciones, marcar_error, marcar_foco, mostrar_error, mostrar_info,
+                               Desplazable, InsigniaNivel, Selector, TablaDatos, Tarjeta, avisar_exito, campo_texto,
+                               casilla, etiqueta_campo, lista_opciones, marcar_error, marcar_foco, mostrar_error,
                                texto_nivel)
 from views.componentes.campos import (ajustar_casilla, campo_en_rejilla, leer_campo, leer_opcion, leer_todos,
                                       limpiar_al_corregir, lista_en_rejilla, sin_error)
@@ -139,9 +139,14 @@ class TriageView(ctk.CTkFrame):
         cuerpo = self._cuerpo(tarjeta)
 
         self._nuevo = ctk.CTkFrame(cuerpo, fg_color="transparent")
-        self._identidad = Selector(self._nuevo, [("documento", "Con documento"), ("nn", "Sin identificar")],
+        fila_identidad = ctk.CTkFrame(self._nuevo, fg_color="transparent")
+        fila_identidad.pack(fill="x", pady=(0, tema.ESPACIO_2))
+        self._identidad = Selector(fila_identidad, [("documento", "Con documento"), ("nn", "Sin identificar")],
                                    self._cambiar_identidad)
-        self._identidad.pack(anchor="w", pady=(0, tema.ESPACIO_2))
+        self._identidad.pack(side="left")
+        # A la derecha, si hay pacientes en la cola, un botón dice cuántos y lleva a ella (_mostrar_recordatorio_cola).
+        # Un botón: se llega con Tab y responde a Enter, como los demás controles
+        self._recordatorio_cola = BotonSecundario(fila_identidad, "", self.ver_cola)
         self._identificacion = ctk.CTkFrame(self._nuevo, fg_color="transparent")
         self._identificacion.pack(fill="x")
         self._con_documento = self._crear_con_documento(self._identificacion)
@@ -264,6 +269,7 @@ class TriageView(ctk.CTkFrame):
         if paciente is None:
             self._mostrar_resultado(self._registro)
             self._datos.enfocar()
+            self._formulario.mostrar_foco()  # el formulario de registro pudo quedar bajo el borde
         else:
             self._ficha.mostrar(paciente)
             self._mostrar_resultado(self._ficha)
@@ -465,7 +471,9 @@ class TriageView(ctk.CTkFrame):
         acciones = ctk.CTkFrame(panel, fg_color="transparent")
         self._boton_confirmar = BotonPrimario(acciones, TEXTO_CONFIRMAR, self.confirmar)
         self._boton_confirmar.pack(fill="x")
-        self._boton_reclasificar = BotonSecundario(acciones, TEXTO_RECLASIFICAR, self.alternar_reclasificacion)
+        # Deshabilitado hasta que haya una sugerencia que reclasificar (lo habilita _actualizar_acciones)
+        self._boton_reclasificar = BotonSecundario(acciones, TEXTO_RECLASIFICAR, self.alternar_reclasificacion,
+                                                   state="disabled")
         self._boton_reclasificar.pack(fill="x", pady=(tema.ESPACIO, 0))
         acciones.pack(side="bottom", fill="x", padx=tema.ESPACIO_2, pady=(0, tema.ESPACIO_2))
         cuerpo.pack(fill="both", expand=True, padx=tema.ESPACIO_2, pady=(0, tema.ESPACIO_2))
@@ -476,8 +484,9 @@ class TriageView(ctk.CTkFrame):
         self._formulario.grid(padx=(0, tema.ESPACIO_MINIMO if con_barra else tema.ESPACIO_MEDIO))
 
     def enfocar_signos(self):
-        """El foco al primer signo vital (paso 2)."""
+        """El foco al primer signo vital (paso 2), a la vista."""
         next(iter(self._campos_signos.values())).focus_set()
+        self._formulario.mostrar_foco()
 
     @staticmethod
     def _enfocar(widget) -> str:
@@ -602,7 +611,7 @@ class TriageView(ctk.CTkFrame):
             mostrar_error(self, error)
             self._recargar_cola()  # si el episodio llegó a abrirse, ya aparece «En cola»
             return "break"
-        mostrar_info(self, texto_tras_triaje(nivel_final or sugerido, estado_previo))
+        avisar_exito(self, texto_tras_triaje(nivel_final or sugerido, estado_previo))
         self.limpiar()
         self._recargar_cola()
         return "break"
@@ -702,6 +711,7 @@ class TriageView(ctk.CTkFrame):
         if cola is None:
             self._tabla.sin_lectura()  # no «Nadie espera triaje»: no se sabe
             self._modo.cambiar_texto("cola", "En cola")  # sin «(0)», por lo mismo
+            self._mostrar_recordatorio_cola(0)
 
     def _recargar_cola(self):
         try:
@@ -723,6 +733,23 @@ class TriageView(ctk.CTkFrame):
                 formato.texto_minutos(formato.minutos_desde(episodio.fecha_ingreso, ahora)))))
         self._tabla.cargar(filas)
         self._modo.cambiar_texto("cola", f"En cola ({len(filas)})")
+        self._mostrar_recordatorio_cola(len(filas))
+
+    def ver_cola(self):
+        """El clic en el recordatorio: como elegir «En cola» arriba."""
+        self._modo.elegir("cola")
+
+    def _mostrar_recordatorio_cola(self, cantidad: int):
+        """
+        En «Nuevo», junto a «Con documento / Sin identificar»: cuántos esperan triaje en la cola, y el botón lleva a
+        ella, para que no se registre de nuevo a quien ya espera (el selector «Nuevo / En cola» está en la esquina).
+        """
+        if cantidad <= 0:
+            self._recordatorio_cola.pack_forget()
+            return
+        espera = "1 espera triaje" if cantidad == 1 else f"{cantidad} esperan triaje"
+        self._recordatorio_cola.configure(text=f"{espera} · Ver la cola")
+        self._recordatorio_cola.pack(side="right")
 
     # ---- Piezas de la pantalla
 

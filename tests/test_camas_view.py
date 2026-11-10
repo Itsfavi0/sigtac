@@ -10,7 +10,8 @@ from views import camas_view
 from views.componentes.tabla import SIN_LECTURA
 from views.camas_view import (ELIJA_PACIENTE, NADIE_ESPERA, SIN_LECTURA_COMPATIBLES, TEXTO_ELEGIR_CAMA,
                               TEXTO_ELEGIR_CON_CAMA, TEXTO_ELEGIR_MANTENIMIENTO, TEXTO_ELEGIR_PACIENTE, TITULOS,
-                              NINGUN_PACIENTE, GestionCamasView, sin_compatibles, texto_resumen)
+                              NADIE_CON_CAMA, NINGUN_PACIENTE, TEXTO_BUSCAR_CON_CAMA, GestionCamasView,
+                              sin_compatibles, texto_resumen)
 
 AHORA = datetime(2026, 10, 30, 10, 0)
 
@@ -20,7 +21,7 @@ def dialogos(monkeypatch):
     """Los diálogos de la pantalla, anotados en lugar de abrirse. `confirmar` responde lo que diga la prueba."""
     anotados = {"error": [], "info": [], "pregunta": [], "respuesta": True}
     monkeypatch.setattr(camas_view, "mostrar_error", lambda ventana, error: anotados["error"].append(error))
-    monkeypatch.setattr(camas_view, "mostrar_info", lambda ventana, texto: anotados["info"].append(texto))
+    monkeypatch.setattr(camas_view, "avisar_exito", lambda ventana, texto: anotados["info"].append(texto))
 
     def confirmar(ventana, pregunta):
         anotados["pregunta"].append(pregunta)
@@ -116,8 +117,19 @@ def test_al_elegir_un_paciente_se_ven_sus_camas_compatibles(crear):
     assert vista._lista_compatibles.elemento(cama(vista, "TS-03").id_cama)._estado.cget("text") == "Trauma shock"
     assert vista._ficha_cola.textos == ("M. Salazar", "Nivel 1 · Rojo · Inmediato", "DNI 43•••19 · Dolor torácico agudo")
     assert vista._titulo_compatibles.cget("text") == "Camas compatibles con el nivel 1 · Rojo (3)"
-    assert vista._boton_asignar.cget("text") == TEXTO_ELEGIR_CAMA
-    assert vista._boton_asignar.cget("state") == "disabled"
+    # La primera ya elegida: asignar queda a un clic (o Enter), y el botón la nombra
+    assert vista._lista_compatibles.seleccionado() == cama(vista, "TS-03").id_cama
+    assert vista._boton_asignar.cget("text") == "Asignar TS-03 a M. Salazar"
+    assert vista._boton_asignar.cget("state") == "normal"
+
+
+def test_sin_camas_compatibles_el_boton_dice_por_que(crear):
+    vista = crear()
+    vista.camas.camas_compatibles.side_effect = None
+    vista.camas.camas_compatibles.return_value = []
+    elegir(vista, vista._lista_cola, 1)
+    assert vista._lista_compatibles.seleccionado() is None
+    assert vista._boton_asignar.cget("text") == TEXTO_ELEGIR_CAMA and vista._boton_asignar.cget("state") == "disabled"
 
 
 def test_elegir_la_cama_habilita_asignar_con_su_codigo(crear):
@@ -176,12 +188,113 @@ def test_con_cama_cambia_el_titulo_y_lista_cama_estado_y_paciente(crear):
     assert visible(vista._paneles["con_cama"]) and not visible(vista._paneles["espera"])
     lista = vista._lista_con_cama
     primera = filas(lista)[0]
-    assert primera[0] == "TS-01" and primera[2].startswith("Ocupada desde las")
+    assert primera[0] == "TS-04" and primera[2].startswith("Reservada desde las")
     assert lista.elemento(lista._ids[0])._insignia.nivel == 1
     assert visible(vista._sin_con_cama) and not visible(vista._detalle_con_cama)
     assert vista._boton_cama.cget("text") == TEXTO_ELEGIR_CON_CAMA
     assert all(b.cget("state") == "disabled"
                for b in (vista._boton_cama, vista._boton_cancelar, vista._boton_referir, vista._boton_fuga))
+
+
+def test_buscar_en_con_cama_por_nombre_o_codigo_de_cama(crear):
+    vista = crear()
+    vista._modo.elegir("con_cama")
+    total = vista._lista_con_cama.cantidad
+    buscar = vista._busqueda_con_cama
+    buscar.insert(0, "uci-0")  # sin distinguir mayúsculas
+    vista._filtrar_con_cama()
+    codigos = codigos_con_cama(vista)
+    assert codigos and all(c.startswith("UCI-0") for c in codigos) and len(codigos) < total
+    buscar.delete(0, "end")
+    buscar.insert(0, "Rojas")
+    vista._filtrar_con_cama()
+    apellidos = [vista._con_cama[i].paciente.apellidos for i in vista._lista_con_cama._ids]
+    assert apellidos and all("Rojas" in a for a in apellidos) and len(apellidos) < total
+
+
+def test_la_eleccion_sigue_si_coincide_y_nadie_coincide_lo_dice(crear):
+    vista = crear()
+    vista._modo.elegir("con_cama")
+    primero = vista._lista_con_cama._ids[0]
+    elegir(vista, vista._lista_con_cama, primero)
+    codigo = vista._con_cama[primero].cama.codigo
+    vista._busqueda_con_cama.insert(0, codigo)
+    vista._filtrar_con_cama()
+    assert vista._lista_con_cama.seleccionado() == primero and visible(vista._detalle_con_cama)
+    vista._busqueda_con_cama.delete(0, "end")
+    vista._busqueda_con_cama.insert(0, "zzz")
+    vista._filtrar_con_cama()
+    assert vista._lista_con_cama.cantidad == 0 and vista._lista_con_cama._vacio.cget("text") == "Nadie coincide con «zzz»."
+    assert vista._boton_cama.cget("state") == "disabled"
+    vista._borrar_busqueda_con_cama()  # Escape
+    assert vista._lista_con_cama.cantidad == 15 and vista._busqueda_con_cama.get() == ""
+
+
+def test_escape_con_el_foco_en_la_busqueda_la_deja_lista_para_escribir(crear):
+    # El texto guía no debe quedar como texto escrito: lo tecleado después se pegaría a él y el filtro no haría nada
+    vista = crear()
+    vista._modo.elegir("con_cama")
+    buscar = vista._busqueda_con_cama
+    buscar._entry_focus_in()  # el foco en el campo, como lo registra CTkEntry (la ventana de pruebas está oculta)
+    buscar.insert(0, "uci")
+    vista._borrar_busqueda_con_cama()
+    assert buscar._entry.get() == ""  # vacío de verdad, sin el texto guía insertado
+    buscar.insert(0, "TS-0")
+    vista._filtrar_con_cama()
+    assert codigos_con_cama(vista) and all(c.startswith("TS-0") for c in codigos_con_cama(vista))
+
+
+def test_si_la_lectura_fallo_la_busqueda_no_dice_que_nadie_tiene_cama(crear):
+    vista = crear()
+    vista.camas.pacientes_con_cama.side_effect = PersistenciaError("Sin conexión.")
+    vista._cargar_datos()
+    vista._modo.elegir("con_cama")
+    vista._busqueda_con_cama.insert(0, "x")
+    vista._filtrar_con_cama()
+    vista._borrar_busqueda_con_cama()
+    assert vista._lista_con_cama._vacio.cget("text") == SIN_LECTURA
+
+
+def test_tras_una_operacion_correcta_se_borra_la_busqueda(crear):
+    vista = crear()
+    vista._modo.elegir("con_cama")
+    vista._busqueda_con_cama.insert(0, "rojas")
+    vista._filtrar_con_cama()
+    vista._operar(lambda: None, "Hecho.")
+    assert vista._busqueda_con_cama.get() == "" and vista._lista_con_cama.cantidad == 15
+    assert vista._lista_con_cama._vacio.cget("text") == NADIE_CON_CAMA  # ya no «Nadie coincide con «rojas»»
+
+
+def test_una_operacion_con_la_busqueda_vacia_no_le_quita_el_texto_guia(crear):
+    vista = crear()
+    buscar = vista._busqueda_con_cama
+    guia = buscar._entry.get()  # el texto guía se muestra como texto del Entry de Tk
+    assert guia == TEXTO_BUSCAR_CON_CAMA
+    vista._operar(lambda: None, "Hecho.")
+    assert buscar._entry.get() == TEXTO_BUSCAR_CON_CAMA
+
+
+def test_si_la_cama_elegida_desaparece_al_recargar_no_se_elige_otra_en_silencio(crear):
+    vista = crear()
+    elegir(vista, vista._lista_cola, 1)
+    otra = cama(vista, "UCI-03").id_cama
+    elegir(vista, vista._lista_compatibles, otra)  # el usuario cambió la preelegida
+    compatibles = [c for c in vista.camas.camas_compatibles(1) if c.id_cama != otra]  # otra PC la reservó
+    vista.camas.camas_compatibles.side_effect = None
+    vista.camas.camas_compatibles.return_value = compatibles
+    vista.al_mostrar()
+    assert vista._lista_compatibles.seleccionado() is None
+    assert vista._boton_asignar.cget("text") == TEXTO_ELEGIR_CAMA
+
+
+def test_con_cama_lista_primero_las_reservadas(crear):
+    # Las reservadas esperan una acción («Llegó a la cama»): arriba, sin buscarlas entre las ocupadas
+    vista = crear()
+    vista._modo.elegir("con_cama")
+    estados = [vista._con_cama[i].cama.estado for i in vista._lista_con_cama._ids]
+    reservadas = estados.count(EstadoCama.RESERVADA)
+    assert reservadas > 0 and estados[:reservadas] == [EstadoCama.RESERVADA] * reservadas
+    assert EstadoCama.RESERVADA not in estados[reservadas:]
 
 
 def test_una_cama_reservada_ofrece_llego_y_cancelar(crear):
@@ -466,7 +579,7 @@ def test_las_listas_de_otras_opciones_se_preparan_de_fondo(crear):
     assert vista._lista_con_cama.cantidad == 15  # ya conoce sus filas aunque aún no se vean
     vista.raiz.update()
     vista._modo.elegir("con_cama")
-    assert codigos_con_cama(vista)[0] == "TS-01"
+    assert codigos_con_cama(vista)[0] == "TS-04"  # la reservada, primero
 
 
 def codigos_con_cama(vista) -> list[str]:

@@ -45,7 +45,8 @@
 - **Gestión de camas rediseñada (2026-11-06):** resumen arriba, dos columnas por pestaña (lista y detalle), la cola como en el tablero, la ficha del paciente y las camas como casillas elegibles. Pieza nueva compartida: `ListaSeleccion` (filas o casillas que se eligen con clic o teclado, reutilizadas y creadas de a pocos).
 - **Cambio de pantalla en un solo paso (2026-11-10):** `Cubierta` (`views/componentes/cubierta.py`) tapa el área con una foto suya mientras cambia y la quita cuando Windows terminó de pintar. Se usa en el cambio de módulo y entre el login y la ventana principal. Medido en la demo: 16 de 16 cambios de módulo en un paso (antes, de 6 a 16 pasos visibles).
 - **Limpieza con el estilo de Gestión de camas y tablero sin reacomodo (2026-11-10):** resumen, casillas elegibles y la cama elegida con su confirmación; piezas compartidas en `views/componentes/columnas.py`. El tablero aparece completo tras el login.
-- Pruebas: **2274 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`. Las de las vistas usan una ventana Tk oculta.
+- **Revisión de experiencia de uso (2026-11-10):** con el usuario, de punta a punta en una guardia de noche. Corregidos 13 de 15 puntos (seguridad en limpieza y confirmaciones, Tab que lleva al campo, pacientes fuera de plazo en el tablero, avisos sin diálogo, asignar en dos clics, búsqueda en «Con cama», botón deshabilitado gris, textos con «…»); uno descartado y uno para el equipo.
+- Pruebas: **2332 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`. Las de las vistas usan una ventana Tk oculta.
 
 ### Tarea actual
 
@@ -188,10 +189,9 @@ Al empezar una sesión: leer `CLAUDE.md`, esta sección y las dos o tres primera
      - mostrar también el rechazo de una regla (RN-10 sin justificación, o una cama tomada por otra PC).
    - **Tabla de pruebas:** los 13 casos de la Fase 7 en `DEVELOPMENT_PLAN.md` (todos pasaron en la revisión de tester del 2026-11-05; el detalle está en el CHANGELOG de ese día). Sumar el número de pruebas automáticas y el 97 de 97 de `verificar_controladores.py`.
    - **Antes de la demo,** volver a cargar `db_scripts/seed.sql` en `sigtac_db`. Quedaron datos de la revisión («Prueba QA Tester Sigtac», un NN fusionado, un episodio abierto de Rosa Mendoza y una cuenta para el empleado 55555555). Lo ejecuta el usuario con su cuenta de administrador.
-2. **Decidir en equipo el botón principal deshabilitado:**
-   - hoy se ve igual que el habilitado; es una decisión del 2026-10-30: su texto dice qué falta, p. ej. «Complete los signos vitales»;
-   - si se cambia, el lugar es `BotonPrimario` (`views/componentes/botones.py`, `text_color_disabled`) y una prueba de `tests/test_triage_view.py` (`test_al_abrir_no_hay_sugerencia_y_el_boton_dice_por_que`);
-   - afecta a todas las pantallas.
+2. **Comentar con el equipo dos cambios de la revisión de experiencia de uso** (CHANGELOG del 2026-11-10):
+   - el botón principal deshabilitado **ahora se ve gris** (era la decisión pendiente del 2026-10-30): si el equipo prefiere el azul, el lugar es `BotonPrimario` (`views/componentes/botones.py`);
+   - **queda para decidir:** el rojo significa «Ocupada» en la matriz y «Nivel 1» en la cola; con muchas camas ocupadas el tablero parece en alarma. Es un cambio de la paleta aprobada (`views/tema.py`, `COLOR_ESTADO_CAMA`).
 3. **Validar con el equipo la matriz de permisos** (`models/permisos.py`; ver CHANGELOG del 2026-10-21 y 2026-10-26): si el enfermero puede registrar una fuga, y que la baja de pacientes sea solo del administrador.
 4. **Opcional, si hay tiempo:**
    - actualizar `db_scripts/diagrama.png` (ver «Pendientes conocidos»).

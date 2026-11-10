@@ -183,6 +183,50 @@ def test_la_cubierta_tapa_el_encabezado_y_el_contenido_no_el_menu(raiz_tk, sesio
     assert not any(_dentro_de(boton, area) for boton, _ in vista._items.values())
 
 
+def test_el_aviso_de_una_operacion_ocupa_el_lugar_de_la_descripcion_y_se_va_solo(raiz_tk, sesion_de):
+    vista, _, _ = crear(raiz_tk, sesion_de(Rol.MEDICO))
+    vista.avisar("Alta registrada. La cama TS-04 espera limpieza.")
+    assert vista.aviso_visible == "✓ Alta registrada. La cama TS-04 espera limpieza."
+    assert not vista._descripcion.winfo_manager()  # el aviso está en su lugar
+    assert tuple(vista._aviso.cget("text_color")) == tema.COLOR_EXITO
+    tarea = vista._tarea_aviso
+    assert tarea in raiz_tk.tk.call("after", "info")  # programado para irse solo
+    vista._quitar_aviso()
+    assert vista.aviso_visible is None and vista._descripcion.winfo_manager() == "pack"
+    assert tarea not in raiz_tk.tk.call("after", "info")
+
+
+def test_el_aviso_dura_mas_si_el_texto_es_largo_con_tope(raiz_tk, sesion_de, monkeypatch):
+    vista, _, _ = crear(raiz_tk, sesion_de(Rol.MEDICO))
+    duraciones = []
+    after = vista.after
+    monkeypatch.setattr(vista, "after", lambda ms, f: duraciones.append(ms) or after(ms, f))
+    vista.avisar("Corto.")
+    vista.avisar("x" * 150)
+    vista.avisar("x" * 1000)
+    assert duraciones == [AppPrincipal.MS_AVISO_MINIMO, 150 * AppPrincipal.MS_AVISO_POR_LETRA,
+                          AppPrincipal.MS_AVISO_MAXIMO]
+    vista._quitar_aviso()
+
+
+def test_las_pantallas_avisan_en_el_encabezado_y_cambiar_de_modulo_lo_quita(raiz_tk, sesion_de):
+    from views.componentes import avisar_exito
+    vista, _, _ = crear(raiz_tk, sesion_de(Rol.MEDICO))
+    avisar_exito(vista._contenido, "Triaje registrado.")  # como lo llama una pantalla, sin diálogo
+    assert vista.aviso_visible == "✓ Triaje registrado."
+    vista.mostrar("pacientes")
+    assert vista.aviso_visible is None and vista._descripcion.winfo_manager() == "pack"
+    assert vista._descripcion.cget("text") == next(m.descripcion for m in MODULOS if m.clave == "pacientes")
+
+
+def test_al_destruirse_deja_de_recibir_los_avisos(raiz_tk, sesion_de, monkeypatch):
+    from views.componentes import errores
+    vista, _, _ = crear(raiz_tk, sesion_de(Rol.MEDICO))
+    assert errores._avisadores[str(raiz_tk)] == vista.avisar
+    vista.destroy()
+    assert str(raiz_tk) not in errores._avisadores
+
+
 def test_al_destruirse_quita_la_cubierta(raiz_tk, sesion_de, monkeypatch):
     vista, _, _ = crear(raiz_tk, sesion_de(Rol.ENFERMERO))
     quitar = MagicMock()

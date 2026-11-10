@@ -87,10 +87,18 @@ class TarjetaKPI(ctk.CTkFrame):
                                   text_color=tema.COLOR_TEXTO_SECUNDARIO)
         self._nota.pack(side="right", anchor="s")
 
-    def mostrar(self, valor: str | None, nota: str | None = None):
-        """El valor ya formateado («15 / 36», «8 min»); None muestra «—» (no hay dato)."""
+    def mostrar(self, valor: str | None, nota: str | None = None, alerta: bool = False):
+        """
+        El valor ya formateado («15 / 36», «8 min»); None muestra «—» (no hay dato). Con `alerta`, la nota va en rojo y
+        en negrita (p. ej. «1 fuera de plazo»): el color no va solo, el texto dice qué pasa.
+        """
         self._valor.configure(text=SIN_VALOR if valor is None else valor)
-        self._nota.configure(text=nota or "")
+        self._nota.configure(text=nota or "", font=tema.fuente("fuerte" if alerta else "pequena"),
+                             text_color=tema.COLOR_ERROR if alerta else tema.COLOR_TEXTO_SECUNDARIO)
+
+    @property
+    def en_alerta(self) -> bool:
+        return tuple(self._nota.cget("text_color")) == tema.COLOR_ERROR
 
     @property
     def valor(self) -> str:

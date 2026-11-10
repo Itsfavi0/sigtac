@@ -25,10 +25,11 @@ from models.estados import EstadoCama
 from models.excepciones import SigtacError
 from models.triaje import excede_plazo
 from views import formato, tema
-from views.componentes import (BotonPrimario, BotonSecundario, Desplazable, InsigniaNivel, ListaSeleccion, Selector,
-                               Tarjeta, TarjetaCama, aviso_columna, campo_texto, confirmar, dos_columnas,
-                               etiqueta_campo, etiqueta_resumen, fila_acciones, marcar_error, mostrar_error,
-                               mostrar_info, texto_nivel)
+from views.componentes import (BotonPrimario, BotonSecundario, Desplazable, EtiquetaRecortada, InsigniaNivel,
+                               ListaSeleccion, Selector,
+                               Tarjeta, TarjetaCama, avisar_exito, aviso_columna, campo_texto, confirmar,
+                               dos_columnas, etiqueta_campo, etiqueta_resumen, fila_acciones, marcar_error,
+                               mostrar_error, texto_nivel)
 from views.componentes.campos import sin_error
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ NADIE_CON_CAMA = "Ninguna cama tiene un paciente asignado."
 SIN_CAMAS_MANTENIMIENTO = "No hay camas disponibles ni fuera de servicio."
 ELIJA_PACIENTE = "Elija un paciente de la cola para ver sus camas."
 ELIJA_CON_CAMA = "Elija un paciente de la lista para ver su cama y sus acciones."
+TEXTO_BUSCAR_CON_CAMA = "Buscar por nombre o código de cama"
 ELIJA_MANTENIMIENTO = "Elija una cama: una disponible sale de servicio con su motivo; una fuera de servicio vuelve."
 SIN_LECTURA_COMPATIBLES = "No se pudieron leer sus camas compatibles. Elíjalo de nuevo."
 SIN_DATOS = "Paciente sin datos"
@@ -52,6 +54,19 @@ TITULOS = {
     "con_cama": ("Pacientes con cama", "Llegada a la cama, alta y otros cierres del episodio"),
     "mantenimiento": ("Mantenimiento", "Camas disponibles o fuera de servicio"),
 }
+
+
+def texto_buscable(en_cama) -> str:
+    """Lo que la búsqueda de «Con cama» compara: nombres, apellidos, el nombre corto y el código de la cama."""
+    paciente = en_cama.paciente
+    partes = [en_cama.cama.codigo]
+    if paciente is not None:
+        partes += [nombre(paciente), paciente.nombres or "", paciente.apellidos or ""]
+    return " ".join(partes).casefold()
+
+
+def nadie_coincide(buscado: str) -> str:
+    return f"Nadie coincide con «{buscado}»."
 
 
 def sin_compatibles(nivel: int | None) -> str:
@@ -135,14 +150,15 @@ class FilaPaciente(ctk.CTkFrame):
         self.grid_columnconfigure(1, weight=1)
         self._insignia = InsigniaNivel(self, lado=self.LADO_INSIGNIA)
         self._insignia.grid(row=0, column=0, padx=tema.ESPACIO_MEDIO)
+        # Los textos ocupan todo el ancho de su columna, que decide cuánto se ve: si no caben, terminan en «…»
         textos = ctk.CTkFrame(self, fg_color="transparent")
-        textos.grid(row=0, column=1, sticky="w")
-        self._principal = ctk.CTkLabel(textos, text="", font=tema.fuente("fuerte"), text_color=tema.COLOR_TEXTO,
-                                       height=17, anchor="w")
-        self._principal.pack(anchor="w")
-        self._secundario = ctk.CTkLabel(textos, text="", font=tema.fuente("pequena"),
-                                        text_color=tema.COLOR_TEXTO_SECUNDARIO, height=15, anchor="w")
-        self._secundario.pack(anchor="w")
+        textos.grid(row=0, column=1, sticky="ew")
+        self._principal = EtiquetaRecortada(textos, font=tema.fuente("fuerte"), text_color=tema.COLOR_TEXTO,
+                                            height=17, anchor="w")
+        self._principal.pack(fill="x")
+        self._secundario = EtiquetaRecortada(textos, font=tema.fuente("pequena"),
+                                             text_color=tema.COLOR_TEXTO_SECUNDARIO, height=15, anchor="w")
+        self._secundario.pack(fill="x")
         self._mostrado = None  # lo que muestra: si una recarga trae lo mismo, no se repinta (cada repintado redibuja)
 
     def _pintar(self, nivel: int | None, principal: str, secundario: str, *dato) -> bool:
@@ -151,13 +167,14 @@ class FilaPaciente(ctk.CTkFrame):
             return False
         self._mostrado = (nivel, principal, secundario, *dato)
         self._insignia.mostrar(nivel)
-        self._principal.configure(text=principal)
-        self._secundario.configure(text=secundario)
+        self._principal.mostrar(principal)
+        self._secundario.mostrar(secundario)
         return True
 
     @property
     def textos(self) -> tuple[str, ...]:
-        return self._principal.cget("text"), self._secundario.cget("text")
+        """Los textos completos (lo que se ve puede terminar en «…»)."""
+        return self._principal.completo, self._secundario.completo
 
 
 class FilaCola(FilaPaciente):
@@ -225,6 +242,7 @@ class GestionCamasView(ctk.CTkFrame):
         self._mantenimiento = {}   # id_cama → Cama
         self._paciente_mostrado = None   # id_episodio cuyas camas compatibles se muestran
         self._motivo_rechazado = None    # el motivo tal como se rechazó: su aviso sigue hasta que cambie
+        self._lectura_fallida = False    # la última lectura falló: las listas dicen que no se pudo leer
 
         # Como Pacientes: la tarjeta se desplaza en vertical si no cabe (1093×614)
         self._contenido = contenido = Desplazable(self)
@@ -304,6 +322,10 @@ class GestionCamasView(ctk.CTkFrame):
                 self._titulo_compatibles.configure(
                     text=f"Camas compatibles con el nivel {texto_nivel(entrada.nivel)} ({len(self._compatibles)})")
         self._lista_compatibles.cargar(self._compatibles.items())
+        if self._compatibles and not recarga:
+            # Al elegir al paciente, la primera ya elegida: asignar queda en dos clics (o Enter, Enter), y el botón la
+            # nombra. En una recarga no: si la cama que eligió el usuario ya no está, otra no la reemplaza en silencio
+            self._lista_compatibles.seleccionar(next(iter(self._compatibles)))
         self._actualizar_asignar()
 
     def _actualizar_asignar(self):
@@ -330,7 +352,12 @@ class GestionCamasView(ctk.CTkFrame):
 
     def _crear_con_cama(self, padre) -> ctk.CTkFrame:
         marco, izquierda, derecha = dos_columnas(padre)
-        etiqueta_campo(izquierda, "Reservadas u ocupadas").pack(anchor="w", pady=(0, tema.ESPACIO))
+        # La búsqueda, en el lugar de la etiqueta de la lista: con 15 o más pacientes, encuentra a uno (p. ej. para el
+        # alta) sin bajar leyendo nombre por nombre. Filtra al escribir; Escape la borra
+        self._busqueda_con_cama = campo_texto(izquierda, TEXTO_BUSCAR_CON_CAMA)
+        self._busqueda_con_cama.pack(fill="x", pady=(0, tema.ESPACIO))
+        self._busqueda_con_cama.bind("<KeyRelease>", lambda _e: self._filtrar_con_cama(), add="+")
+        self._busqueda_con_cama.bind("<Escape>", lambda _e: self._borrar_busqueda_con_cama(), add="+")
         self._lista_con_cama = self._lista_pacientes(izquierda, FilaConCama, NADIE_CON_CAMA, self._con_cama_elegido)
 
         self._sin_con_cama = aviso_columna(derecha, ELIJA_CON_CAMA)
@@ -356,6 +383,33 @@ class GestionCamasView(ctk.CTkFrame):
 
     def _elegido_con_cama(self):
         return self._con_cama.get(self._lista_con_cama.seleccionado())
+
+    def _con_cama_buscados(self) -> dict:
+        """Los pacientes con cama que coinciden con lo escrito en la búsqueda (nombre o código de cama); sin
+        búsqueda, todos."""
+        buscado = self._busqueda_con_cama.get().strip().casefold()
+        if not buscado:
+            return self._con_cama
+        return {i: p for i, p in self._con_cama.items() if buscado in texto_buscable(p)}
+
+    def _filtrar_con_cama(self):
+        """Al escribir en la búsqueda: la lista muestra los que coinciden; el elegido sigue si coincide."""
+        if self._lectura_fallida:
+            return  # la lista sigue diciendo que no se pudo leer: «nadie» sería afirmar lo que no se sabe
+        elegido = self._lista_con_cama.seleccionado()
+        buscados = self._con_cama_buscados()
+        buscado = self._busqueda_con_cama.get().strip()
+        self._lista_con_cama.cambiar_texto_vacio(nadie_coincide(buscado) if buscado else NADIE_CON_CAMA)
+        self._lista_con_cama.cargar(buscados.items())
+        if elegido in buscados:
+            self._lista_con_cama.seleccionar(elegido)
+        self._con_cama_elegido()
+
+    def _borrar_busqueda_con_cama(self):
+        # Solo delete: CTkEntry repone el texto guía al perder el foco. Ponerlo con el foco adentro lo dejaría como
+        # texto escrito, y lo que se tecleara después quedaría pegado a él
+        self._busqueda_con_cama.delete(0, "end")
+        self._filtrar_con_cama()
 
     def _con_cama_elegido(self, _id_episodio=None):
         elegido = self._elegido_con_cama()
@@ -533,7 +587,7 @@ class GestionCamasView(ctk.CTkFrame):
             return "break"
         self._limpiar_motivo()
         self._recargar()
-        mostrar_info(self, f"La cama {cama.codigo} quedó fuera de servicio.")
+        avisar_exito(self, f"La cama {cama.codigo} quedó fuera de servicio.")
         return "break"
 
     def _motivo_editado(self):
@@ -569,8 +623,12 @@ class GestionCamasView(ctk.CTkFrame):
             mostrar_error(self, error)
             self._recargar(conservar=True)
             return
+        # La búsqueda de «Con cama» se borra, si había algo escrito: servía para encontrar a quien se atendió. Vacía no
+        # se toca: borrarla sin foco le quitaría el texto guía
+        if self._busqueda_con_cama.get():
+            self._busqueda_con_cama.delete(0, "end")
         self._recargar()
-        mostrar_info(self, exito(resultado) if callable(exito) else exito)
+        avisar_exito(self, exito(resultado) if callable(exito) else exito)
 
     def _cargar_datos(self):
         """La cola, las camas con paciente y las de mantenimiento, al abrir. Si la BD falla, un solo aviso."""
@@ -583,6 +641,7 @@ class GestionCamasView(ctk.CTkFrame):
             # Las listas no dicen «Nadie espera cama»: no se pudieron leer
             for lista in (self._lista_cola, self._lista_con_cama, self._lista_mantenimiento):
                 lista.sin_lectura()
+            self._lectura_fallida = True  # hasta la próxima lectura correcta (_mostrar)
             # Sin cifra: «(0)» o «0 esperan cama» dirían que nadie espera, y no se sabe
             self._modo.cambiar_texto("espera", "Esperan cama")
             self._modo.cambiar_texto("con_cama", "Con cama")
@@ -619,8 +678,11 @@ class GestionCamasView(ctk.CTkFrame):
         return self._camas.cola_de_espera(), self._camas.pacientes_con_cama(), mantenimiento
 
     def _mostrar(self, cola, con_cama, mantenimiento):
+        self._lectura_fallida = False
         self._ahora = self._reloj()
         self._cola = {e.episodio.id_episodio: e for e in cola}
+        # Las reservadas primero: esperan una acción («Llegó a la cama»). Dentro de cada grupo, el orden que llega
+        con_cama = sorted(con_cama, key=lambda p: p.cama.estado != EstadoCama.RESERVADA)
         self._con_cama = {p.episodio.id_episodio: p for p in con_cama}
         self._mantenimiento = {c.id_cama: c for c in mantenimiento}
         self._pintar_listas()
@@ -646,8 +708,10 @@ class GestionCamasView(ctk.CTkFrame):
         respondiendo): así, al abrir otra opción, sus filas ya existen. Las que no cambiaron no se repintan.
         """
         visible = self._modo.valor
+        buscado = self._busqueda_con_cama.get().strip()  # lo que dice «Con cama» vacía depende de la búsqueda
+        self._lista_con_cama.cambiar_texto_vacio(nadie_coincide(buscado) if buscado else NADIE_CON_CAMA)
         for modo, lista, datos in (("espera", self._lista_cola, self._cola),
-                                   ("con_cama", self._lista_con_cama, self._con_cama),
+                                   ("con_cama", self._lista_con_cama, self._con_cama_buscados()),
                                    ("mantenimiento", self._lista_mantenimiento, self._mantenimiento)):
             lista.cargar(datos.items(), de_fondo=modo != visible)
 

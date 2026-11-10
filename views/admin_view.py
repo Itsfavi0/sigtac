@@ -26,8 +26,8 @@ from models.excepciones import SigtacError
 from models.permisos import Rol
 from views import formato, tema
 from views.componentes import (BotonPrimario, BotonSecundario, CamposDocumento, CamposPeriodo, Desplazable, Selector,
-                               TablaDatos, Tarjeta, fila_acciones, lista_opciones, marcar_error, mostrar_error,
-                               mostrar_info)
+                               TablaDatos, Tarjeta, avisar_exito, fila_acciones, lista_opciones, marcar_error,
+                               mostrar_error, mostrar_info)
 from views.componentes.campos import celda, campo_texto, leer_opcion, lista_en_rejilla
 from views.componentes.documento import ETIQUETAS
 from views.componentes.periodo import texto_periodo
@@ -587,7 +587,7 @@ class AdminView(ctk.CTkFrame):
             self._releer_paciente()     # otra PC pudo cambiarlo
             return
         self._releer_paciente()
-        mostrar_info(self, mensaje)
+        avisar_exito(self, mensaje)
 
     def _releer_paciente(self):
         """Vuelve a leer el paciente que se buscó (no lo escrito después), sin diálogo si falla."""
@@ -619,7 +619,7 @@ class AdminView(ctk.CTkFrame):
             self._recargar(conservar=True)
             return
         self._recargar(conservar=True)
-        mostrar_info(self, exito)
+        avisar_exito(self, exito)
 
     def _cargar_datos(self):
         """

@@ -29,11 +29,16 @@ def textos(widget) -> list[str]:
 @pytest.fixture
 def dialogos(monkeypatch):
     """Reemplaza los diálogos de messagebox (que bloquearían la prueba) y anota cómo se llamaron."""
-    llamadas = []
+    class Llamadas(list):
+        opciones = []  # las opciones de cada diálogo (p. ej. el botón elegido de entrada), en el mismo orden
+
+    llamadas = Llamadas()
+    llamadas.opciones = []
 
     def registrar(tipo, respuesta=None):
-        def dialogo(titulo, texto, parent=None):
+        def dialogo(titulo, texto, parent=None, **opciones):
             llamadas.append((tipo, titulo, texto, parent))
+            llamadas.opciones.append(opciones)
             return respuesta
         return dialogo
 
@@ -59,6 +64,27 @@ def test_mostrar_info_y_confirmar(dialogos):
     assert confirmar(None, "¿Fusionar los pacientes?") is True
     assert [(tipo, texto) for tipo, _, texto, _ in dialogos] == [
         ("info", "Triaje registrado"), ("pregunta", "¿Fusionar los pacientes?")]
+
+
+def test_al_confirmar_el_boton_elegido_de_entrada_es_no(dialogos):
+    # Lo que se confirma no se puede deshacer (alta, fuga, fusión): un Enter apurado no debe confirmarlo
+    confirmar(None, "¿Dar de alta a S. Rojas?")
+    assert dialogos.opciones[-1] == {"default": errores.messagebox.NO}
+
+
+def test_avisar_exito_sin_dialogo_si_la_ventana_principal_se_registro(raiz_tk, dialogos):
+    avisos = []
+    pantalla = ctk.CTkFrame(raiz_tk)
+    errores.registrar_avisos(raiz_tk, avisos.append)
+    try:
+        errores.avisar_exito(pantalla, "Alta registrada.")
+        errores.quitar_avisos(raiz_tk, print)  # otra ventana principal que se cierra no le quita el registro
+        errores.avisar_exito(pantalla, "Sigue registrada.")
+    finally:
+        errores.quitar_avisos(raiz_tk, avisos.append)
+    assert avisos == ["Alta registrada.", "Sigue registrada."] and dialogos == []
+    errores.avisar_exito(pantalla, "Sin ventana principal.")  # ya no registrada: diálogo
+    assert [(tipo, texto) for tipo, _, texto, _ in dialogos] == [("info", "Sin ventana principal.")]
 
 
 @pytest.mark.parametrize("elegida, esperada", [("C:/reportes/octubre.pdf", Path("C:/reportes/octubre.pdf")),
@@ -331,10 +357,18 @@ def test_boton_primario_azul_y_ejecuta_su_accion(raiz_tk):
     assert llamadas == ["ok"]
 
 
-def test_boton_primario_deshabilitado_conserva_el_texto_legible(raiz_tk):
-    # El gris por defecto de CustomTkinter no se lee sobre el azul
-    boton = BotonPrimario(raiz_tk, "Ingresar", None)
-    assert tuple(boton.cget("text_color_disabled")) == tema.COLOR_TEXTO_SOBRE_PRIMARIO
+def test_boton_primario_deshabilitado_se_ve_gris_y_su_texto_se_lee(raiz_tk):
+    # En azul, deshabilitado parecía disponible: quien lo presionaba sin respuesta creía que la aplicación se colgó
+    boton = BotonPrimario(raiz_tk, "Complete los signos vitales", None, state="disabled")
+    assert boton.deshabilitado
+    assert tuple(boton.cget("fg_color")) == tema.COLOR_FONDO_DESHABILITADO
+    assert tuple(boton.cget("text_color_disabled")) == tema.COLOR_TEXTO_DESHABILITADO  # contraste en test_tema
+    boton.configure(state="normal", text="Confirmar nivel 1")
+    assert not boton.deshabilitado and tuple(boton.cget("fg_color")) == tema.COLOR_PRIMARIO
+    boton.configure(state="disabled")
+    assert tuple(boton.cget("fg_color")) == tema.COLOR_FONDO_DESHABILITADO
+    boton.configure(text="Otro texto")  # sin tocar el estado, el relleno no cambia
+    assert tuple(boton.cget("fg_color")) == tema.COLOR_FONDO_DESHABILITADO
 
 
 def test_boton_deshabilitado_no_ejecuta_su_accion(raiz_tk):
@@ -920,6 +954,60 @@ def test_desplazable_muestra_la_barra_solo_si_el_contenido_no_cabe(raiz_tk):
     assert contenido.ajustar_barra(alto_visible=alto - 50) is True and contenido.muestra_barra
     contenido.mostrar_al_pie()  # no falla aunque la ventana esté oculta
     contenido.destroy()
+
+
+def test_desplazable_muestra_el_campo_que_recibe_el_foco(raiz_tk, monkeypatch):
+    # Con Tab hacia un campo bajo el borde, se desplaza hasta él: si no, se escribe en un campo que no se ve
+    from types import SimpleNamespace
+
+    from views.componentes import Desplazable
+    contenido = Desplazable(raiz_tk)
+    adentro = ctk.CTkEntry(contenido)
+    afuera = ctk.CTkEntry(raiz_tk)
+    mostrados = []
+    monkeypatch.setattr(contenido, "winfo_viewable", lambda: 1)  # la ventana de pruebas está oculta
+    monkeypatch.setattr(contenido, "mostrar_hasta", lambda abajo, conservar: mostrados.append((abajo, conservar)))
+    contenido._al_enfocar(SimpleNamespace(widget=adentro._entry))  # el foco va al Entry de Tk dentro del CTkEntry
+    contenido._al_enfocar(SimpleNamespace(widget=afuera._entry))   # otra pantalla: no es asunto suyo
+    contenido._al_enfocar(SimpleNamespace(widget="."))             # un nombre en vez de un widget: se ignora
+    assert mostrados == [(adentro._entry, adentro._entry)]
+    contenido.destroy()
+    afuera.destroy()
+
+
+def test_desplazable_muestra_el_foco_que_pone_el_codigo(raiz_tk, monkeypatch):
+    # El foco que pone el código (p. ej. al primer campo de un formulario que aparece) no pasa por Tab
+    from views.componentes import Desplazable
+    contenido = Desplazable(raiz_tk)
+    campo = ctk.CTkEntry(contenido)
+    mostrados = []
+    monkeypatch.setattr(contenido, "winfo_viewable", lambda: 1)
+    monkeypatch.setattr(contenido, "focus_get", lambda: campo._entry)
+    monkeypatch.setattr(contenido, "mostrar_hasta", lambda abajo, conservar: mostrados.append(abajo))
+    contenido.mostrar_foco()
+    raiz_tk.update_idletasks()  # se muestra cuando Tk termina lo pendiente
+    assert mostrados == [campo._entry]
+    contenido.mostrar_foco()
+    contenido.destroy()          # destruido antes de que corra: la tarea no falla
+    raiz_tk.update_idletasks()
+    assert mostrados == [campo._entry]
+
+
+def test_desplazable_oculto_no_se_desplaza_y_al_destruirse_suelta_solo_su_aviso_de_foco(raiz_tk, monkeypatch):
+    from types import SimpleNamespace
+
+    from views.componentes import Desplazable
+    uno, otro = Desplazable(raiz_tk), Desplazable(raiz_tk)
+    campo = ctk.CTkEntry(uno)
+    mostrados = []
+    monkeypatch.setattr(uno, "mostrar_hasta", lambda abajo, conservar: mostrados.append(abajo))
+    uno._al_enfocar(SimpleNamespace(widget=campo._entry))  # pantalla oculta (la ventana de pruebas lo está)
+    assert mostrados == []
+    id_otro = otro._al_enfocar_id
+    uno.destroy()
+    assert id_otro in raiz_tk.bind("<<TraverseIn>>")  # la otra pantalla sigue desplazándose al foco
+    otro.destroy()
+    assert id_otro not in raiz_tk.bind("<<TraverseIn>>")
 
 
 def test_desplazable_sin_acomodar_aun_no_decide_la_barra(raiz_tk):

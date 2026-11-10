@@ -77,6 +77,10 @@ COLOR_PRIMARIO_HOVER = ("#1E559E", "#0B5FC2")
 # (botones, fila elegida) sigue con COLOR_PRIMARIO: ese texto necesita el tono oscuro.
 COLOR_PRIMARIO_GRAFICO = ("#2563B8", "#3D8BF2")
 COLOR_TEXTO_SOBRE_PRIMARIO = ("#FFFFFF", "#FFFFFF")
+# El botón principal deshabilitado: gris, con el texto secundario, para que no parezca disponible. En oscuro, un gris
+# que se distingue de la tarjeta (#2B2B2B)
+COLOR_FONDO_DESHABILITADO = ("#E2E7EE", "#3A3A3A")
+COLOR_TEXTO_DESHABILITADO = COLOR_TEXTO_SECUNDARIO
 COLOR_ERROR = ("#C5221F", "#FF6B61")
 COLOR_EXITO = ("#137333", "#34C759")           # «Actualizado», conexión correcta
 COLOR_ALERTA_FONDO = ("#FDECEA", "#302525")    # bloque de una prioridad 1

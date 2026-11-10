@@ -28,7 +28,8 @@ from controllers.reporte_controller import ReporteController
 from controllers.triaje_controller import TriajeController
 from models.permisos import Permiso
 from views import formato, tema
-from views.componentes import BotonSecundario, Cubierta, Marca
+from views.componentes import (BotonSecundario, Cubierta, EtiquetaRecortada, Marca, quitar_avisos,
+                               registrar_avisos)
 from views.componentes.foco import GROSOR_FOCO, fijar_borde, marcar_foco_control
 from views.componentes.iconos import MENU, icono
 from views.admin_view import AdminView
@@ -141,6 +142,11 @@ class AppPrincipal(ctk.CTkFrame):
     MS_RELOJ = 1000
     MS_ANTES_DE_PRECARGAR = 500  # que la primera pantalla termine de dibujarse antes de construir las otras
     MS_ENTRE_PRECARGAS = 50      # entre una pantalla y la siguiente: deja pasar los clics del usuario
+    MS_AVISO_MINIMO = 6000       # lo que dura a la vista el aviso de una operación (más si el texto es largo)
+    MS_AVISO_POR_LETRA = 60
+    MS_AVISO_MAXIMO = 15000
+    # El aviso, en dos renglones como mucho, a la izquierda de la fecha y el reloj en una ventana de 1093 px
+    ANCHO_AVISO = 440
 
     def __init__(self, padre, auth: AuthController, sesion: Sesion, al_cerrar,
                  pantallas: dict[str, Callable] | None = None, precargar: bool = False):
@@ -159,6 +165,7 @@ class AppPrincipal(ctk.CTkFrame):
         self._sin_conexion = False  # la última lectura falló: no se precarga (cada pantalla abriría un diálogo)
         self._tarea_reloj = None
         self._tarea_precarga = None
+        self._tarea_aviso = None
 
         self.grid_columnconfigure(2, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -172,6 +179,7 @@ class AppPrincipal(ctk.CTkFrame):
         # Tapa el encabezado y el contenido al cambiar de módulo (el título cambia junto con la pantalla); el menú
         # queda fuera y se marca al instante
         self._cubierta = Cubierta(derecha)
+        registrar_avisos(self, self.avisar)  # avisar_exito de las pantallas avisa en el encabezado, sin diálogo
 
         self._actualizar_reloj()
         if self._modulos:
@@ -254,11 +262,13 @@ class AppPrincipal(ctk.CTkFrame):
         ctk.CTkLabel(avatar, text=iniciales(self._sesion), font=tema.fuente("fuerte"),
                      text_color=tema.COLOR_TEXTO).place(relx=0.5, rely=0.5, anchor="center")
         nombre = f"{self._sesion.nombres.split()[0]} {self._sesion.apellidos.split()[0]}"
-        ctk.CTkLabel(usuario, text=nombre, font=tema.fuente("fuerte"), text_color=tema.COLOR_TEXTO, anchor="w",
-                     height=Marca.ALTO_NOMBRE).grid(row=0, column=1, sticky="w")
-        ctk.CTkLabel(usuario, text=self._sesion.nombre_rol, font=tema.fuente("pequena"),
-                     text_color=tema.COLOR_TEXTO_SECUNDARIO, anchor="w", height=Marca.ALTO_SERVICIO).grid(
-            row=1, column=1, sticky="w")
+        # Con «…» si no caben en la barra (p. ej. «Médico de Emerge…»)
+        usuario.grid_columnconfigure(1, weight=1)
+        EtiquetaRecortada(usuario, nombre, font=tema.fuente("fuerte"), text_color=tema.COLOR_TEXTO, anchor="w",
+                          height=Marca.ALTO_NOMBRE).grid(row=0, column=1, sticky="ew")
+        EtiquetaRecortada(usuario, self._sesion.nombre_rol, font=tema.fuente("pequena"),
+                          text_color=tema.COLOR_TEXTO_SECUNDARIO, anchor="w", height=Marca.ALTO_SERVICIO).grid(
+            row=1, column=1, sticky="ew")
         return usuario
 
     # ---- Encabezado
@@ -274,6 +284,9 @@ class AppPrincipal(ctk.CTkFrame):
         self._descripcion = ctk.CTkLabel(textos, text="", font=tema.fuente("pequena"),
                                          text_color=tema.COLOR_TEXTO_SECUNDARIO, anchor="w")
         self._descripcion.pack(anchor="w")
+        # El aviso de una operación que salió bien ocupa, por unos segundos, el lugar de la descripción (avisar)
+        self._aviso = ctk.CTkLabel(textos, text="", font=tema.fuente("fuerte"), text_color=tema.COLOR_EXITO,
+                                   anchor="w", justify="left", wraplength=self.ANCHO_AVISO)
 
         # A la derecha, de derecha a izquierda: reloj, fecha y la hora de la última actualización
         self._reloj = ctk.CTkLabel(encabezado, text="", font=tema.fuente("fuerte"), text_color=tema.COLOR_TEXTO)
@@ -285,6 +298,33 @@ class AppPrincipal(ctk.CTkFrame):
                                          text_color=tema.COLOR_EXITO)
         self._actualizado.pack(side="right", padx=(0, tema.ESPACIO_2))
         return encabezado
+
+    def avisar(self, texto: str):
+        """
+        Lo que salió bien en una operación (avisar_exito de las pantallas), sin diálogo: en verde y con ✓ en el
+        lugar de la descripción, unos segundos según lo largo del texto. Un aviso nuevo reemplaza al anterior.
+        """
+        self._cancelar_aviso()
+        self._descripcion.pack_forget()
+        self._aviso.configure(text=f"✓ {texto}")
+        self._aviso.pack(anchor="w")
+        duracion = min(self.MS_AVISO_MAXIMO, max(self.MS_AVISO_MINIMO, len(texto) * self.MS_AVISO_POR_LETRA))
+        self._tarea_aviso = self.after(duracion, self._quitar_aviso)
+
+    def _quitar_aviso(self):
+        self._cancelar_aviso()
+        self._aviso.pack_forget()
+        self._descripcion.pack(anchor="w")
+
+    def _cancelar_aviso(self):
+        if self._tarea_aviso is not None:
+            self.after_cancel(self._tarea_aviso)
+            self._tarea_aviso = None
+
+    @property
+    def aviso_visible(self) -> str | None:
+        """El aviso que se ve, o None."""
+        return self._aviso.cget("text") if self._aviso.winfo_manager() else None
 
     def marcar_actualizado(self, momento: datetime | None = None):
         """Lo llama la pantalla al cargar sus datos: «Actualizado 10:42» (brief §2: no «EN VIVO»)."""
@@ -336,6 +376,7 @@ class AppPrincipal(ctk.CTkFrame):
             self._marcar_item(self._actual, activo=False)
         self._actual = clave
         self._marcar_item(clave, activo=True)
+        self._quitar_aviso()  # era de lo hecho en el módulo anterior
         self._titulo.configure(text=modulo.nombre)
         self._descripcion.configure(text=modulo.descripcion)
         self._actualizado.configure(text="")
@@ -449,6 +490,8 @@ class AppPrincipal(ctk.CTkFrame):
 
     def destroy(self):
         self._cubierta.quitar()
+        self._cancelar_aviso()
+        quitar_avisos(self, self.avisar)
         for tarea in (self._tarea_reloj, self._tarea_precarga):
             if tarea is not None:
                 self.after_cancel(tarea)

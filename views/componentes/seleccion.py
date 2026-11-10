@@ -62,7 +62,9 @@ class ListaSeleccion(ctk.CTkFrame):
         margen = round(self.MARGEN * tema.escala(self))  # el lienzo es de Tk: no escala solo
         self._lienzo = tk.Canvas(self, highlightthickness=0, borderwidth=0, takefocus=1,
                                  background=tema.color_actual(tema.COLOR_SUPERFICIE))
-        self._barra = ctk.CTkScrollbar(self, command=self._lienzo.yview)
+        # Del alto de un elemento: se estira hasta el de la lista (fill="y"). Con los 200 px que CustomTkinter le da
+        # por omisión, al aparecer estiraría la lista a 200 px aunque pidiera 2 filas (88 px)
+        self._barra = ctk.CTkScrollbar(self, command=self._lienzo.yview, height=alto_elemento)
         # CTkScrollbar redibuja toda la ventana cada vez que se mueve (update_idletasks): la barra se actualiza una
         # sola vez, cuando Tk termina de acomodar, y no con cada cambio
         self._lienzo.configure(yscrollcommand=self._desplazada)

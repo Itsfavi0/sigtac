@@ -5,21 +5,24 @@ from views.componentes.columnas import aviso_columna, dos_columnas, etiqueta_res
 from views.componentes.cubierta import Cubierta
 from views.componentes.desplazable import Desplazable
 from views.componentes.documento import CamposDocumento
-from views.componentes.errores import confirmar, mostrar_error, mostrar_info, pedir_ruta_pdf
+from views.componentes.errores import (avisar_exito, confirmar, mostrar_error, mostrar_info, pedir_ruta_pdf,
+                                       quitar_avisos, registrar_avisos)
 from views.componentes.foco import marcar_error, marcar_foco
 from views.componentes.marca import Marca
 from views.componentes.matriz import MatrizCamas
 from views.componentes.nivel import InsigniaNivel, texto_nivel
 from views.componentes.paciente import CamposPaciente, FichaPaciente
 from views.componentes.periodo import CamposPeriodo
+from views.componentes.recorte import EtiquetaRecortada
 from views.componentes.seleccion import ListaSeleccion
 from views.componentes.selector import Selector
 from views.componentes.tabla import TablaDatos
 from views.componentes.tarjetas import Tarjeta, TarjetaCama, TarjetaKPI
 
 __all__ = ["BotonPrimario", "BotonSecundario", "CamposDocumento", "CamposPaciente", "CamposPeriodo", "Cubierta",
-           "Desplazable",
+           "Desplazable", "EtiquetaRecortada",
            "FichaPaciente", "InsigniaNivel", "ListaSeleccion", "Marca", "MatrizCamas", "Selector", "TablaDatos",
-           "Tarjeta", "TarjetaCama", "TarjetaKPI", "aviso_columna", "campo_texto", "casilla", "confirmar",
-           "dos_columnas", "etiqueta_campo", "etiqueta_resumen", "fila_acciones", "lista_opciones", "marcar_error",
-           "marcar_foco", "mostrar_error", "mostrar_info", "pedir_ruta_pdf", "texto_nivel"]
+           "Tarjeta", "TarjetaCama", "TarjetaKPI", "avisar_exito", "aviso_columna", "campo_texto", "casilla",
+           "confirmar", "dos_columnas", "etiqueta_campo", "etiqueta_resumen", "fila_acciones", "lista_opciones",
+           "marcar_error", "marcar_foco", "mostrar_error", "mostrar_info", "pedir_ruta_pdf", "quitar_avisos",
+           "registrar_avisos", "texto_nivel"]

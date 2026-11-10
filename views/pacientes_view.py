@@ -17,8 +17,8 @@ import customtkinter as ctk
 from models.excepciones import SigtacError
 from views import formato, tema
 from views.componentes import (BotonPrimario, BotonSecundario, CamposDocumento, CamposPaciente, FichaPaciente,
-                               Desplazable, Selector, TablaDatos, Tarjeta, campo_texto, confirmar, etiqueta_campo,
-                               marcar_error, mostrar_error, mostrar_info)
+                               Desplazable, Selector, TablaDatos, Tarjeta, avisar_exito, campo_texto, confirmar,
+                               etiqueta_campo, marcar_error, mostrar_error)
 from views.componentes.campos import sin_error
 from views.componentes.documento import ETIQUETAS
 
@@ -217,7 +217,7 @@ class PacientesView(ctk.CTkFrame):
             return "break"
         self.cancelar()
         self._mostrar_ficha(paciente)
-        mostrar_info(self, "Datos del paciente guardados.")
+        avisar_exito(self, "Datos del paciente guardados.")
         return "break"
 
     def abrir_episodio(self, _evento=None):
@@ -236,7 +236,7 @@ class PacientesView(ctk.CTkFrame):
             return "break"
         nombre = self._ficha.nombre
         self.cancelar()
-        mostrar_info(self, f"Episodio abierto: {nombre} espera triaje.")
+        avisar_exito(self, f"Episodio abierto: {nombre} espera triaje.")
         return "break"
 
     # ---- Sin identificar
@@ -313,7 +313,7 @@ class PacientesView(ctk.CTkFrame):
         self._documento_nn.limpiar()
         self._datos_nn.limpiar()
         self._recargar_nn()
-        mostrar_info(self, mensaje)
+        avisar_exito(self, mensaje)
         self._documento_nn.enfocar()  # listo para el siguiente; el botón ya está deshabilitado
         return "break"
 

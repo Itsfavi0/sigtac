@@ -4,7 +4,7 @@ confirma cada una cuando la deja lista, y la cama vuelve a estar libre (RN-08). 
 alta, la cama no queda libre sin esta confirmación (RN-07).
 
 Como Mantenimiento en Gestión de camas: arriba, un resumen (cuántas esperan y cuánto la más antigua); a la izquierda
-las camas como casillas, con su tipo; a la derecha la cama elegida y la confirmación.
+las camas como casillas, con su tipo; a la derecha la cama elegida y la confirmación, que se hace solo con el botón.
 
 La lista se lee al abrir, al volver a la pantalla y después de cada confirmación, porque otra PC pudo confirmar la
 misma cama.
@@ -17,9 +17,9 @@ import customtkinter as ctk
 from models.estados import EstadoCama
 from models.excepciones import SigtacError
 from views import formato, tema
-from views.componentes import (BotonPrimario, Desplazable, ListaSeleccion, Tarjeta, TarjetaCama, aviso_columna,
-                               dos_columnas, etiqueta_campo, etiqueta_resumen, fila_acciones, mostrar_error,
-                               mostrar_info)
+from views.componentes import (BotonPrimario, Desplazable, ListaSeleccion, Tarjeta, TarjetaCama, avisar_exito,
+                               aviso_columna, dos_columnas, etiqueta_campo, etiqueta_resumen, fila_acciones,
+                               mostrar_error)
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +74,9 @@ class LimpiezaView(ctk.CTkFrame):
         self._lista = ListaSeleccion(
             izquierda, lambda padre_, cama: TarjetaCama(padre_, cama, detalle=type(cama).NOMBRE_CORTO),
             NADA_POR_LIMPIAR, alto_elemento=TarjetaCama.ALTO, columnas=self.COLUMNAS_CAMAS, filas=self.FILAS_CAMAS,
-            al_seleccionar=lambda _id: self._cama_elegida(), al_activar=lambda _id: self.confirmar(),
-            actualizar=TarjetaCama.mostrar)
+            al_seleccionar=lambda _id: self._cama_elegida(), actualizar=TarjetaCama.mostrar)
+        # Sin al_activar: Enter y el doble clic solo eligen. Confirmar la cama equivocada la mostraría disponible
+        # estando sucia, y se la podrían asignar al siguiente paciente; se confirma solo con el botón, que la nombra
         self._lista.pack(fill="x")
 
         self._sin_eleccion = aviso_columna(derecha, ELIJA_CAMA)
@@ -131,7 +132,7 @@ class LimpiezaView(ctk.CTkFrame):
             self._recargar(conservar=True)
             return
         self._recargar()
-        mostrar_info(self, f"Cama {cama.codigo} lista: vuelve a estar disponible.")
+        avisar_exito(self, f"Cama {cama.codigo} lista: vuelve a estar disponible.")
 
     # ---- Datos
 

@@ -6,6 +6,7 @@ la separa del contenido ESPACIO_MINIMO; sin ella, el contenido llega al borde (n
 CustomTkinter no ofrece ocultar la barra ni desplazar desde el código: se usan sus atributos internos
 (`_scrollbar`, `_parent_canvas`), aquí y en ningún otro lugar. Si una versión nueva los cambia, se corrige solo esto.
 """
+import tkinter as tk
 from collections.abc import Callable
 
 import customtkinter as ctk
@@ -40,6 +41,11 @@ class Desplazable(ctk.CTkScrollableFrame):
         # El contenido cambia de alto (paneles que se muestran u ocultan) y la ventana de tamaño
         self.bind("<Configure>", lambda _e: self._programar(), add="+")
         self._parent_canvas.bind("<Configure>", lambda _e: self._programar(), add="+")
+        # Al pasar con Tab a un campo que quedó bajo el borde, se desplaza hasta él, para no escribir en un campo que
+        # no se ve. <<TraverseIn>> lo genera Tk solo al recorrer con Tab (no con un clic, ni al volver a la ventana o
+        # cerrar un diálogo, que no deben mover la vista), y llega a la ventana por el widget que recibe el foco
+        self._ventana = self.winfo_toplevel()
+        self._al_enfocar_id = self._ventana.bind("<<TraverseIn>>", self._al_enfocar, add="+")
 
     def _programar(self):
         """Una sola revisión cuando Tk termine de acomodar todo, no una por cada evento."""
@@ -104,6 +110,35 @@ class Desplazable(ctk.CTkScrollableFrame):
                                       y_conservar, y_abajo, margen)
         self._parent_canvas.yview_moveto(arriba / alto_total)
 
+    def _al_enfocar(self, evento):
+        """Si el widget que recibió el foco es de este contenido y se ve la pantalla, lo muestra entero."""
+        widget = evento.widget
+        if not isinstance(widget, tk.Misc) or not self.contiene(widget) or not self.winfo_viewable():
+            return
+        self.mostrar_hasta(widget, widget)
+
+    def mostrar_foco(self):
+        """
+        Para el foco que pone el código (p. ej. al primer campo de un formulario que aparece): cuando Tk termine lo
+        pendiente, muestra entero el widget que tenga el foco, si es de este contenido. Tab ya lo hace solo.
+        """
+        def mostrar():
+            if not self.winfo_exists():
+                return
+            widget = self.focus_get()
+            if widget is not None and self.contiene(widget) and self.winfo_viewable():
+                self.mostrar_hasta(widget, widget)
+        # En la ventana, no aquí: si este contenido se destruye antes, la tarea no falla («invalid command name»)
+        self._ventana.after_idle(mostrar)
+
+    def contiene(self, widget) -> bool:
+        """Si `widget` está dentro de este contenido."""
+        while widget is not None:
+            if widget is self:
+                return True
+            widget = widget.master
+        return False
+
     def _y_dentro(self, widget) -> int:
         """La altura de `widget` medida desde el borde de arriba de este contenido (suma la de cada contenedor)."""
         y = 0
@@ -118,4 +153,7 @@ class Desplazable(ctk.CTkScrollableFrame):
         if self._tarea is not None:
             self.after_cancel(self._tarea)
             self._tarea = None
+        if self._al_enfocar_id is not None and self._ventana.winfo_exists():
+            self._ventana.unbind("<<TraverseIn>>", self._al_enfocar_id)  # solo el suyo: las demás pantallas siguen
+            self._al_enfocar_id = None
         super().destroy()

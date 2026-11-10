@@ -47,8 +47,30 @@ def test_indicadores_del_jefe_de_guardia(crear):
     vista = crear()
     assert [(k.valor, k.nota) for k in vista.kpis] == [
         ("15 / 34", "44 % disponible"),  # 34 en servicio: las 2 fuera de servicio no cuentan
-        ("4", "por confirmar"), ("2", "requieren cama ya"), ("8 min", "hoy")]
+        # M. Salazar (nivel 1, inmediato) pasó su plazo: la nota lo dice en rojo. Cuenta solo los de prioridad 1–2,
+        # los del título: el NN (nivel 3, 1 h 11 min) se ve en la cola
+        ("4", "por confirmar"), ("2", "1 fuera de plazo"), ("8 min", "hoy")]
+    assert vista.kpis[2].en_alerta and not vista.kpis[0].en_alerta
     assert vista.avisos == [True]
+
+
+def test_sin_nadie_fuera_de_plazo_la_nota_es_la_de_siempre(raiz_tk, sesion_de):
+    camas = MagicMock(wraps=CamasDemo(lambda: AHORA))
+    en_plazo = [e for e in CamasDemo(lambda: AHORA).cola_de_espera() if e.nivel == 2]  # J. Mendoza, 7 de 10 min
+    camas.cola_de_espera.side_effect = None
+    camas.cola_de_espera.return_value = en_plazo
+    vista = DashboardView(raiz_tk, camas, sesion_de(Rol.JEFE_GUARDIA), ReportesDemo(), TriajeDemo(lambda: AHORA),
+                          reloj=lambda: AHORA)
+    assert (vista.kpis[2].valor, vista.kpis[2].nota) == ("1", "requieren cama ya") and not vista.kpis[2].en_alerta
+
+
+def test_si_alguien_fuera_de_plazo_no_cabe_en_la_cola_el_resumen_lo_dice(crear):
+    # Con poca altura se ven 2: el NN (1 h 11 min, fuera de plazo) quedaba escondido en «2 pacientes más»
+    vista = crear()
+    vista._ajustar_cola(MagicMock(height=round(600 * tema.escala(vista))))
+    visibles = textos(vista._filas)
+    assert "2 pacientes más en espera" in visibles and " · 1 fuera de plazo" in visibles
+    assert not any(t.startswith("NN") for t in visibles)
 
 
 def test_sin_camas_asignadas_hoy_la_asignacion_no_tiene_valor(raiz_tk, sesion_de):
