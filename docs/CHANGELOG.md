@@ -5,6 +5,70 @@
 
 ---
 
+## [2026-11-10] — Cambio de pantalla en un solo paso (Cubierta)
+
+### Cambio
+- **`Cubierta`** (`views/componentes/cubierta.py`), pieza compartida nueva:
+  - al cambiar de pantalla, fotografía el área (`PIL.ImageGrab`) y pone la foto encima, en una ventana aparte sin bordes;
+  - hace el cambio debajo;
+  - quita la foto cuando Windows avisa que ya no queda nada visible por pintar (`GetUpdateRect` sobre cada widget, con `ctypes`). Revisa cada 15 ms, cuando Tk está libre, y como máximo espera 1,5 s de reloj;
+  - resultado: la pantalla nueva aparece completa, de una vez, en lugar de dibujarse por partes.
+- **Cambio de módulo** (`views/app_principal.py`): `mostrar()` abre el módulo bajo una cubierta que tapa el encabezado y el contenido. El menú queda fuera y se marca al instante.
+- **Login ↔ ventana principal** (`main.py`): `Aplicacion._cambiar` recibe una fábrica y hace el cambio bajo una cubierta de toda la ventana. Primero construye la pantalla nueva y después quita la anterior: si la construcción falla, la anterior sigue.
+
+### Archivos afectados
+- `views/componentes/cubierta.py` (nuevo), `views/componentes/__init__.py`
+- `views/app_principal.py`, `main.py`
+- Pruebas: `tests/test_cubierta.py` y `tests/test_main.py` (nuevos), `tests/test_app_principal.py`
+- `docs/`
+
+### Motivo
+El usuario veía «toscos» los cambios de pantalla. Medido en la demo con capturas de pantalla desde otro proceso:
+- después de un clic en el menú, la pantalla seguía cambiando unos 250 ms (casi 1 s en el tablero), en 6 a 16 pasos visibles: fondo vacío, cajas grises y, al final, los textos;
+- del login a la ventana principal se veían 39 pasos.
+
+### Impacto
+- **Cambio de módulo:** 16 de 16 cambios medidos en un solo paso con la versión final (antes, de 6 a 16). La pantalla final aparece unos 100 ms más tarde que antes; en el tablero, la anterior queda quieta hasta ~0,6 s. La ventana nunca perdió el primer plano.
+- **Login → ventana principal:** la foto tapa hasta el límite (1,5 s) y después se ve el tablero terminando de acomodarse (ver Pendientes). Cerrar sesión: 2 pasos.
+- **Fuera de Windows,** con la ventana oculta (las pruebas) o si la foto falla, el cambio se hace sin foto, a la vista.
+- Pruebas: **2251 pasan** (antes 2227).
+
+### Decisiones
+- **Por qué una foto en otra ventana.** Tk dibuja cada widget directamente en la ventana, sin una imagen intermedia, y CustomTkinter no permite animaciones ni transparencias (`PRODUCT.md`). Se midieron y descartaron:
+  - **un telón del color del fondo dentro de la ventana:** Windows no pinta lo que otra parte de la misma ventana tapa, así que la pantalla se dibujaba por partes igual al quitarlo;
+  - **preparar la pantalla nueva tapada por la anterior:** por la misma razón;
+  - **deslizar o fundir pantallas:** con `place()` cada cuadro redibuja decenas de widgets y se ve entrecortado; además, el brief pide «cambio de módulo inmediato, sin transición».
+  - Debajo de *otra* ventana, Windows sí pinta: por eso la foto va en una ventana aparte.
+- **Decisión del usuario:** aplicarlo en el cambio de módulo y en el login, a cambio de la pequeña espera con la pantalla anterior quieta y de usar la API de Windows. El menú se marca al instante, aunque la foto todavía muestre el título anterior.
+- **Sin `update()`:**
+  - la foto se pinta directamente con Windows (`StretchDIBits`) y se le quita la animación de aparición (`DwmSetWindowAttribute`): sin ella, en 2 de 16 cambios se veía un instante el área vacía;
+  - la etiqueta de la foto se coloca con `place` y medidas fijas: con `pack` mediría 1×1 hasta que Tk atienda sus eventos, y se pintaba un solo píxel;
+  - así, mientras se pone la foto, no corren clics ni temporizadores. Con `update()` (la primera versión), un segundo clic rápido se perdía, la precarga podía correr con la sesión ya cerrada y cerrar sesión en ese instante daba `TclError`.
+- **Cuándo se quita:**
+  - dos revisiones seguidas sin nada por pintar;
+  - cada revisión corre cuando Tk está libre (`after_idle`) y antes hace sus tareas pendientes (`update_idletasks`). Windows da una zona por pintada apenas Tk recibe el aviso, aunque Tk la dibuje después;
+  - el límite se mide con reloj, no contando revisiones, porque con Tk ocupado las revisiones se atrasan;
+  - las revisiones se programan en la ventana raíz: si el área se destruye con una revisión pendiente, esta termina sin error.
+- **Si la foto o su ventana fallan** (`OSError`, `TclError`), el cambio se hace igual, sin foto, y no queda ninguna ventana suelta.
+- **Las mediciones** se hicieron con capturas desde otro proceso, porque capturar desde un hilo frenaba a Tk. Una medición quedó descartada: la ventana medida estaba tapada por otra aplicación, y Windows no pinta lo que tapa la ventana de otra aplicación.
+- **Proceso de la interfaz** (skill ui-consistency):
+  - checklist de 10 puntos para esta zona;
+  - calibración con otro agente sobre una copia con un log en f-string plantado, que encontró;
+  - la revisión la hizo, en dos pasadas, un agente que no escribió el código. Encontró:
+    - los problemas de `update()`;
+    - que `pintar_ya` pintaba un solo píxel (la etiqueta aún medía 1×1);
+    - dos pruebas que no comprobaban que el cambio ocurriera dentro de la cubierta;
+    - una prueba de «ya está pintada» que no miraba el tamaño;
+    - tareas `after` huérfanas en las pruebas;
+    - llamadas a Windows sin tipos declarados.
+  - Todo corregido. También se quitó un filtro de ventanas ocultas que no hacía nada: Windows no les guarda partes por pintar.
+
+### Pendientes
+- **Tablero tras el login:** la primera vez, la matriz de camas se sigue reacomodando entre 2 y 4 s (las casillas cambian de ancho y los textos pasan de cortados a completos). Pasa igual sin la cubierta: coincide con la precarga de las otras pantallas, que empieza a los 500 ms (`MS_ANTES_DE_PRECARGAR`). Se podría esperar a que el tablero termine de dibujarse antes de precargar.
+- Probar con la pantalla al 125–150 % y con dos monitores de distinto DPI (en esta PC no se pudo).
+
+---
+
 ## [2026-11-06] — Gestión de camas rediseñada y lista elegible compartida (ListaSeleccion)
 
 ### Cambio

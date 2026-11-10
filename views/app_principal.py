@@ -28,7 +28,7 @@ from controllers.reporte_controller import ReporteController
 from controllers.triaje_controller import TriajeController
 from models.permisos import Permiso
 from views import formato, tema
-from views.componentes import BotonSecundario, Marca
+from views.componentes import BotonSecundario, Cubierta, Marca
 from views.componentes.foco import GROSOR_FOCO, fijar_borde, marcar_foco_control
 from views.componentes.iconos import MENU, icono
 from views.admin_view import AdminView
@@ -169,6 +169,9 @@ class AppPrincipal(ctk.CTkFrame):
         self._crear_encabezado(derecha).pack(fill="x", padx=tema.ESPACIO_3)
         self._contenido = ctk.CTkFrame(derecha, fg_color="transparent", corner_radius=0)
         self._contenido.pack(fill="both", expand=True, padx=tema.ESPACIO_3, pady=(0, tema.ESPACIO_3))
+        # Tapa el encabezado y el contenido al cambiar de módulo (el título cambia junto con la pantalla); el menú
+        # queda fuera y se marca al instante
+        self._cubierta = Cubierta(derecha)
 
         self._actualizar_reloj()
         if self._modulos:
@@ -314,10 +317,21 @@ class AppPrincipal(ctk.CTkFrame):
     # ---- Módulos
 
     def mostrar(self, clave: str):
-        """Cambia al módulo indicado, sin transición. Solo los módulos del menú (los que el rol puede usar)."""
+        """
+        Cambia al módulo indicado, sin transición: la pantalla nueva aparece completa, de una vez (Cubierta). Solo los
+        módulos del menú (los que el rol puede usar).
+        """
         modulo = next((m for m in self._modulos if m.clave == clave), None)
         if modulo is None:
             raise ValueError(f"Módulo no disponible para este rol: {clave!r}.")
+        self._cubierta.cambiar(lambda: self._abrir(modulo))
+
+    def _abrir(self, modulo: Modulo):
+        """
+        El ítem del menú, el encabezado y la pantalla del módulo (la guardada con al_mostrar, una nueva o el aviso).
+        Corre bajo la cubierta, que tapa encabezado y contenido: el menú, que queda fuera, se marca al instante.
+        """
+        clave = modulo.clave
         if self._actual is not None:
             self._marcar_item(self._actual, activo=False)
         self._actual = clave
@@ -434,6 +448,7 @@ class AppPrincipal(ctk.CTkFrame):
         self._al_cerrar()
 
     def destroy(self):
+        self._cubierta.quitar()
         for tarea in (self._tarea_reloj, self._tarea_precarga):
             if tarea is not None:
                 self.after_cancel(tarea)

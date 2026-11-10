@@ -149,6 +149,48 @@ def test_volver_a_un_modulo_no_reconstruye_su_pantalla_y_le_avisa(raiz_tk, sesio
                         ("mostrada", "tablero")]
 
 
+def test_el_cambio_de_modulo_se_hace_bajo_la_cubierta(raiz_tk, sesion_de, monkeypatch):
+    # Menú, encabezado y pantalla cambian dentro de la cubierta: aparecen juntos y de una vez
+    vista, _, _ = crear(raiz_tk, sesion_de(Rol.MEDICO))
+    vistos = []
+    original = vista._cubierta.cambiar
+
+    def cambiar(cambio):
+        vistos.append((vista.modulo_actual, vista._titulo.cget("text")))  # al entrar: aún el anterior
+        resultado = original(cambio)
+        vistos.append((vista.modulo_actual, vista._titulo.cget("text")))
+        return resultado
+
+    monkeypatch.setattr(vista._cubierta, "cambiar", cambiar)
+    vista.mostrar("pacientes")
+    assert vistos == [("tablero", "Tablero de camas"), ("pacientes", "Pacientes")]
+    assert tuple(vista._items["pacientes"][0].cget("fg_color")) == tema.COLOR_ACTIVO
+
+
+def _dentro_de(widget, area) -> bool:
+    while widget is not None:
+        if widget is area:
+            return True
+        widget = widget.master
+    return False
+
+
+def test_la_cubierta_tapa_el_encabezado_y_el_contenido_no_el_menu(raiz_tk, sesion_de):
+    # El menú queda fuera: el ítem elegido se marca al instante
+    vista, _, _ = crear(raiz_tk, sesion_de(Rol.MEDICO))
+    area = vista._cubierta._area
+    assert _dentro_de(vista._contenido, area) and _dentro_de(vista._titulo, area)
+    assert not any(_dentro_de(boton, area) for boton, _ in vista._items.values())
+
+
+def test_al_destruirse_quita_la_cubierta(raiz_tk, sesion_de, monkeypatch):
+    vista, _, _ = crear(raiz_tk, sesion_de(Rol.ENFERMERO))
+    quitar = MagicMock()
+    monkeypatch.setattr(vista._cubierta, "quitar", quitar)
+    vista.destroy()
+    quitar.assert_called_once()
+
+
 def test_el_aviso_de_un_modulo_sin_pantalla_se_destruye_al_salir(raiz_tk, sesion_de):
     anotados = []
     vista, _, _ = crear(raiz_tk, sesion_de(Rol.ENFERMERO), pantallas=_pantallas_que_anotan(anotados, ("triaje",)))

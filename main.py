@@ -12,6 +12,7 @@ from controllers.auth_controller import AuthController, Sesion
 from utils.logging_config import configurar_logging
 from views import tema
 from views.app_principal import AppPrincipal
+from views.componentes import Cubierta
 from views.login_view import LoginView
 
 
@@ -27,24 +28,32 @@ class Aplicacion:
         self._ventana = ventana
         self._auth = auth
         self._pantalla = None
+        self._cubierta = Cubierta(ventana)  # el login y la ventana principal se reemplazan de una vez
 
     def mostrar_login(self):
         self._ventana.title(tema.TITULO_VENTANA)
-        self._cambiar(LoginView(self._ventana, self._auth, al_iniciar=self.mostrar_principal))
+        self._cambiar(lambda: LoginView(self._ventana, self._auth, al_iniciar=self.mostrar_principal))
 
     def mostrar_principal(self, sesion: Sesion):
-        self._cambiar(AppPrincipal(self._ventana, self._auth, sesion, al_cerrar=self.mostrar_login, precargar=True))
+        self._cambiar(lambda: AppPrincipal(self._ventana, self._auth, sesion, al_cerrar=self.mostrar_login,
+                                           precargar=True))
 
     def salir(self):
         """Al cerrar la ventana también se cierra la sesión."""
         self._auth.cerrar_sesion()
+        self._cubierta.quitar()
         self._ventana.destroy()
 
-    def _cambiar(self, pantalla):
-        if self._pantalla is not None:
-            self._pantalla.destroy()
-        self._pantalla = pantalla
-        pantalla.pack(fill="both", expand=True)
+    def _cambiar(self, crear):
+        """Construye la pantalla nueva y después quita la anterior: si la construcción falla, la anterior sigue."""
+        def cambio():
+            pantalla = crear()
+            if self._pantalla is not None:
+                self._pantalla.destroy()
+            self._pantalla = pantalla
+            pantalla.pack(fill="both", expand=True)
+
+        self._cubierta.cambiar(cambio)
 
 
 def main():

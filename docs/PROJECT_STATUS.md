@@ -2,7 +2,7 @@
 
 > Estado de trabajo actual del proyecto.
 > Este archivo debe mantenerse pequeño y actualizado después de cada sesión importante.
-> Última actualización: 2026-11-06.
+> Última actualización: 2026-11-10.
 
 ---
 
@@ -43,7 +43,8 @@
 - **Fase 7, detalles menores (2026-11-06):** mensajes sin nombres técnicos ni «tú», coma decimal en toda la app y el PDF (`utils/numeros.py`), síntomas largos en dos líneas, todos los campos con error marcados a la vez (`leer_todos`), la PA marcada en sus dos campos (`SignosVitales.validar_presion`) y el indicador «Asignación de cama» en el tablero.
 - **Aspecto y fluidez (2026-11-06):** paleta fría y más suave en el modo claro, casillas de cama con tinte y franja del estado, y pantallas que se construyen una vez por sesión (precargadas tras el login): cambiar de módulo pasa de 0,4–1,3 s a 0,1–0,4 s.
 - **Gestión de camas rediseñada (2026-11-06):** resumen arriba, dos columnas por pestaña (lista y detalle), la cola como en el tablero, la ficha del paciente y las camas como casillas elegibles. Pieza nueva compartida: `ListaSeleccion` (filas o casillas que se eligen con clic o teclado, reutilizadas y creadas de a pocos).
-- Pruebas: **2227 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`. Las de las vistas usan una ventana Tk oculta.
+- **Cambio de pantalla en un solo paso (2026-11-10):** `Cubierta` (`views/componentes/cubierta.py`) tapa el área con una foto suya mientras cambia y la quita cuando Windows terminó de pintar. Se usa en el cambio de módulo y entre el login y la ventana principal. Medido en la demo: 16 de 16 cambios de módulo en un paso (antes, de 6 a 16 pasos visibles).
+- Pruebas: **2251 pasan** (`python -m pytest`), sin necesidad de MySQL ni `.env`. Las de las vistas usan una ventana Tk oculta.
 
 ### Tarea actual
 
@@ -192,6 +193,7 @@ Al empezar una sesión: leer `CLAUDE.md`, esta sección y las dos o tres primera
    - afecta a todas las pantallas.
 3. **Validar con el equipo la matriz de permisos** (`models/permisos.py`; ver CHANGELOG del 2026-10-21 y 2026-10-26): si el enfermero puede registrar una fuga, y que la baja de pacientes sea solo del administrador.
 4. **Opcional, si hay tiempo:**
+   - tras el login, la matriz del tablero se reacomoda de 2 a 4 s porque la precarga empieza antes de que termine de dibujarse (`MS_ANTES_DE_PRECARGAR`; ver CHANGELOG del 2026-11-10);
    - dar a Limpieza el estilo de Gestión de camas: casillas elegibles con `ListaSeleccion`, en `views/componentes/seleccion.py`;
    - actualizar `db_scripts/diagrama.png` (ver «Pendientes conocidos»).
 
