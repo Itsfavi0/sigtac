@@ -115,3 +115,20 @@ def test_en_1093x614_la_matriz_se_desplaza(raiz_tk):
     assert matriz.desplazable is True
     matriz.disponer(round(1040 * escala), round(500 * escala))  # al agrandar la ventana, la barra se va
     assert matriz.desplazable is False
+
+
+def test_al_aparecer_la_barra_se_reparte_una_sola_vez(raiz_tk, monkeypatch):
+    # La barra le quita su ancho al lienzo y llega otro <Configure>: no debe volver a acomodar todas las casillas
+    matriz = MatrizCamas(raiz_tk)
+    matriz.cargar(camas_demo())
+    escala = tema.escala(matriz)
+    ancho, alto = round(850 * escala), round(150 * escala)
+    matriz.disponer(ancho, alto)
+    assert matriz.desplazable is True
+    queda = ancho - matriz._barra.winfo_reqwidth()
+    assert matriz._clave[0] == round(queda / escala)  # repartida para el ancho que deja la barra
+    acomodadas = []
+    casilla = matriz._grupos[0][2][0]
+    monkeypatch.setattr(casilla, "grid", lambda **_: acomodadas.append(casilla))
+    matriz.disponer(queda, alto)  # el <Configure> que sigue a la barra
+    assert acomodadas == []

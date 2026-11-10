@@ -129,10 +129,14 @@ class MatrizCamas(ctk.CTkFrame):
         if not self._grupos or ancho_real <= 1:
             self._lienzo.itemconfigure(self._ventana, width=max(ancho_real, 1))
             return
+        filas, columnas, alto = self._calcular(ancho_real / escala)
+        if alto * escala > alto_real + 1 and not self.desplazable:
+            # La barra va a aparecer y le quitará su ancho al lienzo. Se reparte ya para el ancho que quedará: si no,
+            # llegaría otro <Configure> y todas las casillas se volverían a acomodar (unos 0,8 s más al abrir el tablero)
+            self._mostrar_barra(True)
+            ancho_real -= self._barra.winfo_reqwidth()
+            filas, columnas, alto = self._calcular(ancho_real / escala)
         ancho = ancho_real / escala
-        cantidades = [len(casillas) for _, _, casillas, _ in self._grupos]
-        filas, columnas = distribuir(cantidades, ancho - len(cantidades) * 2 * self.MARGEN,
-                                     self.ANCHO_MINIMO, self.SEPARACION)
         clave = (round(ancho), round(alto_real / escala), tuple(columnas))
         if clave == self._clave:
             return
@@ -156,12 +160,19 @@ class MatrizCamas(ctk.CTkFrame):
                              pady=(0, self.SEPARACION))
             x += w
 
-        filas_reales = max(-(-n // k) for n, k in zip(cantidades, columnas))
-        alto = self.MARGEN + self.ALTO_TITULO + filas_reales * (TarjetaCama.ALTO + self.SEPARACION) + self.MARGEN
         self._interior.configure(height=alto)
         self._lienzo.itemconfigure(self._ventana, width=ancho_real, height=round(alto * escala))
         self._lienzo.configure(scrollregion=(0, 0, ancho_real, round(alto * escala)))
         self._mostrar_barra(alto * escala > alto_real + 1)
+
+    def _calcular(self, ancho: float) -> tuple[int, list[int], float]:
+        """Para un ancho (en píxeles de diseño): las filas, las columnas de cada tipo y el alto que ocupa el mapa."""
+        cantidades = [len(casillas) for _, _, casillas, _ in self._grupos]
+        filas, columnas = distribuir(cantidades, ancho - len(cantidades) * 2 * self.MARGEN,
+                                     self.ANCHO_MINIMO, self.SEPARACION)
+        filas_reales = max(-(-n // k) for n, k in zip(cantidades, columnas))
+        alto = self.MARGEN + self.ALTO_TITULO + filas_reales * (TarjetaCama.ALTO + self.SEPARACION) + self.MARGEN
+        return filas, columnas, alto
 
     def _mostrar_barra(self, mostrar: bool):
         self.desplazable = mostrar
