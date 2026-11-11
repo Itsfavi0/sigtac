@@ -2,7 +2,7 @@
 
 > Estado de trabajo actual del proyecto.
 > Este archivo debe mantenerse pequeño y actualizado después de cada sesión importante.
-> Última actualización: 2026-11-10.
+> Última actualización: 2026-11-11.
 
 ---
 
@@ -182,6 +182,12 @@ Ninguno bloqueante. Las decisiones menores están en "Pendientes conocidos".
 Al empezar una sesión: leer `CLAUDE.md`, esta sección y las dos o tres primeras entradas de `docs/CHANGELOG.md`
 (las más recientes, con sus «Pendientes»). Comprobar con `python -m pytest` que todo pasa antes de cambiar nada.
 
+0. **Avance del sábado 21/11/2026** (lo que pide `puntos_poo2_pc03.pdf`): el material está en `docs/sustentacion/` (empezar por su `README.md`). Falta:
+   - **ensayar el guion** (`GUION_DEMO.md`) contra MySQL, con cronómetro, y corregir lo que no coincida;
+   - recargar `seed.sql` y, si se quiere el tablero lleno, `db_scripts/demo_camas.sql` (sin ejecutar todavía);
+   - que cada integrante estudie su hoja (`HOJAS_DE_ESTUDIO.md`) y pasar `DIAPOSITIVAS.md` al Canva;
+   - revisar la copia del informe `SIGTAC_Proyecto_POO_II_v2.docx` (pendientes en el CHANGELOG del 2026-11-11);
+   - confirmar si el profesor hizo más observaciones que la de migrar de motor de base de datos.
 1. **Preparar la sustentación** (entrega: 19/12/2026):
    - **Guion de la demo:**
      - el flujo de `PRODUCT.md` («Operating Context»): login → registrar paciente → triaje → cola → asignar cama → alta → limpieza → indicadores y PDF;

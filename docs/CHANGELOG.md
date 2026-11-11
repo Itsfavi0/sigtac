@@ -5,6 +5,48 @@
 
 ---
 
+## [2026-11-11] — Material para la sustentación del avance (21/11)
+
+### Cambio
+Se preparó lo que pide el profesor en `puntos_poo2_pc03.pdf` (8 criterios y aportes adicionales). No cambió código de la aplicación.
+- **`docs/sustentacion/`** (nuevo):
+  - `README.md`: índice, orden de la exposición (15 minutos) y lista de comprobación;
+  - `CRITERIOS.md`: qué mostrar en cada criterio, con el código real;
+  - `OBSERVACIONES.md`: la observación de la primera presentación (migrar a otro motor de base de datos) y su evidencia;
+  - `GUION_DEMO.md`: 15 pasos con tres rechazos (dato incorrecto, incompleto y duplicado), las cuentas y el plan B;
+  - `HOJAS_DE_ESTUDIO.md`: qué expone cada integrante y sus preguntas probables;
+  - `TABLA_PRUEBAS.md`: los 13 casos de la Fase 7 y los tres niveles de prueba;
+  - `DIAPOSITIVAS.md`: el texto de 14 diapositivas y 7 de respaldo, para el Canva;
+  - `capturas/` (8 capturas de 1280×720 con datos de demostración) y `recorrido.gif`.
+- **`db_scripts/demo_camas.sql`** (nuevo, opcional): agrega 22 camas disponibles después de `seed.sql`, para que el tablero no se vea vacío en el proyector. Solo inserta.
+- **Informe Word:** copia actualizada `SIGTAC_Proyecto_POO_II_v2.docx` (sin versionar; el original no se tocó). 15 párrafos corregidos y la sección nueva «8.5. Estado de implementación y pruebas».
+
+### Archivos afectados
+- `docs/sustentacion/` (nuevo), `db_scripts/demo_camas.sql` (nuevo)
+- `docs/PROJECT_STATUS.md`, `docs/CHANGELOG.md`
+
+### Motivo
+El avance se presenta el sábado 21/11/2026 y el equipo (5 personas) necesita material para estudiar: el criterio 8 exige que cada integrante explique su contribución.
+
+### Impacto
+- Pruebas: **2332 pasan** (sin cambios).
+- `seed.sql` y `schema.sql` no cambian; `verificar_controladores.py` no usa `demo_camas.sql`.
+
+### Decisiones
+- **La observación del profesor se responde con evidencia, no con una promesa:** el conector de MySQL se importa solo en `dao/db_connection.py`, `dao/base_dao.py` y `dao/transaccion.py`, y `tests/test_capas.py` impide que las vistas lo usen. El documento dice también lo que sí habría que cambiar (una docena de consultas con funciones propias de MySQL): la migración no se ha ejecutado.
+- **Camas de la demo en un script aparte y no en `seed.sql`:** el seed alimenta `verificar_controladores.py` y `tests/test_estados_vs_bd.py`; cambiarlo a días de la presentación era un riesgo sin beneficio.
+- **El Word se actualizó en una copia:** es un archivo del equipo, sin versionar. Se corrigió lo que contradecía al código (la consulta con `nivel_min`, «bcrypt o hashlib», matplotlib, CSV, `UsuarioSinPermisoError` «planificada», 21 tablas en lugar de 22, «tres subtipos» de cama). Las actas y la matriz de responsabilidades no se tocaron.
+- **No se modificó el Canva del equipo:** es un documento compartido; el contenido quedó en `DIAPOSITIVAS.md` para que el equipo lo pase.
+
+### Pendientes
+- **El guion no se ensayó contra MySQL:** recorrerlo una vez con cronómetro y corregir lo que no coincida.
+- **`demo_camas.sql` no se ejecutó** (necesita la base real): probarlo en el ensayo.
+- **Word:** las actas de reunión tienen marcadores sin llenar (`[Integrante 1]`, `[dd/mm]`); el diccionario de 7.3 no lista `tipo_documento`; el mapa de navegación de 5.4 no coincide del todo con `models/permisos.py`; faltan capturas reales y el índice se actualiza al abrirlo (clic derecho → Actualizar campo).
+- **`matplotlib` está en `requirements.txt` y ningún archivo lo usa:** quitarlo o usarlo.
+- Confirmar con el equipo si el profesor hizo más observaciones en la primera presentación.
+
+---
+
 ## [2026-11-10] — Correcciones de la revisión de experiencia de uso
 
 ### Cambio
