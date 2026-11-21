@@ -23,7 +23,7 @@ responder las preguntas de su hoja **sin leer**.
 
 ## Favio Brañez — Líder: arquitectura, controladores y la demo
 
-**Expone:** la presentación del proyecto, la demo en vivo y la decisión técnica (criterios 5 y 8).
+**Expone:** la presentación del proyecto, la demo en vivo, la organización del código y la decisión técnica (criterios 5, 7 y 8).
 
 **Archivos:** `main.py`, `controllers/` (sobre todo `cama_controller.py` y `auth_controller.py`), `models/permisos.py`.
 
@@ -77,7 +77,7 @@ responder las preguntas de su hoja **sin leer**.
 
 ## Leonardo Veliz — Interfaz gráfica
 
-**Expone:** las pantallas durante la demo y la organización del código (criterio 7).
+**Expone:** las pantallas durante la demo.
 
 **Archivos:** `views/tema.py`, `views/app_principal.py`, `views/triage_view.py`, `views/componentes/`
 (`botones.py`, `tarjetas.py`, `matriz.py`).

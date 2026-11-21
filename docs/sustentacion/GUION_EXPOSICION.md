@@ -15,7 +15,7 @@ Responde primero quien expuso el tema.
 | 9–12 | Encapsulamiento | 3 | Ian | 6 |
 | 12–18 | Relaciones: herencia, polimorfismo, Strategy, composición, colaboración | 4 | Percy | 7–9 |
 | 18–27 | Demo en vivo | 5 y 6 | Favio maneja; Leonardo explica | 10–11 |
-| 27–30 | Organización del código | 7 | Leonardo | 12 |
+| 27–30 | Organización del código | 7 | Favio | 12 |
 | 30–34 | «Por qué esto y no esto» | 8 | Favio | 13 |
 | 34–36 | Aportes adicionales y cierre | — | Renzo | 14–15 |
 | 36 → | Preguntas | 8 | Favio dirige | — |
@@ -81,7 +81,7 @@ mientras escribe. Tiempo de referencia: pasos 1–2 (1 min), 3–7 (3,5 min), 8�
 
 Los tres rechazos se anuncian: «ahora un dato **incorrecto**, uno **incompleto** y uno **duplicado**».
 
-## 27–30 · Leonardo — Criterio 7: organización del código
+## 27–30 · Favio — Criterio 7: organización del código
 
 - Árbol de carpetas en el editor y `views → controllers → models → dao`.
 - Seguir **una operación por las 4 capas**: `triage_view.py` → `TriajeController.registrar()` → `Triaje.reclasificar()` → `TriajeDAO`.
@@ -118,7 +118,7 @@ Cerrar con: «cada integrante explicó su contribución; las preguntas que sigan
 | 3–7 | Clases + encapsulamiento (Ian) |
 | 7–10 | Herencia, polimorfismo y colaboración (Percy) |
 | 10–16 | Demo recortada: pasos 2, 3, 5, 6, 8 y 15 del guion (Favio + Leonardo) |
-| 16–18 | Organización del código y decisión técnica (Leonardo y Favio) |
+| 16–18 | Organización del código y decisión técnica (Favio) |
 
 ## Ensayo (hoy, antes de entrar)
 

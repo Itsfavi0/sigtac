@@ -27,7 +27,7 @@ Todo lo que el profesor pide está en `puntos_poo2_pc03.pdf` (8 criterios y los 
 | 9–12 | Encapsulamiento | 3 | Ian |
 | 12–18 | Relaciones: herencia, polimorfismo, Strategy, composición, colaboración | 4 | Percy |
 | 18–27 | Demo en vivo, con los tres rechazos | 5 y 6 | Favio maneja; Leonardo explica las pantallas |
-| 27–30 | Organización del código | 7 | Leonardo |
+| 27–30 | Organización del código | 7 | Favio |
 | 30–34 | «Por qué esto y no esto»: 4 decisiones técnicas | 8 | Favio |
 | 34–36 | Aportes adicionales y cierre | — | Renzo |
 | 36 → | Preguntas (Favio dirige) | 8 | Quien expuso el tema |

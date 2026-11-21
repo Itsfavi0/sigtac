@@ -48,8 +48,8 @@ Siempre «complemento», nunca «corrijo». Y siempre le devuelves la palabra po
 | 9–12 | Criterio 3: encapsulamiento | Ian | Escuchas y vigilas |
 | 12–18 | Criterio 4: relaciones | Percy | Escuchas y vigilas (el más delicado) |
 | 18–27 | Demo | **Tú manejas**, Leonardo explica | Manejas, sin hablar mientras escribes |
-| 27–30 | Criterio 7: organización | Leonardo | Escuchas y vigilas |
-| 30–34 | Criterio 8: decisiones | **Tú** | Hablas |
+| 27–30 | Criterio 7: organización del código | **Tú** | Hablas |
+| 30–34 | Criterio 8: decisiones | **Tú** | Hablas (sigues sin pausa: son 7 minutos tuyos, del 27 al 34) |
 | 34–36 | Aportes y cierre | Renzo | Escuchas y vigilas |
 | 36 → | Preguntas | **Tú diriges** | Das la palabra al dueño del tema |
 
@@ -193,20 +193,92 @@ Sigue [GUION_DEMO.md](GUION_DEMO.md). **No hablas mientras escribes.** Si algo f
 
 ---
 
-### 27–30 · Leonardo · Criterio 7: organización del código
+### 27–30 · Tú · Criterio 7: organización del código y estructura de carpetas
 
-**Debe decir:**
-- Capas: `views → controllers → models → dao → MySQL`; las dependencias van solo hacia abajo.
-- Seguir una operación por las 4 capas: `triage_view.py` → `TriajeController.registrar()` → `Triaje.reclasificar()` → `TriajeDAO`.
-- `views/tema.py` es el único archivo con colores y letras; `views/componentes/` reúne lo reutilizable.
-- Nombres en español que dicen lo que hacen (`cama.reservar()`, `episodio.dar_alta()`, `exigir_permiso()`).
+> Este bloque antes era de Leonardo; ahora lo expones tú. Leonardo sigue explicando las pantallas **durante la demo**
+> (hasta el min 27). Cuando termine el paso 15, tú tomas la palabra y pasas directo a este bloque. El texto largo de su
+> versión está en [tarjetas/LEONARDO.md](tarjetas/LEONARDO.md) si quieres compararlo.
+> Ten abierto el **árbol de carpetas en el editor** y, para el punto ②, `triage_view.py`, `triaje_controller.py` y `models/triaje.py`.
 
-**Alarmas:**
-- «Las pantallas validan los datos.» → falso: valida el **modelo**; la pantalla solo muestra el error.
-- «Las pantallas llaman al DAO.» → falso: `test_capas.py` lo impide.
+**Texto sugerido (3 min)**
 
-**Rescate:** «La pantalla solo muestra: recibe su controlador y lo que este le devuelve. El controlador comprueba el permiso y abre
-la transacción; el modelo aplica la regla; el DAO guarda. Cada capa solo conoce la de abajo.»
+**① Las capas y por qué cada carpeta existe (60 s)** *(muestra el árbol)*
+«Profesor, así está organizado el código. Lo separamos en capas para que **cada carpeta tenga una sola responsabilidad** y para
+que un cambio en una no obligue a tocar las demás. Las dependencias van **solo hacia abajo**: `views` → `controllers` →
+`models` → `dao` → MySQL.
+
+`views` es solo la interfaz: nunca tiene SQL ni reglas. `controllers` son los casos de uso: comprueban el permiso del rol,
+abren la transacción y coordinan. `models` son las clases y las **reglas de negocio**; no saben que existe una base de
+datos. Y `dao` es **el único lugar con SQL**. Además: `utils` para lo compartido, como las contraseñas con bcrypt y el PDF;
+`db_scripts` para reconstruir la base desde cero; y `tests`, con un archivo de pruebas por módulo. El criterio que seguimos es
+**una regla, un dueño**: no repetimos una regla en dos capas.»
+
+**② Seguir una operación por las cuatro capas (60 s)** *(opcional: abre los archivos)*
+«Lo vemos con la reclasificación que acabamos de hacer en la demo. La pantalla, `triage_view`, recoge lo que escribió el
+usuario. El controlador, `TriajeController.registrar`, comprueba el permiso, abre la transacción y **recalcula el nivel sugerido
+él mismo**, no lo recibe de la pantalla, para que "sugerido" sea siempre lo que dijo el algoritmo. El modelo,
+`Triaje.reclasificar`, aplica la regla de los 10 caracteres. Y el DAO, `TriajeDAO`, guarda en MySQL. Si algo falla en
+cualquier paso, se deshace todo.»
+
+**③ Cómo comprobamos que se respeta (25 s)**
+«Esto no depende de que nos acordemos: hay una prueba automática, `tests/test_capas.py`, que **falla si una pantalla importa
+`dao` o `mysql`**. Por eso la respuesta a la observación de la primera presentación es verificable.»
+
+**④ Orden y nombres (25 s)**
+«Los colores, letras y medidas salen de un solo archivo, `views/tema.py`; las piezas que se repiten, como botones, tarjetas y
+tablas, están en `views/componentes`. Los nombres están en español y dicen lo que hacen: `cama.reservar()`,
+`episodio.dar_alta()`, `exigir_permiso()`. En total son unas 11 400 líneas de aplicación y unas 13 000 de pruebas. Con esto
+cerramos la organización del código; ahora explico las decisiones técnicas.»
+
+**Puntos clave (por si pierdes el hilo):**
+1. **Cuatro capas, dependencias solo hacia abajo:** `views → controllers → models → dao → MySQL`.
+2. **Una carpeta, una responsabilidad:** vistas muestran, controladores coordinan y dan permiso, modelos deciden, DAO guarda.
+3. **Una regla, un dueño:** no se repite una regla en dos capas.
+4. **Se comprueba:** `tests/test_capas.py`.
+5. **Ejemplo:** la reclasificación (`triage_view` → `TriajeController.registrar` → `Triaje.reclasificar` → `TriajeDAO`).
+
+**Transición:** «Ahora explico las decisiones técnicas: qué elegimos, qué descartamos y qué nos costó.» *(sigues con el bloque 30–34)*
+
+#### Para qué sirve cada carpeta (si te piden «explícame esa estructura»)
+
+| Carpeta | Qué hay | Por qué está separada |
+|---|---|---|
+| `views/` | Pantallas CustomTkinter, `tema.py`, `componentes/` | Solo interfaz. Si cambia el diseño, la lógica no se toca |
+| `controllers/` | `auth`, `paciente`, `triaje`, `cama`, `reporte`, `admin` | Un caso de uso por operación; aquí se comprueban los permisos por rol y se abre la transacción |
+| `models/` | Clases de dominio, estados, permisos, estrategias, excepciones | Las reglas de negocio, que se prueban sin MySQL ni ventana |
+| `dao/` | `db_connection.py`, `base_dao.py`, `transaccion.py`, un `*_dao.py` por entidad | Único lugar con SQL; si cambia el motor, solo se toca aquí |
+| `utils/` | bcrypt, logging, PDF, colores | Herramientas compartidas que no son dominio |
+| `db_scripts/` | `schema.sql`, `seed.sql`, usuario de la app | La base se reconstruye desde cero |
+| `tests/` | Un `test_*.py` por módulo, `conftest.py` | Cada capa se prueba aislada, con dobles de la de abajo |
+| `prototipo/` | Datos de demostración (`python -m prototipo.ver`) | Plan B de la demo: abre la aplicación sin MySQL |
+
+#### Preguntas que pueden venir sobre arquitectura y estructura
+
+Las respuestas completas están en [PREGUNTAS_PROFESOR.md](PREGUNTAS_PROFESOR.md) (sección B). Esto es para contestar en 20–30 segundos.
+
+| Pregunta | Qué respondes | Dónde |
+|---|---|---|
+| «¿Por qué esas carpetas / por qué 4 capas?» | Cada capa tiene un motivo de cambio distinto: la interfaz, los casos de uso, las reglas y el SQL. Una responsabilidad por carpeta. **Costó:** más archivos y pasar datos de una capa a otra | B1 |
+| «¿Por qué no pones el SQL en la pantalla, que es más rápido?» | Más rápido de escribir, pero no se puede probar sin abrir una ventana y la misma regla acabaría copiada en varias pantallas | B2 |
+| «¿Por qué un controlador entre la pantalla y el DAO?» | La pantalla solo muestra; el controlador comprueba el permiso, abre la transacción y coordina. Si mañana hay una versión web, los controladores sirven igual | B2 |
+| «¿Cómo demuestran que se respeta la separación?» | `tests/test_capas.py` falla si `views/` o `main.py` importan `dao` o `mysql` | B1 |
+| «¿Y si cambian de motor de base de datos?» | Solo se toca `dao/`; MySQL se importa en 3 archivos. **Honestidad:** hay SQL propio de MySQL en una docena de consultas y la migración **no se ejecutó**; lo probado es el aislamiento | B6, criterio 1 |
+| «¿Por qué las reglas están en `models/` y no en el DAO o en la BD?» | El modelo es el dueño de la regla y se prueba sin BD. El DAO solo guarda. Algunas reglas críticas viven **también** en la BD (`UNIQUE`, `CHECK`) como último respaldo | B3, C4 |
+| «¿Por qué `models/` no puede importar `dao/`?» | Si importara, las reglas dependerían de la base de datos y ya no se podrían probar solas. Por ejemplo, la compatibilidad cama–nivel es `Cama.es_compatible()` y no una consulta | B3 |
+| «¿Dónde validan los datos?» | En el modelo (`ValueError` si el dato está mal escrito; `SigtacError` si se viola una regla). La pantalla solo pregunta y muestra el error. El permiso lo comprueba el controlador | E3 |
+| «¿Qué patrones usaron y por qué?» | **DAO** (aísla el SQL), **Strategy** (`ReglaManchester`/`ReglaMINSA` intercambiables) y **Singleton** (`ConexionBD`, una sola conexión). **Costó:** el Singleton es estado global y dificulta las pruebas | A6, B5 |
+| «¿Por qué DAO con métodos estáticos?» | Un DAO no guarda estado. **Costó:** es más difícil reemplazarlo; las pruebas usan `monkeypatch`. Con más tiempo se inyectarían | B4 |
+| «¿Por qué no usaron un ORM?» | El curso pide entender el SQL y el patrón DAO. Con un ORM se pierde de vista qué consulta se ejecuta | B6 |
+| «¿Cómo se agrega un rol o un módulo nuevo?» | Un valor en `Rol` y sus permisos en `models/permisos.py`; una entrada en `PANTALLAS` de `views/app_principal.py`. El menú se arma solo con los permisos de la sesión | B7 |
+| «Muéstrame una operación completa» | La reclasificación: `triage_view` → `TriajeController.registrar` → `Triaje.reclasificar` → `TriajeDAO`. O la asignación de cama (permiso → transacción → modelos validan → DAO guarda → bitácora; si otra PC llegó primero, `rowcount` es 0 y se hace `ROLLBACK`) | C2 |
+
+**Si insisten en las debilidades, admite con calma:**
+- Filtrar las camas compatibles en Python y no en SQL no escala a miles de camas; con decenas no se nota.
+- La separación en capas añade archivos y pasos de más para una pantalla sencilla.
+- El Singleton es estado global; se mitigó en las pruebas, pero un *pool* de conexiones sería mejor.
+
+**No digas:** «las pantallas validan» (valida el modelo), «las pantallas llaman al DAO» (`test_capas.py` lo impide) ni
+«el motor es intercambiable al instante» (el trabajo está concentrado en `dao/`, no es de una línea).
 
 ---
 
@@ -282,8 +354,8 @@ Cada integrante explicó su contribución. Quedamos atentos a sus preguntas; res
 | Herencia, polimorfismo, Strategy | Percy |
 | Clases, encapsulamiento, excepciones | Ian |
 | Base de datos, DAO, transacciones, concurrencia | Renzo |
-| Pantallas, tema, roles en el menú | Leonardo |
-| Arquitectura, decisiones, seguridad, IA, commits | Tú |
+| Cómo funciona cada pantalla en la demo, roles en el menú | Leonardo |
+| Arquitectura, estructura de carpetas, decisiones, seguridad, IA, commits | Tú |
 
 ---
 

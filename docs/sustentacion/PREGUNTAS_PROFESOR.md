@@ -26,7 +26,7 @@ Toda respuesta «técnica» se dice en este orden. Dura 20–30 segundos y siemp
 | Clases, encapsulamiento, excepciones | Ian |
 | BD, DAO, transacciones, concurrencia | Renzo |
 | Pantallas, tema, roles en el menú | Leonardo |
-| Arquitectura, decisiones, seguridad, IA, «¿quién hizo qué?» | Favio |
+| Arquitectura, estructura de carpetas, decisiones, seguridad, IA, «¿quién hizo qué?» | Favio |
 
 ---
 

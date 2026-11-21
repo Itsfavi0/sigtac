@@ -1,12 +1,12 @@
 # Tarjeta de Leonardo
 
-**Tu parte:** explicar las pantallas durante la demo (min **18–27**) y el Criterio 7, organización del código (min **27–30**).
+**Tu parte:** explicar las pantallas durante la demo (min **18–27**). El criterio 7, organización del código (min 27–30), lo expone Favio.
 
 > **Cómo usar el texto:** está escrito para que no te quedes en blanco. Léelo en voz alta 2 o 3 veces y luego dilo con
 > tus palabras. Lo que **sí** debe salir exacto está en **negrita**. Favio maneja la PC y **no habla mientras escribe**: tú
 > llenas esos momentos. Detalle de los pasos en [GUION_DEMO.md](../GUION_DEMO.md).
 
-**Antes de entrar:** editor con `views/tema.py`, `views/triage_view.py` y `views/app_principal.py`; el árbol de carpetas visible.
+**Antes de entrar:** editor con `views/tema.py`, `views/triage_view.py` y `views/app_principal.py`.
 
 ---
 
@@ -74,38 +74,7 @@ Administración, la bitácora: todo lo que acabamos de hacer quedó registrado, 
 
 **Paso 15 · Persistencia (40 s)**
 «Por último, cierro la aplicación por completo, la abro de nuevo y busco al paciente que registramos al inicio. Sigue ahí: el
-dato está en MySQL y no en la memoria del programa. Con esto cubrimos el flujo completo y los tres rechazos.»
-
----
-
-## Criterio 7: organización del código · Min 27–30 · Texto sugerido
-
-**① Las capas (50 s)** *(muestra el árbol de carpetas)*
-«Profesor, así está organizado el código. Tenemos cuatro capas, y las dependencias van **solo hacia abajo**: `views`, que son las
-pantallas; `controllers`, que son los casos de uso y los permisos; `models`, que son las clases y las reglas de negocio; y
-`dao`, que es el único lugar con SQL. Más `utils`, para cosas como las contraseñas y el PDF; `db_scripts` con los scripts de la
-base; y `tests`, con un archivo de pruebas por módulo.»
-
-**② Seguir una operación (60 s)** *(opcional: abre los archivos)*
-«Les mostramos cómo atraviesa una operación las cuatro capas, con la reclasificación que acabamos de ver. La pantalla,
-`triage_view`, recoge lo que escribió el usuario. El controlador, `TriajeController`, comprueba el permiso, abre la transacción
-y recalcula el nivel sugerido; **no lo recibe de la pantalla**, para que lo que queda como "sugerido" sea siempre lo que dijo el
-algoritmo. El modelo, `Triaje.reclasificar`, aplica la regla de los 10 caracteres. Y el DAO guarda en la base de datos.»
-
-**③ Una pantalla nunca toca la base (30 s)**
-«**Una pantalla nunca tiene SQL ni reglas de negocio:** recibe su controlador y solo muestra lo que este le devuelve. Hay una
-prueba automática que lo exige: si una pantalla importa un DAO, las pruebas fallan.»
-
-**④ El tema visual (35 s)** *(abre `views/tema.py`)*
-«Los colores, las letras y las medidas de todas las pantallas salen de **un solo archivo, `views/tema.py`**. Cada color es un
-par: uno para el modo claro y otro para el oscuro. Ninguna pantalla escribe un color a mano. Por eso, si se cambia el color de
-una cama ocupada, cambia en toda la aplicación y también en el PDF. Las piezas que se repiten, como botones, tarjetas y tablas,
-están en `views/componentes`.»
-
-**⑤ Nombres y tamaño (25 s)**
-«Los nombres están en español y dicen lo que hacen: `cama.reservar()`, `episodio.dar_alta()`, `exigir_permiso()`. En total son
-unas 11 400 líneas de aplicación y unas 13 000 de pruebas. Con esto cerramos la organización del código. Ahora Favio explica
-las decisiones técnicas.»
+dato está en MySQL y no en la memoria del programa. Con esto cubrimos el flujo completo y los tres rechazos. Ahora Favio explica la organización del código.»
 
 ---
 
@@ -127,10 +96,9 @@ Mira a Favio; a los 5 segundos completa. Si en la demo no recuerdas qué decir d
 
 | Pregunta | Dónde |
 |---|---|
-| «¿Por qué 4 capas?» | B1 |
-| «¿Por qué un controlador y no llamar al DAO desde la pantalla?» | B2 |
 | «¿Cómo sabe la pantalla que un dato es inválido?» | E2, E3 |
-| «¿Qué pasa si cambian el color de “Ocupada”?» | Punto ④ de arriba (`utils/colores.py` y `views/tema.py`) |
+| «¿Qué pasa si cambian el color de “Ocupada”?» | Se cambia en un solo lugar (`utils/colores.py` y `views/tema.py`) y cambia en toda la aplicación y en el PDF |
 | «¿Por qué CustomTkinter y no Tkinter puro?» | HOJAS: es Tkinter por debajo, con mejor aspecto y modo oscuro |
 | «¿Cómo se agrega un rol o módulo nuevo?» | B7 |
 | «¿Cómo prueban las pantallas?» | G1 |
+| «¿Por qué 4 capas?» / «¿por qué un controlador?» | Favio las responde (B1, B2); tú puedes completar con «la pantalla solo muestra» |
