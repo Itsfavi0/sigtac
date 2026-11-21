@@ -59,7 +59,29 @@ Siempre «complemento», nunca «corrijo». Y siempre le devuelves la palabra po
 
 ### 0–2 · Tú · Problema y solución
 
-**Dices (en este orden):**
+> Texto para leer en voz alta 2 o 3 veces y decir con tus palabras. Lo que **sí** debe salir exacto está en **negrita**.
+
+**Texto sugerido (2 min)**
+
+«Buenos días, profesor. Somos Favio Brañez, Renzo Moya, Leonardo Veliz, Ian Sevillano y Percy Malpartida, del curso
+Programación Orientada a Objetos II. Presentamos **SIGTAC: Sistema Integrado de Gestión de Triaje y Asignación de Camas.**
+
+El problema es este: **en una emergencia no se atiende por orden de llegada, sino por gravedad.** Y en muchos servicios, la cama
+se busca por teléfono y el estado de cada cama está en una pizarra. Eso genera demoras y errores, por ejemplo, ofrecer una cama
+que ya estaba ocupada.
+
+SIGTAC junta en un solo sistema el **triaje**, es decir, la clasificación de la prioridad del paciente, y la **asignación de
+camas**. Maneja cinco roles, cada uno con sus permisos; guarda todo en una base de datos MySQL y deja una bitácora de quién
+hizo qué.
+
+Una aclaración importante: **es un prototipo académico.** El nivel de triaje que calcula el sistema es una sugerencia, no está
+validado clínicamente, y el profesional siempre decide.
+
+Vamos a seguir sus ocho criterios en orden: la observación de la primera presentación, las clases, el encapsulamiento, las
+relaciones entre clases, el avance funcional con una demostración en vivo, la validación de datos, la organización del código y,
+al final, las decisiones técnicas. Empieza Renzo con la observación que usted nos hizo.»
+
+**Puntos clave (por si pierdes el hilo):**
 1. «Buenos días, profesor. Somos [nombres]. Presentamos SIGTAC: Sistema Integrado de Gestión de Triaje y Asignación de Camas.»
 2. «En una emergencia se atiende por **gravedad, no por orden de llegada**. Hoy, la cama se busca por teléfono y el estado
    está en una pizarra.»
@@ -191,6 +213,40 @@ la transacción; el modelo aplica la regla; el DAO guarda. Cada capa solo conoce
 ### 30–34 · Tú · Criterio 8: «por qué esto y no esto»
 
 Cada decisión con la fórmula: **dónde → por qué → qué se descartó → qué costó.**
+
+**Texto sugerido (4 min)**
+
+«Para el último criterio, la sustentación técnica, queremos explicar **cuatro decisiones** y, en cada una, qué alternativa
+descartamos y qué nos costó, porque ninguna decisión es gratis.
+
+**Primera, y la principal: ¿qué camas sirven para un paciente de nivel 2?** Nuestra primera idea fue una columna `nivel_min` en
+la tabla de tipos de cama y un filtro en SQL. La descartamos porque **un solo número no alcanza**: Observación acepta los niveles
+2, 3 y 4, y Hospitalización los 3, 4 y 5; no es "de tal nivel en adelante". Además, la regla quedaba escrita dos veces, en SQL y
+en Python, y podían contradecirse. Entonces la dejamos en **un solo lugar: el método `es_compatible` de cada cama**. El DAO trae
+las camas disponibles y cada una responde por sí misma. Lo que nos costó: se filtra en Python y no en la base de datos. Con las
+decenas de camas de una emergencia no se nota; con miles, habría que revisarlo.
+
+**Segunda: la concurrencia.** ¿Qué pasa si dos computadoras asignan la misma cama? Usamos un **`UPDATE` condicional**: la cama
+solo cambia si sigue en el estado que esperábamos, y comprobamos cuántas filas cambió. Si fueron cero, otro llegó primero: se
+lanza una excepción y se deshace toda la transacción. Descartamos leer y luego escribir sin condición, porque la segunda
+computadora pisaría a la primera. Lo que nos costó: la segunda computadora recibe un error y debe volver a consultar; para una
+guardia es aceptable.
+
+**Tercera: separamos el rol del cargo.** El cargo es un dato laboral, como médico o enfermera; el rol es un permiso del software,
+como jefe de guardia. Un médico puede ser jefe de guardia; si los uniéramos, tendríamos que duplicar cargos. Por eso los permisos
+dependen solo del rol, y la tabla de permisos está en un único archivo, `models/permisos.py`.
+
+**Cuarta: no borramos registros; usamos baja lógica**, con `estado_registro` en falso. Es la regla RN-11. Así conservamos el
+historial para auditoría y no rompemos claves foráneas. Además, la cuenta con la que se conecta la aplicación solo tiene
+`SELECT`, `INSERT` y `UPDATE`: ni siquiera puede borrar. Lo que nos costó: cada consulta debe filtrar los registros activos.
+
+Y para cerrar, con honestidad, **lo que no hicimos**: `ReglaMINSA` está implementada y probada, pero la aplicación no tiene un
+selector para elegirla; la migración a otro motor de base de datos no se ejecutó, solo se comprobó el aislamiento; y el triaje
+no está validado clínicamente, es una simulación didáctica.
+
+Cada integrante explicó su contribución. Quedamos atentos a sus preguntas; responderá quien expuso el tema.»
+
+**Puntos clave (por si pierdes el hilo):**
 
 1. **Compatibilidad con polimorfismo y no en SQL.** `Cama.es_compatible()`. Se descartó una columna `nivel_min`: un solo número no
    alcanza (Observación acepta 2, 3 y 4) y la regla quedaba escrita dos veces. Costó: se filtra en Python; con miles de camas habría que revisarlo.
