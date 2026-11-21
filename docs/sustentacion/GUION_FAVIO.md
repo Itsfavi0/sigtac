@@ -203,7 +203,7 @@ Sigue [GUION_DEMO.md](GUION_DEMO.md). **No hablas mientras escribes.** Si algo f
 **Texto sugerido (3 min)**
 
 **① Las capas y por qué cada carpeta existe (60 s)** *(muestra el árbol)*
-«Profesor, así está organizado el código. Lo separamos en capas para que **cada carpeta tenga una sola responsabilidad** y para
+«Profesor, así está organizado el código. Usamos una **arquitectura en capas**: lo separamos para que **cada carpeta tenga una sola responsabilidad** y para
 que un cambio en una no obligue a tocar las demás. Las dependencias van **solo hacia abajo**: `views` → `controllers` →
 `models` → `dao` → MySQL.
 
@@ -224,18 +224,27 @@ cualquier paso, se deshace todo.»
 «Esto no depende de que nos acordemos: hay una prueba automática, `tests/test_capas.py`, que **falla si una pantalla importa
 `dao` o `mysql`**. Por eso la respuesta a la observación de la primera presentación es verificable.»
 
-**④ Orden y nombres (25 s)**
-«Los colores, letras y medidas salen de un solo archivo, `views/tema.py`; las piezas que se repiten, como botones, tarjetas y
-tablas, están en `views/componentes`. Los nombres están en español y dicen lo que hacen: `cama.reservar()`,
-`episodio.dar_alta()`, `exigir_permiso()`. En total son unas 11 400 líneas de aplicación y unas 13 000 de pruebas. Con esto
-cerramos la organización del código; ahora explico las decisiones técnicas.»
+**④ Los controladores: el patrón de cada operación (50 s)** *(abre `controllers/cama_controller.py`, método `asignar`, línea 103)*
+«Nadie ha hablado todavía de los controladores, y son la capa que une todo. Tenemos seis: autenticación, pacientes, triaje, camas,
+reportes y administración; unas 1 100 líneas en total. Cada uno recibe **la sesión del usuario cuando se crea**, no una variable
+global, y **toda operación que escribe sigue el mismo patrón**, que se ve en `asignar`: primero **`exigir_permiso`**, que
+comprueba que el rol puede hacerlo; después abre **`with transaccion()`**; dentro, carga los datos, le pide al **modelo** que aplique
+la regla (`episodio.asignar_cama()`, `cama.reservar()`), le pide al **DAO** que guarde y **registra la auditoría**. Si algo falla,
+la transacción se deshace entera. Y el controlador **no captura los errores**: suben a la pantalla, que sabe cómo mostrarlos. El
+controlador no decide ninguna regla; solo coordina.»
+
+**⑤ Orden y nombres (20 s)**
+«Los colores, letras y medidas salen de un solo archivo, `views/tema.py`, y las piezas que se repiten están en `views/componentes`.
+Los nombres están en español y dicen lo que hacen: `cama.reservar()`, `episodio.dar_alta()`, `exigir_permiso()`. Son unas 11 400
+líneas de aplicación y unas 13 000 de pruebas. Con esto cerramos la organización del código; ahora explico las decisiones técnicas.»
 
 **Puntos clave (por si pierdes el hilo):**
-1. **Cuatro capas, dependencias solo hacia abajo:** `views → controllers → models → dao → MySQL`.
+1. **Arquitectura en capas** (cuatro, más MySQL), dependencias solo hacia abajo: `views → controllers → models → dao → MySQL`.
 2. **Una carpeta, una responsabilidad:** vistas muestran, controladores coordinan y dan permiso, modelos deciden, DAO guarda.
 3. **Una regla, un dueño:** no se repite una regla en dos capas.
 4. **Se comprueba:** `tests/test_capas.py`.
 5. **Ejemplo:** la reclasificación (`triage_view` → `TriajeController.registrar` → `Triaje.reclasificar` → `TriajeDAO`).
+6. **Controladores (6):** reciben la `Sesion`; cada operación = `exigir_permiso` → `with transaccion():` → el modelo aplica la regla → el DAO guarda → auditoría. No capturan errores y no deciden reglas.
 
 **Transición:** «Ahora explico las decisiones técnicas: qué elegimos, qué descartamos y qué nos costó.» *(sigues con el bloque 30–34)*
 
@@ -258,8 +267,13 @@ Las respuestas completas están en [PREGUNTAS_PROFESOR.md](PREGUNTAS_PROFESOR.md
 
 | Pregunta | Qué respondes | Dónde |
 |---|---|---|
+| «¿Qué arquitectura es? ¿MVC?» | **Arquitectura en capas** (4 niveles + MySQL) con el patrón DAO. Se parece a MVC en separar interfaz, control y modelo, pero no es MVC puro: la vista no observa al modelo, el controlador es un caso de uso (permiso, transacción, coordinación) y hay una capa DAO aparte para el SQL. Ver el recuadro de abajo | B1 |
 | «¿Por qué esas carpetas / por qué 4 capas?» | Cada capa tiene un motivo de cambio distinto: la interfaz, los casos de uso, las reglas y el SQL. Una responsabilidad por carpeta. **Costó:** más archivos y pasar datos de una capa a otra | B1 |
 | «¿Por qué no pones el SQL en la pantalla, que es más rápido?» | Más rápido de escribir, pero no se puede probar sin abrir una ventana y la misma regla acabaría copiada en varias pantallas | B2 |
+| «¿Qué hace un controlador?» | Es un caso de uso: comprueba el permiso del rol, abre la transacción y coordina modelos y DAO; no decide ninguna regla. Seis controladores, uno por área | B2 |
+| «¿Dónde se comprueban los permisos?» | En el controlador, al inicio de cada operación, con `exigir_permiso(sesion, Permiso.X)`. La matriz rol → permisos está solo en `models/permisos.py` | B7 |
+| «¿Por qué el controlador recibe la `Sesion` y no usa una variable global?» | Para que cada controlador sepa quién opera (permisos y auditoría) sin estado global; se cierra la sesión y el controlador deja de poder operar. También facilita las pruebas | B2 |
+| «¿Por qué el controlador no captura las excepciones?» | No sabría qué hacer con ellas; suben a la pantalla, que muestra el mensaje y marca el campo. Nunca se usa `except Exception` | E2 |
 | «¿Por qué un controlador entre la pantalla y el DAO?» | La pantalla solo muestra; el controlador comprueba el permiso, abre la transacción y coordina. Si mañana hay una versión web, los controladores sirven igual | B2 |
 | «¿Cómo demuestran que se respeta la separación?» | `tests/test_capas.py` falla si `views/` o `main.py` importan `dao` o `mysql` | B1 |
 | «¿Y si cambian de motor de base de datos?» | Solo se toca `dao/`; MySQL se importa en 3 archivos. **Honestidad:** hay SQL propio de MySQL en una docena de consultas y la migración **no se ejecutó**; lo probado es el aislamiento | B6, criterio 1 |
@@ -271,6 +285,26 @@ Las respuestas completas están en [PREGUNTAS_PROFESOR.md](PREGUNTAS_PROFESOR.md
 | «¿Por qué no usaron un ORM?» | El curso pide entender el SQL y el patrón DAO. Con un ORM se pierde de vista qué consulta se ejecuta | B6 |
 | «¿Cómo se agrega un rol o un módulo nuevo?» | Un valor en `Rol` y sus permisos en `models/permisos.py`; una entrada en `PANTALLAS` de `views/app_principal.py`. El menú se arma solo con los permisos de la sesión | B7 |
 | «Muéstrame una operación completa» | La reclasificación: `triage_view` → `TriajeController.registrar` → `Triaje.reclasificar` → `TriajeDAO`. O la asignación de cama (permiso → transacción → modelos validan → DAO guarda → bitácora; si otra PC llegó primero, `rowcount` es 0 y se hace `ROLLBACK`) | C2 |
+
+**Si preguntan «¿entonces es MVC o no?»** *(respuesta de 15 segundos)*
+
+> «Usamos una **arquitectura en capas** de cuatro niveles: presentación, casos de uso, dominio y acceso a datos. Se parece a MVC en que
+> separa interfaz, control y modelo, pero agregamos una capa DAO para aislar el SQL y las dependencias van solo hacia abajo, lo que se
+> comprueba con una prueba automática. **Es MVC en espíritu, con una capa de persistencia explícita; el nombre más exacto es
+> arquitectura en capas.**»
+
+| Capa | Carpeta | Cómo se le llama |
+|---|---|---|
+| Presentación | `views/` | La «V» de MVC |
+| Aplicación (casos de uso) | `controllers/` | Parecida a la «C», pero es un caso de uso: no recibe eventos, los coordina |
+| Dominio | `models/` | La «M» de MVC, **sin** persistencia |
+| Persistencia | `dao/` | No existe en MVC; patrón DAO |
+
+Diferencias que puedes nombrar si insisten: en MVC clásico la vista **observa** al modelo y se actualiza sola; aquí la vista le pide los
+datos al controlador y los muestra. Y MVC no exige que las dependencias vayan solo hacia abajo; aquí sí, y `tests/test_capas.py` lo comprueba.
+
+**No digas:** «es MVC» a secas (te harán notar que no hay observador y que el DAO no encaja); «hexagonal» o «Clean» (el dominio no define
+puertos ni interfaces de persistencia); «microservicios» ni «cliente–servidor» (es una aplicación de escritorio; varias PCs comparten MySQL).
 
 **Si insisten en las debilidades, admite con calma:**
 - Filtrar las camas compatibles en Python y no en SQL no escala a miles de camas; con decenas no se nota.
