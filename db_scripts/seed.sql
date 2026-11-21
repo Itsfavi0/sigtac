@@ -124,10 +124,20 @@ INSERT INTO paciente (id_paciente, id_tipo_documento, num_documento, nombres, ap
 (4, 2, '001234567', 'María José', 'Rodríguez Silva', '1988-06-03', 'F', 4), -- Paciente extranjera con carné de extranjería
 (5, NULL, NULL, 'NN', 'NN', '1981-01-01', 'M', 4); -- Paciente sin identificar: edad estimada (~45 años)
 
+-- 30 camas, para que el tablero se vea como una guardia real (las 8 primeras tienen un estado distinto a propósito:
+-- ocupada, en limpieza y fuera de servicio; una cama ocupada necesita su paciente y su asignación, por eso las demás
+-- están disponibles). Hospitalización (área 4, tipo 4) solo aparece de la 9 en adelante.
 INSERT INTO cama (id_cama, codigo, id_area, id_tipo_cama, id_estado_cama, estado_registro) VALUES
 (1, 'TRA-01', 1, 1, 3, 1), (2, 'TRA-02', 1, 1, 1, 1),
 (3, 'UCI-01', 2, 2, 1, 1), (4, 'UCI-02', 2, 2, 4, 1), (5, 'UCI-03', 2, 2, 5, 1),
-(6, 'OBS-01', 3, 3, 1, 1), (7, 'OBS-02', 3, 3, 1, 1), (8, 'OBS-03', 3, 3, 3, 1);
+(6, 'OBS-01', 3, 3, 1, 1), (7, 'OBS-02', 3, 3, 1, 1), (8, 'OBS-03', 3, 3, 3, 1),
+(9, 'TRA-03', 1, 1, 1, 1), (10, 'TRA-04', 1, 1, 1, 1),
+(11, 'UCI-04', 2, 2, 1, 1), (12, 'UCI-05', 2, 2, 1, 1), (13, 'UCI-06', 2, 2, 1, 1),
+(14, 'OBS-04', 3, 3, 1, 1), (15, 'OBS-05', 3, 3, 1, 1), (16, 'OBS-06', 3, 3, 1, 1), (17, 'OBS-07', 3, 3, 1, 1),
+(18, 'OBS-08', 3, 3, 1, 1), (19, 'OBS-09', 3, 3, 1, 1), (20, 'OBS-10', 3, 3, 1, 1),
+(21, 'HOS-01', 4, 4, 1, 1), (22, 'HOS-02', 4, 4, 1, 1), (23, 'HOS-03', 4, 4, 1, 1), (24, 'HOS-04', 4, 4, 1, 1),
+(25, 'HOS-05', 4, 4, 1, 1), (26, 'HOS-06', 4, 4, 1, 1), (27, 'HOS-07', 4, 4, 1, 1), (28, 'HOS-08', 4, 4, 1, 1),
+(29, 'HOS-09', 4, 4, 1, 1), (30, 'HOS-10', 4, 4, 1, 1);
 
 -- ==============================================================================
 -- 3. DATOS TRANSACCIONALES

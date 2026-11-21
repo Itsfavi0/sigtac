@@ -288,8 +288,9 @@ def ejecutar_flujo(otra_pc):
     comprobar(f"la cola de cama está ordenada por nivel ({niveles})", niveles == sorted(niveles) and None not in niveles)
     comprobar("el primero de la cola es nivel 2 (Carlos, episodio 2 o el NN reclasificado)", niveles[0] == 2)
     compatibles = [c.codigo for c in camas.camas_compatibles(2)]
-    comprobar(f"camas compatibles con nivel 2: UCI y observación, no trauma shock ({compatibles})",
-              compatibles == ["OBS-01", "OBS-02", "UCI-01"] or set(compatibles) == {"UCI-01", "OBS-01", "OBS-02"})
+    comprobar(f"camas compatibles con nivel 2: solo UCI y observación, con las del seed disponibles ({compatibles})",
+              {"UCI-01", "OBS-01", "OBS-02"} <= set(compatibles)
+              and all(codigo.startswith(("UCI-", "OBS-")) for codigo in compatibles))
     comprobar("asignar una cama de trauma shock a un nivel 2 se rechaza",
               "compatible" in str(lanza(ReglaNegocioError, camas.asignar, 2, 2)))
     comprobar("un enfermero no puede asignar camas", lanza(UsuarioSinPermisoError, CamaController(enfermero).asignar, 2, 3))

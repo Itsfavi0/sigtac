@@ -10,8 +10,7 @@ Dura unos 5 minutos. Una persona maneja la PC y otra explica; quien maneja no ha
 
 1. **Recargar los datos** (lo hace Favio, con su cuenta de administrador de MySQL):
    ```bash
-   mysql -u <admin> -p < db_scripts/seed.sql
-   mysql -u <admin> -p < db_scripts/demo_camas.sql     # opcional: 22 camas más, para que el tablero se vea lleno
+   mysql -u <admin> -p < db_scripts/seed.sql           # incluye las 30 camas del tablero
    ```
    `seed.sql` borra todo lo anterior. Hay que volver a cargarlo **después de cada ensayo**, porque el paciente de
    la demo ya quedaría registrado.

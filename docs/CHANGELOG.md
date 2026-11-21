@@ -5,6 +5,33 @@
 
 ---
 
+## [2026-11-21] — Las camas de la demo pasan al seed
+
+### Cambio
+- **`db_scripts/seed.sql`:** la tabla `cama` pasa de 8 a 30 camas (ids 9 a 30 nuevos: TRA-03/04, UCI-04 a 06, OBS-04 a 10 y HOS-01 a 10). Todas nuevas están `DISPONIBLE`.
+- **`db_scripts/demo_camas.sql`:** eliminado; ya no hace falta cargar un segundo script.
+- **`scripts/verificar_controladores.py`:** la comprobación de «camas compatibles con nivel 2» ya no espera exactamente 3 camas, sino que incluya UCI-01, OBS-01 y OBS-02 y que todas sean UCI u Observación.
+
+### Archivos afectados
+- `db_scripts/seed.sql`, `db_scripts/demo_camas.sql` (borrado), `scripts/verificar_controladores.py`
+- `docs/sustentacion/GUION_DEMO.md`, `docs/sustentacion/README.md`, `docs/PROJECT_STATUS.md`, `docs/diseno/BRIEF.md`
+
+### Motivo
+Tener un solo comando para cargar los datos de la presentación del 21/11 y no depender de acordarse de un script opcional.
+
+### Impacto
+- Los ids 1 a 8 y sus estados no cambian, así que los episodios, asignaciones e historial del seed siguen igual.
+- Hospitalización ahora tiene camas (antes el seed no tenía ninguna); sirven para niveles 3 a 5.
+
+### Decisiones
+- **Se revierte la decisión del 2026-11-11** (camas en un script aparte por riesgo): el único punto del script de verificación que dependía de la cantidad de camas se ajustó, y el resto compara contra la BD.
+- **Las nuevas son todas `DISPONIBLE`:** una cama ocupada necesita su paciente y su asignación.
+
+### Pendientes
+- **No se ejecutó contra MySQL:** correr `python scripts/verificar_controladores.py` y recargar `seed.sql` en el ensayo.
+
+---
+
 ## [2026-11-11] — Material para la sustentación del avance (21/11)
 
 ### Cambio

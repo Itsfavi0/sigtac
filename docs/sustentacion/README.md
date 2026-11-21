@@ -40,5 +40,4 @@ Si el profesor da menos tiempo, se recorta la demo a los pasos 1, 2, 4, 5 y 10 d
 ## Otros archivos
 
 - `recorrido.gif`: las 8 pantallas, una cada 2,5 segundos. Sirve para la portada del Canva.
-- `../../db_scripts/demo_camas.sql`: 22 camas más para la demo (opcional; ver el guion).
 - `../../SIGTAC_Proyecto_POO_II_v2.docx`: copia actualizada del informe (no está en el repositorio).

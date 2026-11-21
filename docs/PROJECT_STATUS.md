@@ -184,7 +184,7 @@ Al empezar una sesión: leer `CLAUDE.md`, esta sección y las dos o tres primera
 
 0. **Avance del sábado 21/11/2026** (lo que pide `puntos_poo2_pc03.pdf`): el material está en `docs/sustentacion/` (empezar por su `README.md`). Falta:
    - **ensayar el guion** (`GUION_DEMO.md`) contra MySQL, con cronómetro, y corregir lo que no coincida;
-   - recargar `seed.sql` y, si se quiere el tablero lleno, `db_scripts/demo_camas.sql` (sin ejecutar todavía);
+   - recargar `seed.sql` (ya trae las 30 camas del tablero; sin ejecutar todavía);
    - que cada integrante estudie su hoja (`HOJAS_DE_ESTUDIO.md`) y pasar `DIAPOSITIVAS.md` al Canva;
    - revisar la copia del informe `SIGTAC_Proyecto_POO_II_v2.docx` (pendientes en el CHANGELOG del 2026-11-11);
    - confirmar si el profesor hizo más observaciones que la de migrar de motor de base de datos.
