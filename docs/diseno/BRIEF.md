@@ -10,7 +10,7 @@
 |---|---|
 | Modo de color | Claro por defecto; el oscuro del Figma, corregido, como modo opcional para la noche |
 | Flujo de triaje | **Unificado**: en «Triaje» se busca o registra al paciente, se abre el episodio y se tría en una sola pantalla |
-| Tamaño del tablero | Debe verse bien con **30 a 40 camas** |
+| Tamaño del tablero | Debe verse bien con **30 a 80 camas** (el seed de la demo trae 80) |
 | Pantallas | Login, ventana principal, tablero, triaje y pacientes |
 | Identidad | Solo la marca SIGTAC |
 | Personalidad (tras la crítica D3) | **Señalética de triaje**: los 5 colores del triaje son el protagonista visual; todo lo demás es sobrio y neutro |
@@ -73,7 +73,7 @@
   - Los tres primeros salen del mapa y de la cola, así que **los ve cualquier rol**. La espera promedio
     necesita el permiso de reportes: para los demás roles, esa tarjeta muestra «En espera de triaje».
 - **Mapa:**
-  - 30 a 40 camas agrupadas por tipo (Trauma shock, UCI, Observación, Hospitalización);
+  - 30 a 80 camas agrupadas por tipo (Trauma shock, UCI, Observación, Hospitalización);
   - cada casilla muestra el código y el estado escrito en letra legible, con el color del estado;
   - una leyenda con los 5 estados.
   - **Solo lectura:** las casillas no reaccionan al clic, para no prometer una acción que todavía no existe

@@ -7,26 +7,31 @@ Todo lo que el profesor pide está en `puntos_poo2_pc03.pdf` (8 criterios y los 
 |---|---|---|
 | [CRITERIOS.md](CRITERIOS.md) | Qué mostrar en cada uno de los 8 criterios, con el código real | Todos |
 | [OBSERVACIONES.md](OBSERVACIONES.md) | La observación de la primera presentación (migrar de motor de BD) y cómo se atendió | Todos; la expone Renzo |
+| [GUION_EXPOSICION.md](GUION_EXPOSICION.md) | **Orden y tiempos de la exposición completa (unos 35 min), minuto a minuto, y la versión corta** | Todos |
+| [PREGUNTAS_PROFESOR.md](PREGUNTAS_PROFESOR.md) | **Banco de preguntas «¿dónde aplicaste X?» / «¿por qué esto y no esto?», con la fórmula de 4 partes** | Todos; Favio dirige |
 | [GUION_DEMO.md](GUION_DEMO.md) | Paso a paso de la demostración en vivo, con los datos que se escriben | Quien maneja la PC |
 | [HOJAS_DE_ESTUDIO.md](HOJAS_DE_ESTUDIO.md) | Qué expone cada integrante y las preguntas que le pueden hacer | Cada uno, la suya |
 | [TABLA_PRUEBAS.md](TABLA_PRUEBAS.md) | Los casos probados y su resultado | Todos |
 | [DIAPOSITIVAS.md](DIAPOSITIVAS.md) | El texto de cada diapositiva, para pasarlo al Canva | Quien edita el Canva |
 | `capturas/` | Capturas de cada pantalla (datos de demostración) | Canva y Word |
 
-## Orden de la exposición (15 minutos)
+## Orden de la exposición (unos 35 minutos, sin máximo)
 
 | Min | Parte | Criterio | Expone |
 |---|---|---|---|
-| 0–1 | Qué es SIGTAC y qué problema resuelve | — | Favio |
-| 1–3 | Observación de la primera presentación y cómo se atendió | 1 | Renzo |
-| 3–5 | Clases principales | 2 | Ian |
-| 5–6 | Encapsulamiento | 3 | Ian |
-| 6–8 | Relaciones: herencia, polimorfismo, composición | 4 | Percy |
-| 8–13 | Demo en vivo, con los tres rechazos | 5 y 6 | Favio maneja; Leonardo explica las pantallas |
-| 13–14 | Organización del código | 7 | Leonardo |
-| 14–15 | Una decisión técnica y aportes adicionales | 8 | Favio y Renzo |
+| 0–2 | Qué es SIGTAC y qué problema resuelve | — | Favio |
+| 2–5 | Observación de la primera presentación y cómo se atendió | 1 | Renzo |
+| 5–9 | Clases principales | 2 | Ian |
+| 9–12 | Encapsulamiento | 3 | Ian |
+| 12–18 | Relaciones: herencia, polimorfismo, Strategy, composición, colaboración | 4 | Percy |
+| 18–27 | Demo en vivo, con los tres rechazos | 5 y 6 | Favio maneja; Leonardo explica las pantallas |
+| 27–30 | Organización del código | 7 | Leonardo |
+| 30–34 | «Por qué esto y no esto»: 4 decisiones técnicas | 8 | Favio |
+| 34–36 | Aportes adicionales y cierre | — | Renzo |
+| 36 → | Preguntas (Favio dirige) | 8 | Quien expuso el tema |
 
-Si el profesor da menos tiempo, se recorta la demo a los pasos 1, 2, 4, 5 y 10 del guion.
+Detalle minuto a minuto y versión corta: [GUION_EXPOSICION.md](GUION_EXPOSICION.md).
+Las diapositivas ([DIAPOSITIVAS.md](DIAPOSITIVAS.md)) siguen el orden de 15 minutos: hay que ampliarlas a este orden.
 
 ## Antes del día
 
