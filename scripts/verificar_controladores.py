@@ -334,7 +334,9 @@ def ejecutar_flujo(otra_pc):
 
     print("\n--- Limpieza")
     pendientes = [s.id_solicitud for s in camas_limpieza.solicitudes_limpieza()]
-    comprobar(f"la bandeja tiene la del seed y la del alta ({pendientes})", pendientes == [1, id_sol])
+    pendientes_bd = valor("SELECT COUNT(*) FROM solicitud_limpieza WHERE fecha_atencion IS NULL")
+    comprobar(f"la bandeja tiene las del seed (con la 1) y la del alta ({pendientes})",
+              pendientes[0] == 1 and id_sol in pendientes and len(pendientes) == pendientes_bd)
     comprobar("un médico no confirma limpiezas (RN-08)", lanza(UsuarioSinPermisoError, camas.confirmar_limpieza, id_sol))
     camas_limpieza.confirmar_limpieza(id_sol)
     comprobar("confirmar_limpieza: cama DISPONIBLE, solicitud atendida por el empleado 4",

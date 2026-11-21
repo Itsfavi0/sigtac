@@ -5,6 +5,69 @@
 
 ---
 
+## [2026-11-21] — Exposición completa y banco de preguntas del profesor
+
+### Cambio
+- **`docs/sustentacion/GUION_EXPOSICION.md`** (nuevo): orden y tiempos minuto a minuto de una exposición de unos 35 minutos, con la versión corta de 18 y el ensayo previo.
+- **`docs/sustentacion/PREGUNTAS_PROFESOR.md`** (nuevo): unas 30 preguntas «¿dónde aplicaste X?» / «¿por qué esto y no esto?», cada una con la fórmula dónde → por qué → qué se descartó → qué costó, y las referencias a archivo y línea verificadas.
+- **`docs/sustentacion/README.md`:** nuevo orden de la exposición y tabla de archivos.
+- **`docs/sustentacion/GUION_DEMO.md`:** el botón «Registrar la llegada» se llama «Llegó a la cama» en la pantalla; la demo dura 9 minutos.
+
+### Archivos afectados
+- `docs/sustentacion/` (2 archivos nuevos y 2 modificados), `docs/CHANGELOG.md`
+
+### Motivo
+El profesor hace preguntas de diseño («¿dónde aplicaste polimorfismo?», «¿por qué esto y no esto?») y el equipo necesita responderlas con la misma estructura y desde el código real. La documentación vigente cubría 15 minutos y llegaba sin ensayo.
+
+### Impacto
+Solo documentación. `python -m pytest` del 21/11/2026: 2 331 pasan y 1 se omite (solo corre en Windows).
+
+### Decisiones
+- `obtener_resumen()` no se presenta como ejemplo de polimorfismo: ninguna pantalla lo llama, solo las pruebas.
+- `ReglaMINSA` se declara como implementada y probada, sin selector en la aplicación.
+- Las preguntas sobre IA y sobre los commits quedan como respuesta propuesta: el equipo debe confirmarla.
+
+### Pendientes
+- Ampliar `DIAPOSITIVAS.md` al nuevo orden (están pensadas para 15 minutos).
+- Un ensayo completo de la demo con cronómetro.
+
+---
+
+## [2026-11-21] — Seed más variado: 80 camas y 76 pacientes
+
+### Cambio
+- **`db_scripts/seed.sql`:**
+  - Camas: de 30 a 80 (Trauma Shock 8, UCI 16, Observación 28 y Hospitalización 28). Estados: 26 disponibles, 37 ocupadas, 5 reservadas, 7 en limpieza y 5 fuera de servicio. En la pantalla del tablero (1915 px de ancho) 40 camas ocupaban solo la mitad del espacio.
+  - Pacientes: de 5 a 76, con 70 episodios nuevos (ids 4 a 74): 7 esperan triaje (un NN incluido), 11 esperan cama (niveles 2 a 5), 42 están en atención con su cama (37 ocupadas y 5 reservadas) y 14 terminaron (10 altas, 2 referidos y 2 fugas). Todos ingresaron en las últimas 24 horas.
+  - Cada episodio con triaje trae sus signos vitales, síntomas y, si corresponde, su asignación; hay 7 reclasificaciones con justificación (RN-10). Las solicitudes de limpieza pasan de 1 a 11 (7 pendientes y 4 atendidas); el historial de camas y la bitácora crecen en consecuencia.
+  - **OBS-03** estaba ocupada sin paciente ni asignación; ahora la ocupa el paciente 30.
+  - Los datos nuevos salen de un generador de semilla fija (no se versiona); el archivo queda como SQL plano.
+- **`scripts/verificar_controladores.py`:** la bandeja de limpieza ya no espera exactamente `[1, id_sol]`: comprueba que la solicitud 1 y la del alta estén y que el total coincida con la BD.
+- **`docs/sustentacion/GUION_DEMO.md`:** tabla «Cómo queda la guardia» y los pasos 8 y 12 piden elegir por nombre o por cama.
+
+### Archivos afectados
+- `db_scripts/seed.sql`, `scripts/verificar_controladores.py`
+- `docs/sustentacion/GUION_DEMO.md`, `docs/diseno/BRIEF.md`, `docs/CHANGELOG.md`
+
+### Motivo
+Un tablero, una cola y unos reportes con tres o cuatro filas no muestran el sistema. Con más gente en cada estado se ve el ciclo completo (espera, atención, alta, limpieza) en la presentación.
+
+### Impacto
+- Los ids 1 a 8 de camas, los pacientes 1 a 5 y los episodios 1 a 3 no cambian (el script de verificación los usa). La paciente 4 sigue sin episodios, TRA-02, UCI-01, OBS-01 y OBS-02 siguen disponibles y la cola de cama no tiene nivel 1 (se verifica «el primero de la cola es nivel 2»).
+- Los niveles sugeridos de todos los triajes nuevos coinciden con `ReglaManchester` y los datos cumplen las claves foráneas, RN-05 y la compatibilidad cama–nivel (comprobado con un script que lee el seed; **no** contra MySQL).
+- Con la mitad de las camas ocupadas el rojo pesa en la matriz (pendiente ya anotado el 2026-11-10 sobre la paleta). En una pantalla pequeña (1093 × 540) 80 camas no caben y la matriz usa su barra de desplazamiento.
+
+### Decisiones
+- **Ningún paciente de nivel 1 en la cola de cama:** `verificar_controladores.py` espera que el primero sea de nivel 2; los de nivel 1 que hay ya tienen cama o fueron referidos.
+- **Sin empleados nuevos:** las asignaciones usan los empleados 2 y 7, y las limpiezas atendidas el 4.
+- **Documentos distintos a los del guion y del script:** ningún DNI nuevo coincide con 45678912/45678913 (demo), 72345678 ni 73456789 (los crea el script de verificación).
+
+### Pendientes
+- **No se cargó en MySQL:** recargar `seed.sql` y correr `python scripts/verificar_controladores.py` con la cuenta de administrador.
+- Volver a mirar el tablero y la cola con el seed nuevo (capturas de `docs/sustentacion/capturas/` son de los datos de demostración).
+
+---
+
 ## [2026-11-21] — Las camas de la demo pasan al seed
 
 ### Cambio

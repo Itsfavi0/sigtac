@@ -143,7 +143,7 @@
   seed.
 - ~~**«Criterios detectados»**~~ Decidido (2026-10-27): se amplía la estrategia para que devuelva los motivos.
   Es un cambio de lógica, con sus pruebas, que va antes del prototipo de la pantalla de triaje.
-- **Datos de la demo:** el seed tiene 30 camas (ampliado el 2026-11-21) para que el tablero luzca en el
+- **Datos de la demo:** el seed tiene 80 camas y 76 pacientes (ampliado el 2026-11-21) para que el tablero luzca en el
   proyector.
 - **Errores junto al campo:** hoy los modelos lanzan `ValueError` con un mensaje. Mostrar el error junto al
   campo exige saber de qué campo es: hay que decidir cómo se asocia el mensaje a su campo.
