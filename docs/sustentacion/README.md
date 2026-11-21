@@ -9,6 +9,8 @@ Todo lo que el profesor pide está en `puntos_poo2_pc03.pdf` (8 criterios y los 
 | [OBSERVACIONES.md](OBSERVACIONES.md) | La observación de la primera presentación (migrar de motor de BD) y cómo se atendió | Todos; la expone Renzo |
 | [GUION_EXPOSICION.md](GUION_EXPOSICION.md) | **Orden y tiempos de la exposición completa (unos 35 min), minuto a minuto, y la versión corta** | Todos |
 | [PREGUNTAS_PROFESOR.md](PREGUNTAS_PROFESOR.md) | **Banco de preguntas «¿dónde aplicaste X?» / «¿por qué esto y no esto?», con la fórmula de 4 partes** | Todos; Favio dirige |
+| [tarjetas/](tarjetas/) | **Una hoja por persona** (`RENZO.md`, `IAN.md`, `PERCY.md`, `LEONARDO.md`): su parte en orden, qué no decir y qué hacer si se bloquea | Cada uno, la suya |
+| [GUION_FAVIO.md](GUION_FAVIO.md) | **Guion del que audita: reglas para intervenir, alarmas y rescates por bloque, y datos de bolsillo** | Favio |
 | [GUION_DEMO.md](GUION_DEMO.md) | Paso a paso de la demostración en vivo, con los datos que se escriben | Quien maneja la PC |
 | [HOJAS_DE_ESTUDIO.md](HOJAS_DE_ESTUDIO.md) | Qué expone cada integrante y las preguntas que le pueden hacer | Cada uno, la suya |
 | [TABLA_PRUEBAS.md](TABLA_PRUEBAS.md) | Los casos probados y su resultado | Todos |
